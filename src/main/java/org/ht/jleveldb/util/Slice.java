@@ -11,8 +11,17 @@ public class Slice {
 		
 	}
 
+	public Slice(Slice s) {
+		init(s);
+	}
+	
+	public Slice(String s) {
+		byte[] b = s.getBytes();
+		init(b, 0, b.length);
+	}
+	
 	public Slice(ByteBuf buf) {
-		init(buf.data(), 0, buf.size());
+		init(buf);
 	}
 	
 	public Slice(byte[] data, int offset, int size) {
@@ -23,6 +32,14 @@ public class Slice {
 		this.data = data;
 		this.offset = offset;
 		this.limit = offset + size;
+	}
+	
+	public void init(Slice s) {
+		init(s.data, s.offset, s.size());
+	}
+	
+	public void init(ByteBuf buf) {
+		init(buf.data(), 0, buf.size());
 	}
 	
 	public byte getByte(int idx) {
@@ -54,6 +71,11 @@ public class Slice {
 	
 	public void clear() {
 		//TODO
+	}
+	
+	@Override
+	public Slice clone() {
+		return new Slice(this);
 	}
 	
 	final public static int memcmp(byte[] a, int aoff, byte[] b, int boff, int size) {

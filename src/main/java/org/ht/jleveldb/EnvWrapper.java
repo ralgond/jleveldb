@@ -115,6 +115,11 @@ public class EnvWrapper implements Env {
 	public Status writeStringToFile(Slice data, String fname) {
 		return target.writeStringToFile(data, fname);
 	}
+	
+	@Override
+	public Status writeStringToFileSync(Slice data, String fname) {
+		return target.writeStringToFileSync(data, fname);
+	}
 
 	@Override
 	public Status readFileToString(String fname, ByteBuf data) {

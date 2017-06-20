@@ -116,7 +116,7 @@ public class VersionSetGlobal {
 		  int index = 0;
 		  if (smallestUserKey != null) {
 			  // Find the earliest possible internal key for smallest_user_key
-			  InternalKey small = new InternalKey(smallestUserKey, DBFormat.MaxSequenceNumber, DBFormat.ValueTypeForSeek);
+			  InternalKey small = new InternalKey(smallestUserKey, DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek);
 			  index = findFile(icmp, files, small.encode());
 		  }
 

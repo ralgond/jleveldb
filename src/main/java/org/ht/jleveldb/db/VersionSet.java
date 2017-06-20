@@ -364,7 +364,7 @@ public class VersionSet {
 	
 	public int numLevelFiles(int level) {
 		assert(level >= 0);
-		assert(level < DBFormat.NumLevels);
+		assert(level < DBFormat.kNumLevels);
 		return current.files[level].size();
 	}
 	  
@@ -375,7 +375,7 @@ public class VersionSet {
 	 */
 	public long numLevelBytes(int level) {
 		assert(level >= 0);
-		assert(level < DBFormat.NumLevels);
+		assert(level < DBFormat.kNumLevels);
 		return VersionSetGlobal.totalFileSize(current.files[level]);
 	}
 	
@@ -440,7 +440,7 @@ public class VersionSet {
 		if (sizeCompaction) {
 		    level = current.compactionLevel;
 		    assert(level >= 0);
-		    assert(level+1 < DBFormat.NumLevels);
+		    assert(level+1 < DBFormat.kNumLevels);
 		    c = new Compaction(options, level);
 
 		    // Pick the first file that comes after compact_pointer_[level]
@@ -551,7 +551,7 @@ public class VersionSet {
 	public long maxNextLevelOverlappingBytes() {
 		long result = 0;
 		ArrayList<FileMetaData> overlaps = new ArrayList<FileMetaData>();
-		for (int level = 1; level < DBFormat.NumLevels - 1; level++) {
+		for (int level = 1; level < DBFormat.kNumLevels - 1; level++) {
 		    for (int i = 0; i < current.files[level].size(); i++) {
 		    	FileMetaData f = current.files[level].get(i);
 		    	current.getOverlappingInputs(level+1, f.smallest, f.largest, overlaps);
@@ -631,7 +631,7 @@ public class VersionSet {
 	 */
 	public void addLiveFiles(Set<Long> live) {
 		for (Version v = dummyVersions.next; v != dummyVersions; v = v.next) {
-			for (int level = 0; level < DBFormat.NumLevels; level++) {
+			for (int level = 0; level < DBFormat.kNumLevels; level++) {
 				ArrayList<FileMetaData> files = v.files[level];
 			    for (int i = 0; i < files.size(); i++) {
 			    	live.add(files.get(i).number);
@@ -647,7 +647,7 @@ public class VersionSet {
 	 */
 	public long approximateOffsetOf(Version v, InternalKey ikey) {
 		long result = 0;
-		for (int level = 0; level < DBFormat.NumLevels; level++) {
+		for (int level = 0; level < DBFormat.kNumLevels; level++) {
 			ArrayList<FileMetaData> files = v.files[level];
 		    for (int i = 0; i < files.size(); i++) {
 		    	if (icmp.compare(files.get(i).largest, ikey) <= 0) {
@@ -723,7 +723,7 @@ public class VersionSet {
 		int bestLevel = -1;
 		double bestScore = -1.0;
 
-		for (int level = 0; level < DBFormat.NumLevels-1; level++) {
+		for (int level = 0; level < DBFormat.kNumLevels-1; level++) {
 		    double score;
 		    if (level == 0) {
 		      // We treat level-0 specially by bounding the number of files
@@ -738,7 +738,7 @@ public class VersionSet {
 		      // setting, or very high compression ratios, or lots of
 		      // overwrites/deletions).
 		      score = v.files[level].size() /
-		          (double)(DBFormat.L0_CompactionTrigger);
+		          (double)(DBFormat.kL0_CompactionTrigger);
 		    } else {
 		    	// Compute the ratio of current size to size limit.
 		    	long level_bytes = VersionSetGlobal.totalFileSize(v.files[level]);
@@ -836,7 +836,7 @@ public class VersionSet {
 
 		// Compute the set of grandparent files that overlap this compaction
 		// (parent == level+1; grandparent == level+2)
-		if (level + 2 < DBFormat.NumLevels) {
+		if (level + 2 < DBFormat.kNumLevels) {
 			current.getOverlappingInputs(level + 2, allStart, allLimit, c.grandparents);
 		}
 
@@ -863,7 +863,7 @@ public class VersionSet {
 		  edit.setComparatorName(icmp.userComparator().name());
 
 		  // Save compaction pointers
-		  for (int level = 0; level < DBFormat.NumLevels; level++) {
+		  for (int level = 0; level < DBFormat.kNumLevels; level++) {
 			  if (!compactPointer[level].empty()) {
 				  InternalKey key = new InternalKey();
 				  key.decodeFrom(compactPointer[level]);
@@ -872,7 +872,7 @@ public class VersionSet {
 		  }
 
 		  // Save files
-		  for (int level = 0; level < DBFormat.NumLevels; level++) {
+		  for (int level = 0; level < DBFormat.kNumLevels; level++) {
 			  ArrayList<FileMetaData> files = current.files[level];
 		   	  for (int i = 0; i < files.size(); i++) {
 		   		  FileMetaData f = files.get(i);
@@ -907,5 +907,5 @@ public class VersionSet {
 	 *  Per-level key at which the next compaction at that level should start.
 	 *  Either an empty string, or a valid InternalKey.
 	 */
-	ByteBuf[] compactPointer = new ByteBuf[DBFormat.NumLevels];
+	ByteBuf[] compactPointer = new ByteBuf[DBFormat.kNumLevels];
 }

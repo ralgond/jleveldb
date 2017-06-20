@@ -28,7 +28,7 @@ public class Compaction {
 		for (int i = 0; i < inputs.length; i++)
 			inputs[i] = new ArrayList<FileMetaData>();
 				
-		for (int i = 0; i < DBFormat.NumLevels; i++) {
+		for (int i = 0; i < DBFormat.kNumLevels; i++) {
 		    levelPtrs[i] = 0;
 		}
 	}
@@ -110,7 +110,7 @@ public class Compaction {
 	public boolean isBaseLevelForKey(Slice userKey) {
 		// Maybe use binary search to find right entry instead of linear search?
 		final Comparator0 userCmp = inputVersion.vset.icmp.userComparator();
-		for (int lvl = level + 2; lvl < DBFormat.NumLevels; lvl++) {
+		for (int lvl = level + 2; lvl < DBFormat.kNumLevels; lvl++) {
 		    ArrayList<FileMetaData> files = inputVersion.files[lvl];
 		    for (; levelPtrs[lvl] < files.size(); ) {
 		    	FileMetaData f = files.get(levelPtrs[lvl]);
@@ -192,5 +192,5 @@ public class Compaction {
 	 * higher level than the ones involved in this compaction (i.e. for
 	 * all L >= level_ + 2).
 	 */
-	int levelPtrs[] = new int[DBFormat.NumLevels]; //TODO What should type int changed to be?
+	int levelPtrs[] = new int[DBFormat.kNumLevels]; //TODO What should type int changed to be?
 }

@@ -51,4 +51,9 @@ public class ParsedInternalKey {
 	    
 	    return true;
 	}
+	
+	public String debugString() {
+		//TODO
+		return null;
+	}
 };

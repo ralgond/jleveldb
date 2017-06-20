@@ -2,8 +2,8 @@ package org.ht.jleveldb;
 
 public enum CompressionType {
 	
-	NoCompression((byte)0x00),
-	SnappyCompression((byte)0x01);
+	kNoCompression((byte)0x00),
+	kSnappyCompression((byte)0x01);
 	
 	private byte type;
 	

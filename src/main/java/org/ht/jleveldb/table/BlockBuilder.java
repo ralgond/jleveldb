@@ -25,7 +25,7 @@ public class BlockBuilder {
 		lastKey.clear();
 	}
 	
-	public void add(Slice key, Slice value) throws Exception {
+	public void add(Slice key, Slice value) {
 		Slice lastKeyPiece = new Slice(lastKey);
 		assert(!finished);
 		assert(counter <= options.blockRestartInterval);
@@ -62,7 +62,7 @@ public class BlockBuilder {
 		counter++;
 	}
 	
-	public Slice finish() throws Exception {
+	public Slice finish() {
 		// Append restart array
 		for (int i = 0; i < restarts.size(); i++) {
 		    buffer.writeFixedNat32(restarts.get(i));

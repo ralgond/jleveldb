@@ -177,6 +177,9 @@ public interface Env {
 	 */
 	Status writeStringToFile(Slice data, String fname);
 	
+	
+	Status writeStringToFileSync(Slice data, String fname);
+	
 	/**
 	 * A utility routine: read contents of named file into data.
 	 * @param fname

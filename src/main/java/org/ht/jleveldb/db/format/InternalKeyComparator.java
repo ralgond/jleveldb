@@ -61,7 +61,7 @@ public class InternalKeyComparator extends Comparator0 {
 		    userComparator.compare(userStart, new Slice(tmp)) < 0) {
 			// User key has become shorter physically, but larger logically.
 		    // Tack on the earliest possible number to the shortened user key.
-			tmp.writeFixedNat64(packSequenceAndType(DBFormat.MaxSequenceNumber,DBFormat.ValueTypeForSeek));
+			tmp.writeFixedNat64(packSequenceAndType(DBFormat.kMaxSequenceNumber,DBFormat.kValueTypeForSeek));
 		    assert(this.compare(new Slice(start), new Slice(tmp)) < 0);
 		    assert(this.compare(new Slice(tmp), limit) < 0);
 		    start.swap(tmp);
@@ -77,7 +77,7 @@ public class InternalKeyComparator extends Comparator0 {
 		      userComparator.compare(userKey, new Slice(tmp)) < 0) {
 		    // User key has become shorter physically, but larger logically.
 		    // Tack on the earliest possible number to the shortened user key.
-			tmp.writeFixedNat64(packSequenceAndType(DBFormat.MaxSequenceNumber,DBFormat.ValueTypeForSeek));
+			tmp.writeFixedNat64(packSequenceAndType(DBFormat.kMaxSequenceNumber,DBFormat.kValueTypeForSeek));
 		    assert(this.compare(new Slice(key), new Slice(tmp)) < 0);
 		    key.swap(tmp);
 		}
@@ -88,8 +88,8 @@ public class InternalKeyComparator extends Comparator0 {
 	}
 	
 	static long packSequenceAndType(long seq, ValueType t) {
-		assert(seq <= DBFormat.MaxSequenceNumber);
-		assert(t.type <= DBFormat.ValueTypeForSeek.type);
+		assert(seq <= DBFormat.kMaxSequenceNumber);
+		assert(t.type <= DBFormat.kValueTypeForSeek.type);
 		return (seq << 8) | (t.type & 0xff);
 	}
 }

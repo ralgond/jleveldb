@@ -186,7 +186,7 @@ public class Options {
 		  blockSize = 4*1024;
 		  blockRestartInterval = 16;
 		  maxFileSize = 2*1024*1024;
-		  compression = CompressionType.SnappyCompression;
+		  compression = CompressionType.kSnappyCompression;
 	  }
 	  
 	  public Options cloneOptions() {

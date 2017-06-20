@@ -16,4 +16,13 @@ public enum ValueType {
     public byte type() {
     	return type;
     }
+    
+    public static ValueType create(byte type) {
+    	if (type == Deletion.type)
+    		return Deletion;
+    	else if (type == Value.type)
+    		return Value;
+    	else
+    		return null;
+    }
 };

@@ -1,11 +1,15 @@
 package org.ht.jleveldb.table;
 
+import org.ht.jleveldb.CompressionType;
 import org.ht.jleveldb.RandomAccessFile0;
 import org.ht.jleveldb.ReadOptions;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Coding;
+import org.ht.jleveldb.util.Crc32c;
+import org.ht.jleveldb.util.FuncOutputInt;
 import org.ht.jleveldb.util.Slice;
+import org.ht.jleveldb.util.Snappy;
 
 public class Format {
 	//BlockHandle is a pointer to the extent of a file that stores a data
@@ -81,15 +85,15 @@ public class Format {
 			dst.resize(2 * BlockHandle.MaxEncodedLength);  // Padding
 			dst.writeFixedNat32Long((kTableMagicNumber & 0xffffffffL));
 			dst.writeFixedNat32Long((kTableMagicNumber >> 32));
-			assert(dst.size() == originalSize + EncodedLength);
+			assert(dst.size() == originalSize + kEncodedLength);
 		}
 		
 		public Status decodeFrom(Slice input) {
-			const char* magic_ptr = input->data() + kEncodedLength - 8;
-			const uint32_t magic_lo = DecodeFixed32(magic_ptr);
-			const uint32_t magic_hi = DecodeFixed32(magic_ptr + 4);
-			const uint64_t magic = ((static_cast<uint64_t>(magic_hi) << 32) |
-			                          (static_cast<uint64_t>(magic_lo)));
+			byte[] data = input.data();
+			int magicOffset = kEncodedLength - 8; //const char* magic_ptr = input->data() + kEncodedLength - 8;
+			long magic_lo = (Coding.decodeFixedNat32(data, magicOffset) & 0xffffffffL);
+			long magic_hi = (Coding.decodeFixedNat32(data, magicOffset + 4) & 0xffffffffL);
+			long magic = ((magic_hi << 32) | magic_lo);
 			if (magic != kTableMagicNumber) {
 				return Status.corruption("not an sstable (bad magic number)");
 			}
@@ -100,8 +104,8 @@ public class Format {
 			}
 			if (result.ok()) {
 				// We skip over any leftover data (just padding for now) in "input"
-			    const char* end = magic_ptr + 8;
-			    *input = Slice(end, input->data() + input->size() - end);
+			    int end = magicOffset + 8;
+			    input.init(data, end, input.size() - 8);
 			}
 			return result;
 		}
@@ -109,7 +113,7 @@ public class Format {
 		// Encoded length of a Footer.  Note that the serialization of a
 		// Footer will always occupy exactly this many bytes.  It consists
 		// of two block handles and a magic number.
-		public static final int EncodedLength = 2 * BlockHandle.MaxEncodedLength + 8;
+		public static final int kEncodedLength = 2 * BlockHandle.MaxEncodedLength + 8;
 	}
 
 	// kTableMagicNumber was picked by running
@@ -132,7 +136,74 @@ public class Format {
             ReadOptions options,
             BlockHandle handle,
             BlockContents result) {
-		//TODO
-		return null;
+		result.data = new Slice();
+		result.cachable = false;
+		result.heapAllocated = false;
+		
+		// Read the block contents as well as the type/crc footer.
+		// See table_builder.cc for the code that built this structure.
+		int n = (int)handle.size();
+		byte[] buf = new byte[n + kBlockTrailerSize];
+		Slice contents = new Slice();
+		Status s = file.read(handle.offset(), n + kBlockTrailerSize, contents, buf);
+		if (!s.ok()) {
+		    buf = null;
+		    return s;
+		}
+		if (contents.size() != n + kBlockTrailerSize) {
+		    buf = null;
+		    return Status.corruption("truncated block read");
+		}
+		
+		// Check the crc of the type and the block contents
+		byte[] data = contents.data();    // Pointer to where Read put the data
+		int offset = contents.offset;
+		if (options.verifyChecksums) {
+			long crc = Crc32c.unmask(Coding.decodeFixedNat32(data, offset + n + 1));
+		    long actual = Crc32c.value(data, offset, n + 1);
+		    if (actual != crc) {
+		    	buf = null;
+		    	s = Status.corruption("block checksum mismatch");
+		    	return s;
+		    }
+		}
+		
+	    if (data[n] == CompressionType.kNoCompression.getType()) {
+	    	if (data != buf) {
+    			// File implementation gave us pointer to some other data.
+    			// Use it directly under the assumption that it will be live
+    			// while the file is open.
+    			buf = null;
+    			result.data = new Slice(data, offset, n);
+    			result.heapAllocated = false;
+    			result.cachable = false;  // Do not double-cache
+    		} else {
+    			result.data = new Slice(buf, 0, n);
+    			result.heapAllocated = true;  //TODO: the logic behind this variable?
+    			result.cachable = true;
+    		}
+    	} else if (data[n] == CompressionType.kSnappyCompression.getType()) {
+    		FuncOutputInt ulength0 = new FuncOutputInt();
+	    	if (!Snappy.getUncompressedLength(data, 0, n, ulength0)) {
+	    		buf = null;
+	    		return Status.corruption("corrupted compressed block contents");
+	    	}
+	    	int ulength = ulength0.getValue();
+	    	byte[] ubuf = new byte[ulength];
+	    	if (!Snappy.uncompress(data, 0, n, ubuf)) {
+	    		buf = null;
+	    		ubuf = null;
+	    		return Status.corruption("corrupted compressed block contents");
+	    	}
+	    	buf = null;
+	    	result.data = new Slice(ubuf, 0, ulength);
+	    	result.heapAllocated = true;
+	    	result.cachable = true;
+		} else {
+    		buf = null;
+    		return Status.corruption("bad block type");
+	    }
+
+		return Status.ok0();
 	}
 }

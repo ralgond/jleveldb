@@ -134,13 +134,13 @@ public class Table {
             long size,
             FuncOutput<Table> table) {
 		table.setValue(null);
-		if (size < Footer.EncodedLength) {
+		if (size < Footer.kEncodedLength) {
 			return Status.corruption("file is too short to be an sstable");
 		}
 		
-		byte footerSpace[] = new byte[Footer.EncodedLength];
+		byte footerSpace[] = new byte[Footer.kEncodedLength];
 		Slice footerInput = new Slice();
-		Status s = file.read(size - Footer.EncodedLength, Footer.EncodedLength,
+		Status s = file.read(size - Footer.kEncodedLength, Footer.kEncodedLength,
 		                        footerInput, footerSpace);
 		if (!s.ok()) 
 			return s;

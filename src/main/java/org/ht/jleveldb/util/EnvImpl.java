@@ -592,25 +592,38 @@ public class EnvImpl implements Env {
 			e.printStackTrace();
 		}
 	}
+	
+	Status doWriteStringToFile(Slice data, String fname, boolean shouldSync) {
+		FuncOutput<WritableFile> file0 = new FuncOutput<WritableFile>();
+		Status s = newWritableFile(fname, file0);
+		if (!s.ok()) {
+			return s;
+		}
+		WritableFile file = file0.getValue();
+		s = file.append(data);
+		if (s.ok() && shouldSync) {
+			s = file.sync();
+		}
+		if (s.ok()) {
+			s = file.close();
+		}
+		file.delete();  // Will auto-close if we did not close above
+		if (!s.ok()) {
+			deleteFile(fname);
+		}
+		return s;
+	}
+
+	
 
 	@Override
 	public Status writeStringToFile(Slice data, String fname) {
-		DataOutputStream os = null;
-		try {
-			os = new DataOutputStream(new FileOutputStream(new File(fname)));
-			os.write(data.data, data.offset, data.size());
-			os.flush();
-			return Status.ok0();
-		} catch (Exception e) {
-			return Status.ioError(fname+" writeStringToFile failed: "+e.getMessage());
-		} finally {
-			try {
-				if (os != null)
-					os.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+		return doWriteStringToFile(data, fname, false);
+	}
+	
+	@Override
+	public Status writeStringToFileSync(Slice data, String fname) {
+		return doWriteStringToFile(data, fname, true);
 	}
 
 	@Override

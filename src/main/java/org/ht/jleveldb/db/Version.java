@@ -40,7 +40,7 @@ public class Version {
 		next.prev = prev;
 
 		// Drop references to files
-		for (int level = 0; level < DBFormat.NumLevels; level++) {
+		for (int level = 0; level < DBFormat.kNumLevels; level++) {
 		    for (int i = 0; i < files[level].size(); i++) {
 		    	FileMetaData f = files[level].get(i);
 		    	assert(f.refs > 0);
@@ -62,7 +62,7 @@ public class Version {
 		// For levels > 0, we can use a concatenating iterator that sequentially
 		// walks through the non-overlapping files in the level, opening them
 		// lazily.
-		for (int level = 1; level < DBFormat.NumLevels; level++) {
+		for (int level = 1; level < DBFormat.kNumLevels; level++) {
 		    if (!files[level].isEmpty()) {
 		    	iters.add(newConcatenatingIterator(options, level));
 		    }
@@ -132,7 +132,7 @@ public class Version {
 		// in an smaller level, later levels are irrelevant.
 		ArrayList<FileMetaData> tmp = new ArrayList<FileMetaData>();
 		FileMetaData tmp2;
-		for (int level = 0; level < DBFormat.NumLevels; level++) {
+		for (int level = 0; level < DBFormat.kNumLevels; level++) {
 			int numFiles = files[level].size();
 		    if (numFiles == 0) 
 		    	continue;
@@ -305,7 +305,7 @@ public class Version {
 	 */
 	public void getOverlappingInputs(int level, InternalKey begin, InternalKey end, List<FileMetaData> inputs) {
 		  assert(level >= 0);
-		  assert(level < DBFormat.NumLevels);
+		  assert(level < DBFormat.kNumLevels);
 		  inputs.clear();
 		  Slice userBegin = new Slice();
 		  Slice userEnd = new Slice();
@@ -369,14 +369,14 @@ public class Version {
 		if (!overlapInLevel(0, smallestUserKey, largestUserKey)) {
 		    // Push to next level if there is no overlap in next level,
 		    // and the #bytes overlapping in the level after that are limited.
-		    InternalKey start = new InternalKey(smallestUserKey, DBFormat.MaxSequenceNumber, DBFormat.ValueTypeForSeek);
+		    InternalKey start = new InternalKey(smallestUserKey, DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek);
 		    InternalKey limit = new InternalKey(largestUserKey, 0, ValueType.Deletion); //(ValueType)(0)
 		    ArrayList<FileMetaData> overlaps = new ArrayList<FileMetaData>();
-		    while (level < DBFormat.MaxMemCompactLevel) {
+		    while (level < DBFormat.kMaxMemCompactLevel) {
 		    	if (overlapInLevel(level + 1, smallestUserKey, largestUserKey)) {
 		    		break;
 		    	}
-		    	if (level + 2 < DBFormat.NumLevels) {
+		    	if (level + 2 < DBFormat.kNumLevels) {
 		    		// Check that file does not overlap too many grandparent bytes.
 		    		getOverlappingInputs(level + 2, start, limit, overlaps);
 		    		long sum = VersionSetGlobal.totalFileSize(overlaps);
@@ -426,7 +426,7 @@ public class Version {
 		}
 
 		// Search other levels.
-		for (int level = 1; level < DBFormat.NumLevels; level++) {
+		for (int level = 1; level < DBFormat.kNumLevels; level++) {
 		    int numFiles = files[level].size();
 		    if (numFiles == 0) continue;
 
@@ -493,6 +493,12 @@ public class Version {
 			this.icmp = icmp;
 			this.flist = flist;
 			index = flist.size();
+		}
+		
+		@Override
+		public void delete() {
+			icmp = null;
+			flist.clear();
 		}
 		
 		@Override

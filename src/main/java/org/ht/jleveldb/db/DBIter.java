@@ -56,7 +56,7 @@ public class DBIter extends Iterator0 {
 	// Pick next gap with average value of config::kReadBytesPeriod.
 	long randomPeriod() {
 	    //return rnd_.Uniform(2*config::kReadBytesPeriod);
-		return 0; //TODO
+		return (long)(rnd.nextDouble() * 2* DBFormat.kReadBytesPeriod);
 	}
 	
 	void findNextUserEntry(boolean skipping, ByteBuf skip) {
@@ -112,7 +112,7 @@ public class DBIter extends Iterator0 {
 						Slice rawValue = iter.value();
 						if (savedValue.capacity() > rawValue.size() + 1048576) {
 							ByteBuf empty = ByteBufFactory.defaultByteBuf();
-							swap(empty, savedValue);
+							empty.swap(savedValue); //swap(empty, savedValue); //TODO: logic? something trick of swap
 						}
 						saveKey(DBFormat.extractUserKey(iter.key()), savedKey);
 						savedValue.assign(rawValue.data(), rawValue.offset, rawValue.size());
@@ -156,7 +156,7 @@ public class DBIter extends Iterator0 {
 	final void clearSavedValue() {
 	    if (savedValue.capacity() > 1048576) {
 	    	ByteBuf empty = ByteBufFactory.defaultByteBuf();
-	    	swap(empty, savedValue); //TODO
+	    	empty.swap(savedValue); //swap(empty, savedValue); //TODO: logic? something trick of swap
 	    } else {
 	    	savedValue.clear();
 	    }
@@ -180,32 +180,91 @@ public class DBIter extends Iterator0 {
 
 	@Override
 	public void seekToFirst() {
-		// TODO Auto-generated method stub
-
+		direction = Direction.kForward;
+		clearSavedValue();
+		iter.seekToFirst();
+		if (iter.valid()) {
+		    findNextUserEntry(false, savedKey /* temporary storage */);
+		} else {
+		    valid = false;
+		}
 	}
 
 	@Override
 	public void seekToLast() {
-		// TODO Auto-generated method stub
-
+		direction = Direction.kReverse;
+		clearSavedValue();
+		iter.seekToLast();
+		findPrevUserEntry();
 	}
 
 	@Override
 	public void seek(Slice target) {
-		// TODO Auto-generated method stub
-
+		direction = Direction.kForward;
+		clearSavedValue();
+		savedKey.clear();
+		DBFormat.appendInternalKey(savedKey, new ParsedInternalKey(target, sequence, DBFormat.kValueTypeForSeek));
+		iter.seek(new Slice(savedKey));
+		if (iter.valid()) {
+			findNextUserEntry(false, savedKey /* temporary storage */);
+		} else {
+			valid = false;
+		}
 	}
 
 	@Override
 	public void next() {
-		// TODO Auto-generated method stub
+		assert(valid);
 
+		if (direction == Direction.kReverse) {  // Switch directions?
+		    direction = Direction.kForward;
+		    // iter_ is pointing just before the entries for this->key(),
+		    // so advance into the range of entries for this->key() and then
+		    // use the normal skipping code below.
+		    if (!iter.valid()) {
+		    	iter.seekToFirst();
+		    } else {
+		    	iter.next();
+		    }
+		    if (!iter.valid()) {
+		    	valid = false;
+		    	savedKey.clear();
+		    	return;
+		    }
+		    // saved_key_ already contains the key to skip past.
+		} else {
+		    // Store in saved_key_ the current key so we skip it below.
+		    saveKey(DBFormat.extractUserKey(iter.key()), savedKey);
+		}
+
+		findNextUserEntry(true, savedKey);
 	}
 
 	@Override
 	public void prev() {
-		// TODO Auto-generated method stub
+		assert(valid);
 
+		if (direction == Direction.kForward) {  // Switch directions?
+		    // iter_ is pointing at the current entry.  Scan backwards until
+		    // the key changes so we can use the normal reverse scanning code.
+		    assert(iter.valid());  // Otherwise valid_ would have been false
+		    saveKey(DBFormat.extractUserKey(iter.key()), savedKey);
+		    while (true) {
+		    	iter.prev();
+		    	if (!iter.valid()) {
+		    		valid = false;
+		    		savedKey.clear();
+		    		clearSavedValue();
+		    		return;
+		    	}
+		    	if (userComparator.compare(DBFormat.extractUserKey(iter.key()), savedKey) < 0) {
+		    		break;
+		    	}
+		    }
+		    direction = Direction.kReverse;
+		}
+		
+		findPrevUserEntry();
 	}
 
 	@Override
@@ -238,7 +297,6 @@ public class DBIter extends Iterator0 {
 	    Iterator0 internalIter,
 	    long sequence,
 	    int seed) {
-		//TODO
-		return null;
+		return new DBIter(db, userKeyComparator, internalIter, sequence, seed);
 	} 
 }

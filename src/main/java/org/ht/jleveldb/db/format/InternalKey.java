@@ -2,6 +2,7 @@ package org.ht.jleveldb.db.format;
 
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Slice;
+import org.ht.jleveldb.util.Strings;
 
 /**
  * Modules in this directory should keep internal keys wrapped inside
@@ -35,12 +36,10 @@ public class InternalKey {
 	
 	//TODO: reduce the copy frequency.
 	public Slice encode() {
-		//TODO
 		return new Slice(rep);
 	}
 	
 	public Slice userKey() {
-		//TODO
 		return DBFormat.extractUserKey(new Slice(rep));
 	}
 	
@@ -63,7 +62,14 @@ public class InternalKey {
 	}
 	
 	public String debugString() {
-		//TODO
-		return null;
+		String result;
+		ParsedInternalKey parsed = new ParsedInternalKey();
+		if (parsed.parse(new Slice(rep))) {
+			result = parsed.debugString();
+		} else {
+		    result = "(bad)";
+		    result += Strings.escapeString(rep);
+		}
+		return result;
 	}
 }

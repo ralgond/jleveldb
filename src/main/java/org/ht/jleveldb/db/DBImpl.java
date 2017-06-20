@@ -807,7 +807,7 @@ public class DBImpl implements DB {
 				      s = bgError.clone();
 				      break;
 				} else if (allowDelay &&
-				        versions.numLevelFiles(0) >= DBFormat.L0_SlowdownWritesTrigger) {
+				        versions.numLevelFiles(0) >= DBFormat.kL0_SlowdownWritesTrigger) {
 				      // We are getting close to hitting a hard limit on the number of
 				      // L0 files.  Rather than delaying a single write by several
 				      // seconds when we hit the hard limit, start delaying each
@@ -827,7 +827,7 @@ public class DBImpl implements DB {
 				      // one is still being compacted, so we wait.
 	//			      Log(options_.info_log, "Current memtable full; waiting...\n");
 				      bgCv.await();
-				 } else if (versions.numLevelFiles(0) >= DBFormat.L0_StopWritesTrigger) {
+				 } else if (versions.numLevelFiles(0) >= DBFormat.kL0_StopWritesTrigger) {
 				      // There are too many level-0 files.
 	//			      Log(options_.info_log, "Too many L0 files; waiting...\n");
 					 bgCv.await();
@@ -1216,7 +1216,7 @@ public class DBImpl implements DB {
 		ParsedInternalKey ikey = new ParsedInternalKey();
 		ByteBuf currentUserKey = ByteBufFactory.defaultByteBuf();
 		boolean hasCurrentUserKey = false;
-		long lastSequenceForKey = DBFormat.MaxSequenceNumber;
+		long lastSequenceForKey = DBFormat.kMaxSequenceNumber;
 		for (; input.valid() && shuttingDown.get() != null; ) { //shutting_down_.Acquire_Load()
 			// Prioritize immutable compaction work
 			if (hasImm.get() != null) { //has_imm_.NoBarrier_Load() != NULL
@@ -1244,13 +1244,13 @@ public class DBImpl implements DB {
 				// Do not hide error keys
 				currentUserKey.clear();
 				hasCurrentUserKey = false;
-				lastSequenceForKey = DBFormat.MaxSequenceNumber;
+				lastSequenceForKey = DBFormat.kMaxSequenceNumber;
 			} else {
 				if (!hasCurrentUserKey || userComparator().compare(ikey.userKey, new Slice(currentUserKey)) != 0) {
 					// First occurrence of this user key
 					currentUserKey.assign(ikey.userKey.data(), ikey.userKey.offset(), ikey.userKey.size());
 					hasCurrentUserKey = true;
-					lastSequenceForKey = DBFormat.MaxSequenceNumber;
+					lastSequenceForKey = DBFormat.kMaxSequenceNumber;
 				}
 				
 				if (lastSequenceForKey <= compact.smallestSnapshot) {
@@ -1408,7 +1408,7 @@ public class DBImpl implements DB {
 			bytesWritten += c.bytesWritten;
 		}
 	}
-	CompactionStats stats[] = new CompactionStats[DBFormat.NumLevels];
+	CompactionStats stats[] = new CompactionStats[DBFormat.kNumLevels];
 	
 	public Comparator0 userComparator() {
 		return internalComparator.userComparator();

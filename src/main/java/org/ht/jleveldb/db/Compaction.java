@@ -192,5 +192,5 @@ public class Compaction {
 	 * higher level than the ones involved in this compaction (i.e. for
 	 * all L >= level_ + 2).
 	 */
-	int levelPtrs[] = new int[DBFormat.kNumLevels]; //TODO What should type int changed to be?
+	int levelPtrs[] = new int[DBFormat.kNumLevels]; //What should type int changed to be?
 }

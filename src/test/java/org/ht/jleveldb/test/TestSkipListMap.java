@@ -14,16 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.ht.test.jleveldb;
+package org.ht.jleveldb.test;
 
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.ht.jleveldb.db.SkipListMap;
-import org.ht.jleveldb.db.SkipListMapComparator;
 import org.ht.jleveldb.db.SkipListMap.Node;
 import org.ht.jleveldb.util.ReflectionUtil;
 import org.junit.Test;
@@ -82,7 +82,7 @@ public class TestSkipListMap {
 		}
 	}
 	
-	SkipListMapComparator<Integer> comp = new SkipListMapComparator<Integer>() {
+	Comparator<Integer> comp = new Comparator<Integer>() {
 		@Override
 		final public int compare(Integer k1, Integer k2) {
 			return k1.compareTo(k2);

@@ -6,7 +6,7 @@ import org.ht.jleveldb.ReadOptions;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.Crc32c;
+import org.ht.jleveldb.util.Crc32C;
 import org.ht.jleveldb.util.FuncOutputInt;
 import org.ht.jleveldb.util.Slice;
 import org.ht.jleveldb.util.Snappy;
@@ -159,8 +159,8 @@ public class Format {
 		byte[] data = contents.data();    // Pointer to where Read put the data
 		int offset = contents.offset;
 		if (options.verifyChecksums) {
-			long crc = Crc32c.unmask(Coding.decodeFixedNat32(data, offset + n + 1));
-		    long actual = Crc32c.value(data, offset, n + 1);
+			long crc = Crc32C.unmask(Coding.decodeFixedNat32(data, offset + n + 1));
+		    long actual = Crc32C.value(data, offset, n + 1);
 		    if (actual != crc) {
 		    	buf = null;
 		    	s = Status.corruption("block checksum mismatch");

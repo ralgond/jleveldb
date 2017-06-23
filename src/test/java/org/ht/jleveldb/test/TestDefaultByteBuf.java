@@ -1,11 +1,15 @@
-package org.ht.test.jleveldb;
+package org.ht.jleveldb.test;
 
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.DefaultByteBuf;
 import org.ht.jleveldb.util.ReflectionUtil;
+import org.ht.jleveldb.util.Slice;
 
 public class TestDefaultByteBuf {
 	@Test
@@ -140,5 +144,20 @@ public class TestDefaultByteBuf {
 		assertTrue(buf.readVarNat64() == Short.MAX_VALUE);
 		assertTrue(buf.readVarNat32() == Integer.MAX_VALUE);
 		assertTrue(buf.readVarNat64() == 0);
+	}
+	
+	@Test
+	public void testResize() {
+		ByteBuf buf = ByteBufFactory.defaultByteBuf();
+		Slice s = new Slice("123456");
+		buf.append(s.data, s.offset, s.size());
+		
+		buf.resize(3);
+		//System.out.println(buf.encodeToString());
+		assertEquals("123", buf.encodeToString());
+		
+		buf.resize(5, (byte)0x30);
+		//System.out.println(buf.encodeToString());
+		assertEquals("12300", buf.encodeToString());
 	}
 }

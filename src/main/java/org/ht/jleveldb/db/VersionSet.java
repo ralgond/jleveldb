@@ -1,6 +1,9 @@
 package org.ht.jleveldb.db;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -22,10 +25,10 @@ import org.ht.jleveldb.table.Table;
 import org.ht.jleveldb.table.TwoLevelIterator;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
-import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.FuncOutput;
 import org.ht.jleveldb.util.FuncOutputBoolean;
 import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.IntLongPair;
 import org.ht.jleveldb.util.Mutex;
 import org.ht.jleveldb.util.Slice;
 
@@ -75,31 +78,179 @@ public class VersionSet {
 	
 	static class Builder {
 		
+		static class BySmallestKey implements Comparator<FileMetaData> {
+			InternalKeyComparator ikcmp;
+			public BySmallestKey(InternalKeyComparator ikcmp) {
+				this.ikcmp = ikcmp;
+			}
+			
+			public int compare(FileMetaData a, FileMetaData b) {
+				int r = ikcmp.compare(a.smallest, b.smallest);
+			    if (r != 0) {
+			        return r;
+			    } else {
+			        // Break ties by file number
+			        return Long.compare(a.number, b.number);
+			    }
+			}
+		}
+		
 		static class  LevelState {
 		    TreeSet<Long> deletedFiles;
-		    //FileSet* added_files;
+		    TreeSet<FileMetaData> addedFiles;
 		};
 		
+		VersionSet vset;
+		Version base;
+		LevelState[] levels = new LevelState[DBFormat.kNumLevels];
+		BySmallestKey cmp;
+		
 		public Builder(VersionSet vset, Version base) {
-			//TODO
+			base.ref();
+			this.vset = vset;
+			this.base = base;
+			cmp = new BySmallestKey(vset.icmp);
+			for (int level = 0; level < DBFormat.kNumLevels; level++) {
+			      levels[level].addedFiles = new TreeSet<FileMetaData>(cmp);
+			}
 		}
 		
 		public void delete() {
-			//TODO
+			for (int level = 0; level < DBFormat.kNumLevels; level++) {
+				TreeSet<FileMetaData> added = levels[level].addedFiles;
+			    ArrayList<FileMetaData> toUnref = new ArrayList<>();
+			    //toUnref.reserve(added->size());
+			    for (FileMetaData fmd : added) {
+			        toUnref.add(fmd);
+			    }
+			    added.clear();
+			    for (int i = 0; i < toUnref.size(); i++) {
+			        FileMetaData f = toUnref.get(i);
+			        f.refs--;
+			        if (f.refs <= 0) {
+			        	f.delete();// delete f;
+			        }
+			    }
+			}
+			base.unref();
 		}
 		
+		/**
+		 * Apply all of the edits in edit to the current state.
+		 * @param edit
+		 */
 		public void apply(VersionEdit edit) {
-			//TODO
+			//TODO(may bug): check once more time.
+			
+		    // Update compaction pointers
+		    for (int i = 0; i < edit.compactPointers.size(); i++) {
+		    	int level = edit.compactPointers.get(i).i;
+		    	Slice tmp = edit.compactPointers.get(i).obj.encode();
+		    	vset.compactPointer[level].assign(tmp.data, tmp.offset, tmp.size());
+		    }
+
+		    // Delete files
+		    HashSet<IntLongPair> del = edit.deletedFiles;
+		    for (IntLongPair p : del) {
+		    	int level = p.i;
+		    	long number = p.l;
+		    	levels[level].deletedFiles.add(number);
+		    }
+
+		    // Add new files
+		    for (int i = 0; i < edit.newFiles.size(); i++) {
+		    	int level = edit.newFiles.get(i).i;
+		    	FileMetaData f = edit.newFiles.get(i).obj.clone();
+		    	f.refs = 1;
+
+		        // We arrange to automatically compact this file after
+		        // a certain number of seeks.  Let's assume:
+		        //   (1) One seek costs 10ms
+		        //   (2) Writing or reading 1MB costs 10ms (100MB/s)
+		        //   (3) A compaction of 1MB does 25MB of IO:
+		        //         1MB read from this level
+		        //         10-12MB read from next level (boundaries may be misaligned)
+		        //         10-12MB written to next level
+		        // This implies that 25 seeks cost the same as the compaction
+		        // of 1MB of data.  I.e., one seek costs approximately the
+		        // same as the compaction of 40KB of data.  We are a little
+		        // conservative and allow approximately one seek for every 16KB
+		        // of data before triggering a compaction.
+		    	f.allowedSeeks = (int)(f.fileSize / 16384);
+		    	if (f.allowedSeeks < 100)
+		    		f.allowedSeeks = 100;
+
+		    	levels[level].deletedFiles.remove(f.number);
+		    	levels[level].addedFiles.add(f);
+		    }
 		}
 		
 		public void saveTo(Version v) {
-			//TODO
+			//TODO(check): bugs may happens, be careful.
+		    BySmallestKey cmp = new BySmallestKey(vset.icmp);
+		    for (int level = 0; level < DBFormat.kNumLevels; level++) {
+		    	// Merge the set of added files with the set of pre-existing files.
+		    	// Drop any deleted files.  Store the result in *v.
+		    	ArrayList<FileMetaData> baseFiles = base.files[level];
+		    	TreeSet<FileMetaData> added = levels[level].addedFiles;
+		    	
+		    	//v.files[level].reserve(base_files.size() + added->size());
+		    	
+		    	int baseFilesSize = baseFiles.size();
+		    	int startIdx = 0;
+		    	for (FileMetaData fmd : added) {
+		    		// Add all smaller files listed in base_
+		    		int upperIdx = upperBound(baseFiles, fmd, cmp);
+		    		if (upperIdx > startIdx) {
+		    			for (int i = startIdx; i < upperIdx && i < baseFilesSize; i++)
+		    				maybeAddFile(v, level, baseFiles.get(startIdx));
+		    		}
+		    		startIdx = upperIdx;
+		    		maybeAddFile(v, level, fmd);
+		    	}
+		    	
+		    	// Add remaining base files
+		    	for (; startIdx < baseFiles.size(); startIdx++)
+		    		maybeAddFile(v, level, baseFiles.get(startIdx));
+		    }
 		}
 		
+		static <T> int count(TreeSet<T> set, T v) {
+			return set.contains(v) ? 1 : 0;
+		}
 		public void maybeAddFile(Version v, int level, FileMetaData f) {
-			//TODO
+			if (count(levels[level].deletedFiles, f.number) > 0) {
+		        // File is deleted: do nothing
+			} else {
+		        ArrayList<FileMetaData> files = v.files[level];
+		        if (level > 0 && !files.isEmpty()) {
+		          // Must not overlap
+		        	assert(vset.icmp.compare(files.get(files.size()-1).largest, f.smallest) < 0);
+		        }
+		        f.refs++;
+		        files.add(f);
+		    }
 		}
 	}
+	
+	public static <T> int upperBound(ArrayList<T> l, T target, Comparator<T> cmp) {
+		int offset = 0;
+		int size = l.size();
+		List<T> view = l.subList(offset, offset+size);
+		int ret = Collections.binarySearch(view, target, cmp);
+		while (ret >= 0) {
+			//System.out.printf("offset=%d, size=%d, ret=%d\n", offset, size, ret);
+			offset += (ret + 1);
+			size -= (ret + 1);
+			view = l.subList(offset, offset+size);
+			ret = Collections.binarySearch(view, target, cmp);
+		}
+		
+		int insertionPoint = -1 * (ret + 1);
+		
+		return (insertionPoint == size ? l.size() : insertionPoint + offset);
+	}
+	
 	/**
 	 * Apply *edit to the current version to form a new descriptor that
 	 * is both saved to persistent state and installed as the new
@@ -664,25 +815,31 @@ public class VersionSet {
 		    	} else {
 		    		// "ikey" falls in the range for this table.  Add the
 		    		// approximate offset of "ikey" within the table.
-		    		FuncOutput<Table> tableptr = new FuncOutput<Table>();
-		    		Iterator0 iter = tcache.newIterator(
-		    				new ReadOptions(), files.get(i).number, files.get(i).fileSize, tableptr);
-		    		if (tableptr.getValue() != null) {
-		    			result += tableptr.getValue().approximateOffsetOf(ikey.encode());
+		    		FuncOutput<Table> table0 = new FuncOutput<Table>();
+		    		Iterator0 iter = tcache.newIterator(new ReadOptions(), 
+		    				files.get(i).number, files.get(i).fileSize, table0);
+		    		if (table0.getValue() != null) {
+		    			result += table0.getValue().approximateOffsetOf(ikey.encode());
 		    		}
-		    		iter = null;//delete iter;
+		    		iter.delete();
+		    		iter = null;
 		    	}
 		    }
 		}
 		return result;
 	}
 	
-	class LevelSummaryStorage {
-		String info;
-	}
-	
-	public void levelSummary(LevelSummaryStorage scratch) {
-		//TODO
+	public String levelSummary() {
+		// Update code if kNumLevels changes
+		//assert(DBFormat.kNumLevels == 7);
+		return String.format("files[ %d %d %d %d %d %d %d ]", 
+		           current.files[0].size(),
+		           current.files[1].size(),
+		           current.files[2].size(),
+		           current.files[3].size(),
+		           current.files[4].size(),
+		           current.files[5].size(),
+		           current.files[6].size());
 	}
 	
 	
@@ -856,7 +1013,7 @@ public class VersionSet {
 	}
 	
 	Status writeSnapshot(LogWriter log) {
-		  // TODO: Break up into multiple records to reduce memory usage on recovery?
+		  // TODO(optimize): Break up into multiple records to reduce memory usage on recovery?
 
 		  // Save metadata
 		  VersionEdit edit = new VersionEdit();

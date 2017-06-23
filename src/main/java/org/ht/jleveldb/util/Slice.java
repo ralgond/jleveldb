@@ -43,7 +43,7 @@ public class Slice {
 	}
 	
 	public byte getByte(int idx) {
-		if (idx < offset || idx >= limit)
+		if (idx < 0 || idx >= size())
 			throw new BufferUnderflowException();
 		
 		return data[offset+idx];
@@ -66,11 +66,13 @@ public class Slice {
 	}
 	
 	public String encodeToString() {
-		return null; //TODO
+		return new String(data, offset, size());
 	}
 	
 	public void clear() {
-		//TODO
+		data = null;
+		offset = 0;
+		limit = 0;
 	}
 	
 	@Override
@@ -78,24 +80,8 @@ public class Slice {
 		return new Slice(this);
 	}
 	
-	final public static int memcmp(byte[] a, int aoff, byte[] b, int boff, int size) {
-		for (int i = 0; i < size; i++) {
-			if (a[aoff+i] < b[boff+i])
-				return -1;
-			else if (a[aoff+i] > b[boff+i])
-				return 1;
-		}
-		return 0;
-	}
-	
 	final public int compare(Slice b) {
-		int minLen = (size() < b.size()) ? size() : b.size();
-		int r = memcmp(data, offset, b.data, b.offset, minLen);
-		if (r == 0) {
-		    if (size() < b.size()) r = -1;
-		    else if (size() > b.size()) r = +1;
-		}
-		return r;
+		return ByteUtils.bytewiseCompare(data, offset, size(), b.data, b.offset, b.size());
 	}
 	
 	// Drop the first "n" bytes from this slice.
@@ -107,6 +93,9 @@ public class Slice {
 	@Override
 	public boolean equals(Object o) {
 		Slice s = (Slice)o;
+		if (size() == 0 && size() == size())
+			return true;
+		
 		if (data != null && s.data != null && size() == s.size()) {
 			int size = size();
 			int soffset = s.offset;
@@ -134,5 +123,10 @@ public class Slice {
         }
 
         return result;
+	}
+	
+	@Override
+	public String toString() {
+		return encodeToString();
 	}
 }

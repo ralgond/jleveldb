@@ -5,12 +5,35 @@ import org.ht.jleveldb.db.format.InternalKey;
 public class FileMetaData {
 	public int refs;
 	int allowedSeeks; // Seeks allowed until compaction
-	long number;
+	public long number;
 	public long fileSize;    // File size in bytes;
-	InternalKey smallest;       // Smallest internal key served by table
-	InternalKey largest;        // Largest internal key served by table
+	InternalKey smallest = new InternalKey();       // Smallest internal key served by table
+	InternalKey largest = new InternalKey();        // Largest internal key served by table
+	
+	public FileMetaData() {
+		
+	}
+	
+	public FileMetaData(long number, long fileSize, InternalKey smallest, InternalKey largest) {
+		this.number = number;
+		this.fileSize = fileSize;
+		this.smallest = smallest;
+		this.largest = largest;
+	}
 	
 	public void delete() {
-		//TODO
+
+	}
+	
+	@Override
+	public FileMetaData clone() {
+		FileMetaData ret = new FileMetaData();
+		ret.refs = refs;
+		ret.allowedSeeks = allowedSeeks;
+		ret.number = number;
+		ret.fileSize = fileSize;
+		ret.smallest = smallest.clone();
+		ret.largest = largest.clone();
+		return ret;
 	}
 }

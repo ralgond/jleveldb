@@ -58,7 +58,6 @@ public class BlockBuilder {
 		lastKey.resize(shared);
 		lastKey.append(key.data,  key.offset + shared, nonShared);
 		
-		//TODO://assert(Slice(last_key_) == key);
 		counter++;
 	}
 	

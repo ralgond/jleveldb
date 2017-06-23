@@ -24,7 +24,6 @@ public abstract class Iterator0 {
 	public abstract Status status();
 	
 	public void registerCleanup(Runnable runnable) {
-		//TODO
 		Cleanup c = new Cleanup();
 		c.runnable = runnable;
 		
@@ -40,12 +39,10 @@ public abstract class Iterator0 {
 	Cleanup cleanup = new Cleanup();
 	
 	public static Iterator0 newEmptyIterator() {
-		//TODO
-		return null;
+		return new EmptyIterator0(Status.ok0());
 	}
 	
 	public static Iterator0 newErrorIterator(Status status) {
-		//TODO
-		return null;
+		return new EmptyIterator0(status);
 	}
 }

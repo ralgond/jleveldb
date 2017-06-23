@@ -111,6 +111,8 @@ public class FileName {
 	public static boolean parseFileName(String fname,
 			FuncOutputLong number,
 			FuncOutput<FileType> type) {
+		number.setValue(0);
+		type.setValue(null);
 		String rest = fname;
 		if (fname.equals("CURRENT")) {
 			number.setValue(0);

@@ -1,12 +1,16 @@
 package org.ht.jleveldb.db;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
 import org.ht.jleveldb.Status;
+import org.ht.jleveldb.db.format.DBFormat;
 import org.ht.jleveldb.db.format.InternalKey;
 import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.Coding;
+import org.ht.jleveldb.util.FuncOutputInt;
 import org.ht.jleveldb.util.IntLongPair;
 import org.ht.jleveldb.util.IntObjectPair;
 import org.ht.jleveldb.util.Slice;
@@ -24,12 +28,46 @@ public class VersionEdit {
 	boolean hasNextFileNumber;
 	boolean hasLastSequence;
 	
-	ArrayList<IntObjectPair<InternalKey>> compactPointers = new ArrayList<>(); //TODO: change pointer to ?
-	DeletedFileSet deletedFiles;
+	ArrayList<IntObjectPair<InternalKey>> compactPointers = new ArrayList<>();
+	HashSet<IntLongPair> deletedFiles = new HashSet<>();
 	ArrayList<IntObjectPair<FileMetaData>> newFiles = new ArrayList<>();
 	
+	// Tag numbers for serialized VersionEdit.  These numbers are written to
+	// disk and should not be changed.
+	enum Tag {
+		kComparator(1),
+		kLogNumber(2),
+		kNextFileNumber(3),
+		kLastSequence(4),
+		kCompactPointer(5),
+		kDeletedFile(6),
+		kNewFile(7),
+		// 8 was used for large value refs
+		kPrevLogNumber(9);
+	  
+		int value;
+		private Tag(int value) {
+			this.value = value;
+		}
+	  
+		public int getValue() {
+			return value;
+		}
+	};
+	
 	public void clear() {
-		//TODO
+		comparator = "";
+		logNumber = 0;
+		prevLogNumber = 0;
+		lastSequence = 0;
+		nextFileNumber = 0;
+		hasComparator = false;
+		hasLogNumber = false;
+		hasPrevLogNumber = false;
+		hasNextFileNumber = false;
+		hasLastSequence = false;
+		deletedFiles.clear();
+		newFiles.clear();
 	}
 	
 	public void setComparatorName(Slice name) {
@@ -67,7 +105,7 @@ public class VersionEdit {
 	
 	/**
 	 * Add the specified file at the specified number.</br>
-	 * REQUIRES: This version has not been saved (see VersionSet::SaveTo)</br>
+	 * REQUIRES: This version has not been saved (see {@link VersionSet::saveTo})</br>
 	 * REQUIRES: "smallest" and "largest" are smallest and largest keys in file</br>
 	 * @param level
 	 * @param file
@@ -79,11 +117,7 @@ public class VersionEdit {
             long fileSize,
             InternalKey smallest,
             InternalKey largest) {
-		FileMetaData f = new FileMetaData();
-		f.number = file;
-		f.fileSize = fileSize;
-		f.smallest = smallest;
-		f.largest = largest;
+		FileMetaData f = new FileMetaData(file, fileSize, smallest, largest);
 		newFiles.add(new IntObjectPair<FileMetaData>(level, f));
 	}
 	
@@ -93,22 +127,242 @@ public class VersionEdit {
 	 * @param file
 	 */
 	public void deleteFile(int level, long file) {
-		deletedFiles.insert(new IntLongPair(level, file));
+		deletedFiles.add(new IntLongPair(level, file));
 	}
 	
 	public void encodeTo(ByteBuf dst) {
-		//TODO
+		if (this.hasComparator) {
+			dst.writeVarNat32(Tag.kComparator.getValue());
+		    dst.writeLengthPrefixedSlice(new Slice(comparator));
+		}
+		
+		if (hasLogNumber) {
+			dst.writeVarNat32(Tag.kLogNumber.getValue());
+			dst.writeVarNat64(logNumber);
+		}
+		
+		if (hasPrevLogNumber) {
+		    dst.writeVarNat32(Tag.kPrevLogNumber.getValue());
+		    dst.writeVarNat64(prevLogNumber);
+		}
+		
+		if (hasNextFileNumber) {
+			dst.writeVarNat32(Tag.kNextFileNumber.getValue());
+			dst.writeVarNat64(nextFileNumber);
+		}
+		
+		if (hasLastSequence) {
+			dst.writeVarNat32(Tag.kLastSequence.getValue());
+			dst.writeVarNat64(lastSequence);
+		}
+
+		for (int i = 0; i < compactPointers.size(); i++) {
+			dst.writeVarNat32(Tag.kCompactPointer.getValue());
+			dst.writeVarNat32(compactPointers.get(i).i);  // level
+		    dst.writeLengthPrefixedSlice(compactPointers.get(i).obj.encode());
+		}
+
+		for (IntLongPair pair : deletedFiles) {
+			dst.writeVarNat32(Tag.kDeletedFile.getValue());
+			dst.writeVarNat32(pair.i);   // level
+			dst.writeVarNat32((int)(pair.l & 0xffffffffL));  // file number
+		}
+
+		for (int i = 0; i < newFiles.size(); i++) {
+			FileMetaData f = newFiles.get(i).obj;
+			dst.writeVarNat32(Tag.kNewFile.getValue());
+			dst.writeVarNat32(newFiles.get(i).i);  // level
+			dst.writeVarNat64(f.number);
+		    dst.writeVarNat64(f.fileSize);
+		    dst.writeLengthPrefixedSlice(f.smallest.encode());
+		    dst.writeLengthPrefixedSlice(f.largest.encode());
+		}
 	}
 	
 	public Status decodeFrom(Slice src) {
-		//TODO
-		return null;
+		clear();
+		Slice input = src.clone();
+		String msg = null;
+		int tag;
+
+		// Temporary storage for parsing
+		int level;
+		long number;
+		
+		Slice str = new Slice();
+		
+		FuncOutputInt result0 = new FuncOutputInt();
+		
+		while (msg == null) {
+			try {
+				tag = Coding.getVarNat32(input);
+			} catch (Exception e) {
+				break;
+			}
+			
+			if (tag == Tag.kComparator.getValue()) {
+		        if (Coding.getLengthPrefixedSlice(input, str)) {
+		        	comparator = str.toString();
+		        	hasComparator = true;
+		        } else {
+		        	msg = "comparator name";
+		        }
+			} else if (tag == Tag.kLogNumber.getValue()) {
+				try { 
+					logNumber = Coding.getVarNat64(input);
+					hasLogNumber = true;
+				} catch (Exception e) {
+					msg = "log number";
+				}
+			} else if (tag == Tag.kPrevLogNumber.getValue()) {
+				try { 
+					prevLogNumber = Coding.getVarNat64(input);
+					hasPrevLogNumber = true;
+				} catch (Exception e) {
+					msg = "previous log number";
+		        }
+			} else if (tag == Tag.kNextFileNumber.getValue()) {
+				try { 
+					nextFileNumber = Coding.getVarNat64(input);
+					hasNextFileNumber = true;
+				} catch (Exception e) {
+					msg = "next file number";
+				}
+			} else if (tag == Tag.kLastSequence.getValue()) {
+				try { 
+					lastSequence = Coding.getVarNat64(input);
+					hasLastSequence = true;
+				} catch (Exception e) {
+					msg = "last sequence number";
+				}
+			} else if (tag == Tag.kCompactPointer.getValue()) {
+				result0.setValue(0);
+				InternalKey key = new InternalKey();
+		        if (getLevel(input, result0) && getInternalKey(input, key)) {
+		        	level = result0.getValue();
+		        	compactPointers.add(new IntObjectPair<InternalKey>(level, key));
+		        } else {
+		        	msg = "compaction pointer";
+		        }
+			} else if (tag == Tag.kDeletedFile.getValue()) {
+				result0.setValue(0);
+				try {
+					if (getLevel(input, result0)) {
+						level = result0.getValue();
+						number = Coding.getVarNat64(input);
+						deletedFiles.add(new IntLongPair(level, number));
+					} else {
+						msg = "deleted file";
+					}
+		        } catch (Exception e) {
+		        	msg = "deleted file";
+		        }
+			} else if (tag == Tag.kNewFile.getValue()) {
+				result0.setValue(0);
+				FileMetaData f = new FileMetaData();
+				try {
+					if (getLevel(input, result0)) {
+						level = result0.getValue();
+						f.number = Coding.getVarNat64(input);
+						f.fileSize = Coding.getVarNat64(input);
+						if (getInternalKey(input, f.smallest) && getInternalKey(input, f.largest)) {
+							newFiles.add(new IntObjectPair<FileMetaData>(level, f));
+						} else {
+							msg = "new-file entry";
+						}
+					} else {
+						msg = "new-file entry";
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+		        	msg = "new-file entry";
+		        }
+			} else {
+		        msg = "unknown tag";
+		    }
+		}
+
+		if (msg == null && !input.empty()) {
+			msg = "invalid tag";
+		}
+
+		Status result = Status.ok0();
+		if (msg != null) {
+		    result = Status.corruption("VersionEdit "+msg);
+		}
+		  
+		return result;
 	}
 	
 	public String debugString() {
-		//TODO
-		return null;
+		StringBuilder sb = new StringBuilder();
+		sb.append("VersionEdit {");
+		if (hasComparator) {
+			sb.append("\n  Comparator: ");
+			sb.append(comparator);
+		}
+		if (hasLogNumber) {
+			sb.append("\n  LogNumber: ");
+			sb.append(logNumber);
+		}
+		if (hasPrevLogNumber) {
+			sb.append("\n  PrevLogNumber: ");
+			sb.append(this.prevLogNumber);
+		}
+		if (hasNextFileNumber) {
+			sb.append("\n  NextFile: ");
+			sb.append(nextFileNumber);
+		}
+		if (this.hasLastSequence) {
+			sb.append("\n  LastSeq: ");
+			sb.append(lastSequence);
+		}
+		for (int i = 0; i < compactPointers.size(); i++) {
+			sb.append("\n  CompactPointer: ");
+			sb.append(compactPointers.get(i).i);
+			sb.append(" ");
+			sb.append(compactPointers.get(i).obj.debugString());
+		}
+		for (IntLongPair pair : deletedFileSet) {
+			sb.append("\n  DeleteFile: ");
+			sb.append(pair.i);
+			sb.append(" ");
+			sb.append(pair.l);
+		}
+		for (int i = 0; i < newFiles.size(); i++) {
+			FileMetaData f = newFiles.get(i).obj;
+			sb.append("\n  AddFile: ");
+			sb.append(newFiles.get(i).i);
+			sb.append(" ");
+			sb.append(f.number);
+			sb.append(" ");
+			sb.append(f.fileSize);
+			sb.append(" ");
+			sb.append(f.smallest.debugString());
+			sb.append(" .. ");
+			sb.append(f.largest.debugString());
+		}
+		sb.append("\n}\n");
+		return sb.toString();
 	}
 	
+	static boolean getInternalKey(Slice input, InternalKey dst) {
+		Slice str = new Slice();
+		if (Coding.getLengthPrefixedSlice(input, str)) {
+		    dst.decodeFrom(str);
+		    return true;
+		} else {
+		    return false;
+		}
+	}
 	
+	static boolean getLevel(Slice input, FuncOutputInt level) {
+		int v = Coding.getVarNat32(input);
+		if (v < DBFormat.kNumLevels) {
+		    level.setValue(v);
+		    return true;
+		} else {
+		    return false;
+		}
+	}
 }

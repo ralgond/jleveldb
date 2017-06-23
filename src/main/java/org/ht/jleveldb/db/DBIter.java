@@ -63,8 +63,8 @@ public class DBIter extends Iterator0 {
 		// Loop until we hit an acceptable entry to yield
 		assert(iter.valid());
 		assert(direction == Direction.kForward);
+		ParsedInternalKey ikey = new ParsedInternalKey();
 		do {
-			ParsedInternalKey ikey = new ParsedInternalKey(); //TODO: optimized: reduce the new frequency.
 		    if (parseKey(ikey) && ikey.sequence <= sequence) {
 		    	switch (ikey.type) {
 		        case Deletion:

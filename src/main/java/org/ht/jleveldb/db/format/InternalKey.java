@@ -1,6 +1,7 @@
 package org.ht.jleveldb.db.format;
 
 import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Slice;
 import org.ht.jleveldb.util.Strings;
 
@@ -12,7 +13,7 @@ import org.ht.jleveldb.util.Strings;
  * @author Teng Huang ht201509@163.com
  */
 public class InternalKey {
-	ByteBuf rep;
+	ByteBuf rep = ByteBufFactory.defaultByteBuf();
 	
 	public InternalKey() {
 		
@@ -22,8 +23,13 @@ public class InternalKey {
 		return rep;
 	}
 	
+	static void appendInternalKey(ByteBuf result, ParsedInternalKey key) {
+		result.append(key.userKey.data(), key.userKey.size());
+		result.writeFixedNat64(DBFormat.packSequenceAndType(key.sequence, key.type));
+	}
+	
 	public InternalKey(Slice userKey, long s, ValueType t) {
-		(new ParsedInternalKey(userKey, s, t)).append(rep);
+		appendInternalKey(rep, new ParsedInternalKey(userKey, s, t));
 	}
 	
 	public void decodeFrom(Slice s) {
@@ -34,7 +40,6 @@ public class InternalKey {
 		rep.assign(b.data(), b.size());
 	}
 	
-	//TODO: reduce the copy frequency.
 	public Slice encode() {
 		return new Slice(rep);
 	}
@@ -45,7 +50,7 @@ public class InternalKey {
 	
 	public void setFrom(ParsedInternalKey p) {
 		rep.clear();
-		p.append(rep);
+		DBFormat.appendInternalKey(rep, p);
 	}
 	
 	public void clear() {
@@ -71,5 +76,12 @@ public class InternalKey {
 		    result += Strings.escapeString(rep);
 		}
 		return result;
+	}
+	
+	@Override
+	public InternalKey clone() {
+		InternalKey ik = new InternalKey();
+		ik.rep.assign(rep.data(), rep.size());
+		return ik;
 	}
 }

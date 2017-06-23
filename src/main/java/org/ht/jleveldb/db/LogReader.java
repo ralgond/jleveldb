@@ -4,7 +4,7 @@ import org.ht.jleveldb.SequentialFile;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.Crc32c;
+import org.ht.jleveldb.util.Crc32C;
 import org.ht.jleveldb.util.Slice;
 
 public class LogReader {
@@ -296,8 +296,8 @@ public class LogReader {
 
 		    // Check crc
 		    if (checksum) {
-		    	long expected_crc = Crc32c.unmask(Coding.decodeFixedNat32(header, headerOffset));
-		    	long actual_crc = Crc32c.value(header, 6, 1 + length);
+		    	long expected_crc = Crc32C.unmask(Coding.decodeFixedNat32(header, headerOffset));
+		    	long actual_crc = Crc32C.value(header, 6, 1 + length);
 		    	if (actual_crc != expected_crc) {
 		    		// Drop the rest of the buffer since "length" itself may have
 		    		// been corrupted and if we trust it, we could find some

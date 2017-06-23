@@ -4,13 +4,12 @@ import org.ht.jleveldb.CompressionType;
 import org.ht.jleveldb.Options;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.WritableFile;
-import org.ht.jleveldb.db.format.DBFormat;
 import org.ht.jleveldb.table.Format.BlockHandle;
 import org.ht.jleveldb.table.Format.Footer;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.Crc32c;
+import org.ht.jleveldb.util.Crc32C;
 import org.ht.jleveldb.util.Slice;
 import org.ht.jleveldb.util.Snappy;
 
@@ -272,9 +271,11 @@ public class TableBuilder {
 		if (r.status.ok()) {
 		    byte[] trailer = new byte[Format.kBlockTrailerSize];
 		    trailer[0] = type.getType();
-		    long crc = Crc32c.value(blockContents.data(), blockContents.offset, blockContents.size());
-		    crc = Crc32c.extend(crc, trailer, 0, 1);  // Extend crc to cover block type
-		    Coding.encodeFixedNat32Long(trailer, 1, 5, Crc32c.mask(crc));
+		    Crc32C chksum = new Crc32C();
+		    chksum.update(blockContents.data(), blockContents.offset, blockContents.size());
+		    chksum.update(trailer, 0, 1);
+		    long crc = chksum.getValue();
+		    Coding.encodeFixedNat32Long(trailer, 1, 5, Crc32C.mask(crc));
 		    r.status = r.file.append(new Slice(trailer, 0, Format.kBlockTrailerSize));
 		    if (r.status.ok()) {
 		    	r.offset += blockContents.size() + Format.kBlockTrailerSize;

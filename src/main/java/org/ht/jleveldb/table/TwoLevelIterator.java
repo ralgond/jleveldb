@@ -25,8 +25,9 @@ public class TwoLevelIterator extends Iterator0 {
 		return new TwoLevelIterator(indexIter, blockFunction, arg, options);
 	}
 	
-	public TwoLevelIterator(Iterator0 indexIter, BlockFunction blockFunction, Object arg, ReadOptions options) {
-		this.indexIter = new Iterator0Wrapper(indexIter);
+	public TwoLevelIterator(Iterator0 indexIter0, BlockFunction blockFunction, Object arg, ReadOptions options) {
+		this.indexIter = new Iterator0Wrapper();
+		this.indexIter.set(indexIter0);
 		this.blockFunction = blockFunction;
 		this.arg = arg;
 		this.options = options.clone();

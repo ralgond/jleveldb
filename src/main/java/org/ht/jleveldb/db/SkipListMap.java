@@ -16,6 +16,7 @@
  */
 package org.ht.jleveldb.db;
 
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
@@ -32,7 +33,7 @@ public class SkipListMap<K, V> {
 	//private static Logger logger = LoggerFactory.getLogger(SkipListMap.class);
 	
 	ThreadLocalRandom rnd = ThreadLocalRandom.current();
-	SkipListMapComparator<K> comp;
+	Comparator<K> comp;
 	final int maxLevel;
 	final Node<K,V> head;
 	Node<K,V> tail;
@@ -77,6 +78,7 @@ public class SkipListMap<K, V> {
 		@SuppressWarnings("unchecked")
 		@Override
 		public boolean equals(Object o) {
+			// Why need this method?
 			Node<K1,V1> e2 = (Node<K1,V1>)o;
 			return (getKey()==null ?
 					e2.getKey()==null : getKey().equals(e2.getKey()))  &&
@@ -151,16 +153,18 @@ public class SkipListMap<K, V> {
 		this.maxLevel = maxLevel;
 		this.head = new Node<K,V>(maxLevel);
 	}
+	
+	public SkipListMap(int maxLevel, int branching, Comparator<K> comp) {
+		this(maxLevel);
+		this.branching = branching;
+		this.comp = comp;
+	}
 
-	public void setComparator(SkipListMapComparator<K> comp) {
+	public void setComparator(Comparator<K> comp) {
 		this.comp = comp;
 	}
 	
-	public void setBranching(int branching) {
-		this.branching = branching;
-	}
-	
-	protected int randomLevel() {
+	final int randomLevel() {
 		int level = 1;
 		while (rnd.nextInt() % branching == 0) {
 			level++;
@@ -179,10 +183,11 @@ public class SkipListMap<K, V> {
 	final static class FindResult<K1,V1> {
 		Node<K1,V1> prev;
 		Node<K1,V1> node;
+		boolean found;
 	}
 	
-	public FindResult<K,V> find(K k) {
-		Objects.requireNonNull(k);
+	public FindResult<K,V> findFirstGreaterOrEqual(K target) {
+		Objects.requireNonNull(target);
 		
 		FindResult<K,V> result = new FindResult<K,V>();
 		
@@ -196,21 +201,33 @@ public class SkipListMap<K, V> {
 				continue;
 			}
 			
-			int cmpRes = comp.compare(k, next.key);
+			int cmpRes = comp.compare(next.key, target);
 			if (cmpRes == 0) {
+				//System.out.println("skiplist.find: target="+k+" == next.key="+next.key);
 				result.prev = prev;
 				result.node = next;
+				result.found = true;
 				return result;
-			} else if (cmpRes > 0) {
+			} else if (cmpRes < 0) {
+				//System.out.println("skiplist.find: target="+k+" < next.key="+next.key);
 				prev = next;
 			} else {
+				//System.out.println("skiplist.find: target="+k+" > next.key="+next.key);
 				l--;
 			}
 		}
 		
 		result.prev = prev;
-		result.node = null;
+		result.node = prev.next(0);
+		result.found = false;
 		
+		return result;
+	}
+	
+	public FindResult<K,V> find(K target) {
+		FindResult<K,V> result = findFirstGreaterOrEqual(target);
+		if (!result.found)
+			result.node = null;
 		return result;
 	}
 	
@@ -262,6 +279,84 @@ public class SkipListMap<K, V> {
 		}
 		
 		return result.node == null ? null : result.node.value;
+	}
+	
+	public class Iterator1 {
+		
+		Node<K,V> prev;
+		Node<K,V> node;
+		
+		public Iterator1() {
+			prev = head;
+			node = prev.next(0);
+		}
+		
+		/**
+		 *  Returns true iff the iterator is positioned at a valid node.
+		 * @return
+		 */
+	    public boolean valid() {
+	    	return (node != null && node != head);
+	    }
+
+		/**
+		 *  Advances to the next position.</br>
+		 *  REQUIRES: valid()
+		 */
+		public void next() {
+			assert(valid());
+			prev = node;
+			node = node.next(0);
+		}
+
+		/**
+		 *  Advances to the previous position.</br>
+		 *  REQUIRES: valid()
+		 */
+		public void prev() {
+			node = prev;
+			prev = prev.prev(0);
+		}
+
+		/**
+		 *  Advance to the first entry with a key >= target
+		 * @param target
+		 */
+		public void seek(K target) {
+			FindResult<K,V> result = findFirstGreaterOrEqual(target);
+			prev = result.prev;
+			node = result.node;
+		}
+
+		/**
+		 *  Position at the first entry in list.
+		 *  Final state of iterator is valid() iff list is not empty.
+		 */
+		public void seekToFirst() {
+			prev = head;
+			node = prev.next(0);
+		}
+
+		/**
+		 *  Position at the last entry in list.
+		 *  Final state of iterator is Valid() iff list is not empty.
+		 */
+		public void seekToLast() {
+			node = tail;
+			prev = node.prev(0);
+		}
+		
+		public K key() {
+			return node.key;
+		}
+		
+		public V value() {
+			return node.value;
+		}
+	}
+	
+	public Iterator1 iterator1() {
+		return new Iterator1();
 	}
 	
 	public class DefaultIterator implements Iterator<Map.Entry<K,V>> {

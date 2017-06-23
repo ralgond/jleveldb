@@ -10,6 +10,8 @@ public interface ByteBuf {
 
 	int size();
 	
+	void init(byte[] data, int size);
+	
 	boolean empty();
 	
 	boolean isDirect();
@@ -26,6 +28,8 @@ public interface ByteBuf {
 	
 	byte getByte(int idx);
 	
+	ByteBuf clone();
+	
 	byte[] copyData();
 	
 	public String encodeToString();
@@ -41,7 +45,7 @@ public interface ByteBuf {
 	
 	void append(byte[] buf, int offset, int size);
 	
-	void addByte(Byte b);
+	void addByte(byte b);
 	
 	/**
 	 * append 32bit fixed natural number.

@@ -20,21 +20,41 @@ public class InternalKeyComparator extends Comparator0 {
 		this.userComparator = userComparator;
 	}
 	
-	public int compare(Slice akey, Slice bkey) {
-		// Order by:
-		//    increasing user key (according to user-supplied comparator)
-		//    decreasing sequence number
-		//    decreasing type (though sequence# should be enough to disambiguate)
-		int r = userComparator.compare(DBFormat.extractUserKey(akey), DBFormat.extractUserKey(bkey));
+	/**
+	 * Order by:
+	 * 	increasing user key (according to user-supplied comparator)
+	 * 	decreasing sequence number
+	 * 	decreasing type (though sequence# should be enough to disambiguate)
+	 * 
+	 * 	aikey, bikey : {userKey:byte[size-8], seq_type:[8]}
+	 */
+	public int compare(Slice aikey, Slice bikey) {
+		int r = userComparator.compare(aikey.data, aikey.offset, aikey.size()-8, 
+				bikey.data, bikey.offset, bikey.size()-8);
 		if (r == 0) {
-		    long anum = Coding.decodeFixedNat64(akey.data, akey.limit - 8);
-		    long bnum = Coding.decodeFixedNat64(bkey.data, bkey.limit - 8);
-		    if (anum > bnum) {
-		    	r = -1;
-		    } else if (anum < bnum) {
-		    	r = +1;
-		    }
+		    long anum = Coding.decodeFixedNat64(aikey.data, aikey.limit - 8);
+		    long bnum = Coding.decodeFixedNat64(bikey.data, bikey.limit - 8);
+		    r = anum > bnum ? -1 : +1;
+		    //System.out.println("anum="+anum+", bnum="+bnum+", r="+r);
 		}
+		return r;
+	}
+	
+	/**
+	 * Order by:
+	 * 	increasing user key (according to user-supplied comparator)
+	 * 	decreasing sequence number
+	 * 	decreasing type (though sequence# should be enough to disambiguate)
+	 * 
+	 * 	a, b : {seq:long, valueType:ValueType, userKey:byte[size]}
+	 */
+	public int compare(ParsedInternalKeySlice a, ParsedInternalKeySlice b) {
+		// System.out.println("InternalKeyComparator.compare02");
+		int r = userComparator.compare(a.data, a.offset, a.size(), b.data, b.offset, b.size());
+		if (r == 0)
+		    r = (a.sequence > b.sequence) ? -1 : (a.sequence < b.sequence ? +1 : 0);
+		if (r == 0)
+			r = (a.valueType.type > b.valueType.type) ? -1 : (a.valueType.type < b.valueType.type ? +1 : 0);
 		return r;
 	}
 	
@@ -43,6 +63,7 @@ public class InternalKeyComparator extends Comparator0 {
 	}
 	
 	public int compare(InternalKey a, InternalKey b) {
+		//InternalKey a => {rep:ByteBuf}
 		return compare(a.encode(), b.encode());
 	}
 	
@@ -50,6 +71,9 @@ public class InternalKeyComparator extends Comparator0 {
 		return "leveldb.InternalKeyComparator";
 	}
 	
+	/**
+	 * @param start [INPUT][OUTPUT]
+	 */
 	public void findShortestSeparator(ByteBuf start, Slice limit) {
 		// Attempt to shorten the user portion of the key
 		Slice userStart = DBFormat.extractUserKey(new Slice(start));
@@ -68,6 +92,9 @@ public class InternalKeyComparator extends Comparator0 {
 		}
 	}
 	
+	/**
+	 * @param key [INPUT][OUTPUT]
+	 */
 	public void findShortSuccessor(ByteBuf key) {
 		Slice userKey = DBFormat.extractUserKey(new Slice(key));
 		ByteBuf tmp = ByteBufFactory.defaultByteBuf();
@@ -87,7 +114,7 @@ public class InternalKeyComparator extends Comparator0 {
 		return userComparator;
 	}
 	
-	static long packSequenceAndType(long seq, ValueType t) {
+	public final static long packSequenceAndType(long seq, ValueType t) {
 		assert(seq <= DBFormat.kMaxSequenceNumber);
 		assert(t.type <= DBFormat.kValueTypeForSeek.type);
 		return (seq << 8) | (t.type & 0xff);

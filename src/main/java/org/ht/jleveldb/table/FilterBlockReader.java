@@ -6,7 +6,7 @@ import org.ht.jleveldb.util.Slice;
 
 public class FilterBlockReader {
 	public void delete() {
-		//TODO
+
 	}
 	
 	// REQUIRES: "contents" and *policy must stay live while *this is live.
@@ -19,13 +19,17 @@ public class FilterBlockReader {
 		baseLg = 0;
 		
 		int n = contents.size();
-		if (n < 5) return;  // 1 byte for base_lg_ and 4 for start of offset array //TODO: add exception
-		baseLg = contents.data[contents.offset + n - 1];
+		if (n < 5)
+			return;  // 1 byte for base_lg_ and 4 for start of offset array //TODO: add exception
+		
+		baseLg = (contents.data[contents.offset + n - 1] & 0xff);
 		int lastWord = Coding.decodeFixedNat32(contents.data, contents.offset+n-5);
-		if (lastWord > n - 5) return; //TODO: add exception
+		if (lastWord > n - 5) 
+			return; //TODO: add exception
+		
 		data = contents.data;
 		begin  = contents.offset;
-		end  = contents.offset + lastWord;
+		end  = begin + lastWord;
 		num = (n - 5 - lastWord) / 4;
 	}
 	
@@ -33,15 +37,16 @@ public class FilterBlockReader {
 		long index = blockOffset >> baseLg;
 		if (index < num) {
 			int start = Coding.decodeFixedNat32(data, (int)(end + index * 4));
-		    int limit = Coding.decodeFixedNat32(data, (int)(end + index*4 + 4));
+		    int limit = Coding.decodeFixedNat32(data, (int)(end + index * 4 + 4));
 		    if (start <= limit && limit <= (end - begin)) {
 		    	Slice filter = new Slice(data, begin + start, limit - start);
 		    	return policy.keyMayMatch(key, filter);
 		    } else if (start == limit) {
-		      // Empty filters do not match any keys
-		      return false;
+		    	// Empty filters do not match any keys
+		    	return false;
 		    }
 		}
+		System.out.println("====>key: [3] "+key.encodeToString());
 		return true;  // Errors are treated as potential matches
 	}
 

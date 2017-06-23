@@ -14,11 +14,7 @@ public final class Status {
 	final Code code;
 	final String message;
 	
-	private static Status  DEFAULT_STATUS = new Status();
 	
-	public static Status defaultStatus() {
-		return DEFAULT_STATUS;
-	}
 	
 	private Status() {
 		code = Code.Ok;
@@ -52,12 +48,19 @@ public final class Status {
 		return new Status(code, message);
 	}
 	
+	private static Status OK_STATUS = new Status();
+	private static Status NOT_FOUND_STATUS = new Status(Code.NotFound, null);
+	
 	public static Status ok0() {
-		return defaultStatus();
+		return OK_STATUS;
 	}
 	
 	public static Status notFound(String message) {
 		return new Status(Code.NotFound, message);
+	}
+	
+	public static Status notFound() {
+		return NOT_FOUND_STATUS;
 	}
 	
 	public static Status corruption(String message) {

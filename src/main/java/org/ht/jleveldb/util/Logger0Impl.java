@@ -5,7 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class Logger0Impl implements Logger0 {
+public class Logger0Impl extends Logger0 {
 	
 	private static Logger logger = LoggerFactory.getLogger(Logger0Impl.class);
 	

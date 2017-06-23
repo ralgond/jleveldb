@@ -36,7 +36,8 @@ public class DBFormat {
 	// ValueType, not the lowest).
 	public static final ValueType kValueTypeForSeek = ValueType.Value;
 	
-	public static final long kMaxSequenceNumber =((((long)1) << 56) - 1);
+//	public static final long kMaxSequenceNumber =((((long)1) << 56) - 1);
+	public static final long kMaxSequenceNumber = Long.MAX_VALUE >> 8;
 	
 
 	// Returns the user key portion of an internal key.
@@ -56,7 +57,7 @@ public class DBFormat {
 	public static long packSequenceAndType(long seq, ValueType t) {
 		assert(seq <= kMaxSequenceNumber);
 		assert(t.type() <= kValueTypeForSeek.type());
-		return (seq << 8) | (t.type() & 0x0ff);
+		return ((seq << 8) | (t.type() & 0x0ffL));
 	}
 
 	public static void appendInternalKey(ByteBuf result, ParsedInternalKey key) {

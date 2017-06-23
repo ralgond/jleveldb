@@ -54,8 +54,13 @@ public class DBImpl implements DB {
 		Mutex lock;
 		CondVar cv;
 		
-		public Writer(Mutex lock) {
-			
+		public Writer(Mutex lock, WriteBatch batch, boolean sync, boolean done) {
+			status = Status.ok0();
+			this.lock = lock;
+			this.batch = batch;
+			this.sync = sync;
+			this.done = done;
+			cv = lock.newCondVar();
 		}
 	}
 	
@@ -137,25 +142,22 @@ public class DBImpl implements DB {
 	}
 	
 	@Override
-	public Status put(WriteOptions options, Slice key, Slice value) {
+	public Status put(WriteOptions options, Slice key, Slice value) throws Exception {
 		WriteBatch batch = new WriteBatch();
 		batch.put(key, value);
 		return write(options, batch);
 	}
 
 	@Override
-	public Status delete(WriteOptions options, Slice key) {
+	public Status delete(WriteOptions options, Slice key) throws Exception {
 		WriteBatch batch = new WriteBatch();
 		batch.delete(key);
 		return write(options, batch);
 	}
 
 	@Override
-	public Status write(WriteOptions options, WriteBatch batch) {
-		Writer w = new Writer(mutex);
-		w.batch = batch;
-		w.sync = options.isSync();
-		w.done  = false;
+	public Status write(WriteOptions options, WriteBatch batch) throws Exception {
+		Writer w = new Writer(mutex, batch,  options.isSync(), false);
 		
 		mutex.lock();
 		try {
@@ -178,40 +180,37 @@ public class DBImpl implements DB {
 				lastSequence += WriteBatchInternal.count(updates);
 				
 				// Add to log and apply to memtable.  We can release the lock
-			    // during this phase since &w is currently responsible for logging
+			    // during this phase since w is currently responsible for logging
 			    // and protects against concurrent loggers and concurrent writes
-			    // into mem.
+			    // into memtable.
 				{
-				      mutex.unlock();
-				      status = logWriter.addRecord(WriteBatchInternal.contents(updates));
-				      boolean syncError = false;
-				      if (status.ok() && options.sync) {
-				    	  status = logFile.sync();
-				    	  if (!status.ok()) {
-				    		  syncError = true;
-				    	  }
-				      }
+					mutex.unlock();
+					status = logWriter.addRecord(WriteBatchInternal.contents(updates));
+					boolean syncError = false;
+					if (status.ok() && options.sync) {
+						status = logFile.sync();
+						if (!status.ok())
+							syncError = true;
+					}
 				      
-				      if (status.ok()) {
-				    	  status = WriteBatchInternal.insertInto(updates, memtable);
-				      }
+				    if (status.ok())
+				    	status = WriteBatchInternal.insertInto(updates, memtable);
 				      
-				      mutex.lock();
-				      if (syncError) {
-				          // The state of the log file is indeterminate: the log record we
-				    	  // just added may or may not show up when the DB is re-opened.
-				    	  // So we force the DB into a mode where all future writes fail.
-				    	  recordBackgroundError(status);
-				      }
+				   mutex.lock();
+				   if (syncError) {
+					   // The state of the log file is indeterminate: the log record we
+					   // just added may or may not show up when the DB is re-opened.
+					   // So we force the DB into a mode where all future writes fail.
+					   recordBackgroundError(status);
+				   }
 				}
+				
+				if (updates == tmpBatch)
+					tmpBatch.clear();
+				
+				versions.setLastSequence(lastSequence);
 			}
-			
-			//TODO
-//			if (updates == tmpBatch)
-//				tmpBatch.clear();
-			
-			versions.setLastSequence(lastSequence);
-			
+	
 			while (true) {
 				Writer ready = writers.pollFirst();
 				if (ready != w) {
@@ -229,9 +228,6 @@ public class DBImpl implements DB {
 			}
 			
 			return status;
-		} catch (Exception e) {
-			//TODO: the w.cv
-			return null;
 		} finally {
 			mutex.unlock();
 		}
@@ -239,13 +235,13 @@ public class DBImpl implements DB {
 
 	@Override
 	public Status get(ReadOptions options, Slice key, ByteBuf value) {
-		Status s = Status.defaultStatus();
+		FuncOutput<Status> s = new FuncOutput<Status>();
+		s.setValue(Status.ok0());
 		mutex.lock();
 		try {
 			long snapshotSeqNumber= 0;
 			if (options.snapshot != null) {
-				//TODO
-//			    snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
+			    snapshotSeqNumber = options.snapshot.number;
 			} else {
 				snapshotSeqNumber = versions.lastSequence();
 			}
@@ -263,12 +259,13 @@ public class DBImpl implements DB {
 				mutex.unlock();
 				// First look in the memtable, then in the immutable memtable (if any).
 			    LookupKey lkey = new LookupKey(key, snapshotSeqNumber);
+			    
 			    if (mem0.get(lkey, value, s)) {
 			    	// Done
 			    } else if (imm0 != null && immtable.get(lkey, value, s)) {
 			    	// Done
 			    } else {
-			    	s = current.get(options, lkey, value, stats);
+			    	s.setValue(current.get(options, lkey, value, stats));
 			    	haveStatUpdate = true;
 			    }
 				mutex.lock();
@@ -281,7 +278,7 @@ public class DBImpl implements DB {
 			// mem->Unref();
 			// if (imm != NULL) imm->Unref();
 			// current->Unref();
-			return s;
+			return s.getValue();
 		} finally {
 			mutex.unlock();
 		}
@@ -369,11 +366,12 @@ public class DBImpl implements DB {
 		    LogWriter logWriter = new LogWriter(file.getValue());
 		    ByteBuf record = null;
 		    ndb.encodeTo(record);
-		    s = logWriter.addRecord(new Slice(record)); //TODO
+		    s = logWriter.addRecord(new Slice(record));
 		    if (s.ok()) {
 		    	s = file.getValue().close();
 		    }
 		}
+		
 		file.setValue(null);
 		
 		if (s.ok()) {
@@ -490,8 +488,8 @@ public class DBImpl implements DB {
 			    // No change needed
 			  return s;
 		  } else {
-//			  Log(options_.info_log, "Ignoring error %s", s->ToString().c_str());
-			  return Status.defaultStatus();
+			  Logger0.log0(options.infoLog, "Ignoring error %s", s);
+			  return Status.ok0();
 		  }
 	}
 	
@@ -546,9 +544,10 @@ public class DBImpl implements DB {
 		    	  if (type.getValue() == FileType.TableFile) {
 		    		  tcache.evict(number.getValue());
 		    	  }
-//		        Log(options_.info_log, "Delete type=%d #%lld\n",
-//		            int(type),
-//		            static_cast<unsigned long long>(number));
+		    	  
+		          Logger0.log0(options.infoLog, "Delete type=%d #%d\n",
+		        		  type.getValue().ordinal(), number);
+		          
 		    	  env.deleteFile(dbname + "/" + filenames.get(i));
 		      }
 		   }
@@ -568,9 +567,12 @@ public class DBImpl implements DB {
 		
 		// Save the contents of the memtable as a new Table
 		VersionEdit edit = new VersionEdit();
-		Version base = versions.current(); //base->Ref();
+		Version base = versions.current(); 
+		base.ref();
+		
 		Status s = writeLevel0Table(immtable, edit, base);
-		base = null; //base->Unref();
+		base.unref();
+		base = null;
 		
 		if (s.ok() && shuttingDown.get() != null) { //shutting_down_.Acquire_Load()
 		    s = new Status(Status.Code.IOError, "Deleting DB during memtable compaction");
@@ -597,12 +599,13 @@ public class DBImpl implements DB {
 		Env env;
 	    Logger0 infoLog;
 	    String fname;
-	    Status status;  // NULL if options_.paranoid_checks==false
+	    Status status = Status.ok0();
 	    
 		public void corruption(int bytes, Status s) {
-//		      Log(info_log, "%s%s: dropping %d bytes; %s",
-//		              (this->status == NULL ? "(ignoring error) " : ""),
-//		              fname, static_cast<int>(bytes), s.ToString().c_str());
+		    Logger0.log0(infoLog, "%s%s: dropping %d bytes; %s",
+		              (status == null ? "(ignoring error) " : ""),
+		              fname, bytes, s);
+		    
 			if (status != null && status.ok()) 
 				status = s.clone();
 		}
@@ -643,8 +646,8 @@ public class DBImpl implements DB {
 		// to be skipped instead of propagating bad information (like overly
 		// large sequence numbers).
 		LogReader reader = new LogReader(file, reporter, true, 0);
-//		  Log(options_.info_log, "Recovering log #%llu",
-//			      (unsigned long long) log_number);
+		
+		Logger0.log0(options.infoLog, "Recovering log #%d", logNumber);
 		
 		// Read all the records and add to a memtable
 		ByteBuf scratch = null; //std::string scratch
@@ -662,7 +665,7 @@ public class DBImpl implements DB {
 			
 			if (mem == null) {
 				mem = new MemTable(internalComparator);
-			    //mem0->Ref();
+			    mem.ref();
 			}
 			 
 			status = WriteBatchInternal.insertInto(batch, mem);
@@ -683,7 +686,8 @@ public class DBImpl implements DB {
 		    	compactions++;
 		    	saveManifest.setValue(true);
 		    	status = writeLevel0Table(mem, edit, null);
-		    	mem = null; //mem->Unref();
+		    	mem.unref();
+		    	mem = null; 
 		    	if (!status.ok()) {
 		            // Reflect errors immediately so that conditions like full
 		            // file-systems cause the DB::Open() to fail.
@@ -692,8 +696,7 @@ public class DBImpl implements DB {
 		    }
 		}
 		
-		//TODO: should close file
-		file = null;
+		file.delete(); //should close file
 		
 		// See if we should keep reusing the last log file.
 		if (status.ok() && options.reuseLogs && lastLog && compactions == 0) {
@@ -706,7 +709,7 @@ public class DBImpl implements DB {
 		    
 		    if (env.getFileSize(fname, lfileSize).ok() && env.newAppendableFile(fname, logFile0).ok()) {
 		    	logFile = logFile0.getValue();
-//		    	Log(options_.info_log, "Reusing old log %s \n", fname.c_str());
+		    	Logger0.log0(options.infoLog, "Reusing old log %s \n", fname);
 		    	logWriter = new LogWriter(logFile, lfileSize.getValue());
 		    	logFileNumber = logNumber;
 		    	if (mem != null) {
@@ -715,7 +718,7 @@ public class DBImpl implements DB {
 		        } else {
 		            // mem can be NULL if lognum exists but was empty.
 		            memtable = new MemTable(internalComparator);
-		            //mem_->Ref();
+		            memtable.ref();
 		        }
 		    }
 		}
@@ -726,7 +729,8 @@ public class DBImpl implements DB {
 				saveManifest.setValue(true);
 				status = writeLevel0Table(mem, edit, null);
 			}
-			mem = null; //mem->Unref();
+			mem.unref();
+			mem = null;
 		}
 		
 		return status;
@@ -747,24 +751,17 @@ public class DBImpl implements DB {
 		meta.number = versions.newFileNumber();
 		pendingOutputs.add(meta.number);
 		Iterator0 iter = mem.newIterator();
-//		Log(options_.info_log, "Level-0 table #%llu: started",
-//			      (unsigned long long) meta.number);
+		Logger0.log0(options.infoLog, "Level-0 table #%d: started", meta.number);
 		
-		Status s = null;
+		Status s = Status.ok0();
 		{
 		    mutex.unlock();
-		    try {
-		    	s = Builder.buildTable(dbname, env, options, tcache, iter, meta);
-		    } catch (Exception e) {
-		    	//TODO
-		    }
+			s = Builder.buildTable(dbname, env, options, tcache, iter, meta);
 		    mutex.lock();
 		}
 		
-//		  Log(options_.info_log, "Level-0 table #%llu: %lld bytes %s",
-//			      (unsigned long long) meta.number,
-//			      (unsigned long long) meta.file_size,
-//			      s.ToString().c_str());
+		Logger0.log0(options.infoLog, "Level-0 table #%d: %d bytes %s", meta.number, meta.fileSize, s);
+		
 		iter = null;
 		
 		pendingOutputs.remove(meta.number);
@@ -796,12 +793,11 @@ public class DBImpl implements DB {
 	 * @return
 	 */
 	Status makeRoomForWrite(boolean force /* compact even if there is room? */) {
-		//TODO
 		mutex.assertHeld();
 		assert(!writers.isEmpty());
+		Status s = Status.ok0();
 		try {
 			boolean allowDelay = !force;
-			Status s = null;
 			while (true) {
 				if (!bgError.ok()) {// Yield previous error
 				      s = bgError.clone();
@@ -825,12 +821,12 @@ public class DBImpl implements DB {
 				 } else if (immtable != null) {
 				      // We have filled up the current memtable, but the previous
 				      // one is still being compacted, so we wait.
-	//			      Log(options_.info_log, "Current memtable full; waiting...\n");
+				      Logger0.log0(options.infoLog, "Current memtable full; waiting...\n");
 				      bgCv.await();
 				 } else if (versions.numLevelFiles(0) >= DBFormat.kL0_StopWritesTrigger) {
 				      // There are too many level-0 files.
-	//			      Log(options_.info_log, "Too many L0 files; waiting...\n");
-					 bgCv.await();
+				      Logger0.log0(options.infoLog, "Too many L0 files; waiting...\n");
+				      bgCv.await();
 				 } else {
 				      // Attempt to switch to a new memtable and trigger compaction of old
 				      assert(versions.prevLogNumber() == 0);
@@ -842,23 +838,25 @@ public class DBImpl implements DB {
 				    	  versions.reuseFileNumber(newLogNumber);
 				    	  break;
 				      }
-				      logWriter = null; // TODO: delete log_;
-				      logFile = null; //TODO: delete logfile_;
+				      logWriter.delete();
+				      logWriter = null;
+				      logFile.delete();
+				      logFile = null;
+				      
 				      logFile = lfile.getValue();
 				      logFileNumber = newLogNumber;
 				      logWriter = new LogWriter(lfile.getValue());
 				      immtable = memtable;
 				      hasImm.set(immtable); //has_imm_.Release_Store(imm_);
 				      memtable = new MemTable(internalComparator);
-				      //mem_->Ref();
+				      memtable.ref();
 				      force = false;   // Do not force another compaction if have room
 				      maybeScheduleCompaction();
 				 }
 			}
-			return s; //TODO: May be null
+			return s;
 		} catch (Exception e) {
-			//TODO:
-			return null;
+			return Status.otherError(""+e);
 		}
 	}
 	
@@ -871,8 +869,8 @@ public class DBImpl implements DB {
 		long size = WriteBatchInternal.byteSize(first.batch);
 		 
 		// Allow the group to grow up to a maximum size, but if the
-		  // original write is small, limit the growth so we do not slow
-		  // down the small write too much.
+		// original write is small, limit the growth so we do not slow
+		// down the small write too much.
 		long maxSize = 1 << 20;
 		if (size <= (128<<10)) {
 			maxSize = size + (128<<10);
@@ -933,13 +931,14 @@ public class DBImpl implements DB {
 		    // No work to be done
 		} else {
 			bgCompactionScheduled = true;
-		    //TODO: env.schedule(&DBImpl::BGWork, this);
+		    env.schedule(new BgWorkRunnable());
 		}
 	}
 	
-	static void bgWork(Object obj) {
-		DBImpl db = (DBImpl)obj;
-		db.backgroundCall();
+	public class BgWorkRunnable implements Runnable {
+		public void run() {
+			backgroundCall();
+		}
 	}
 	
 	void backgroundCall() {
@@ -985,17 +984,18 @@ public class DBImpl implements DB {
 			if (c != null) {
 				manualEnd = c.input(0, c.numInputFiles(0) - 1).largest;
 			}
-//			    Log(options_.info_log,
-//			        "Manual compaction at level-%d from %s .. %s; will stop at %s\n",
-//			        m->level,
-//			        (m->begin ? m->begin->DebugString().c_str() : "(begin)"),
-//			        (m->end ? m->end->DebugString().c_str() : "(end)"),
-//			        (m->done ? "(end)" : manual_end.DebugString().c_str()));
+			
+		    Logger0.log0(options.infoLog,
+		        "Manual compaction at level-%d from %s .. %s; will stop at %s\n",
+		        m.level,
+		        (m.begin != null ? m.begin.debugString() : "(begin)"),
+		        (m.end != null ? m.end.debugString() : "(end)"),
+		        (m.done ? "(end)" : manualEnd.debugString()));
 		} else {
 			c = versions.pickCompaction();
 		}
 		
-	    Status status = Status.defaultStatus();
+	    Status status = Status.ok0();
 	    if (c == null) {
 	    	// Nothing to do
 	    } else if (!isManual && c.isTrivialMove()) {
@@ -1009,20 +1009,17 @@ public class DBImpl implements DB {
 	    	if (!status.ok()) {
 	    		recordBackgroundError(status);
 	    	}
-//	    	VersionSet.LevelSummaryStorage tmp;
-//	        Log(options_.info_log, "Moved #%lld to level-%d %lld bytes %s: %s\n",
-//	                static_cast<unsigned long long>(f->number),
-//	                c->level() + 1,
-//	                static_cast<unsigned long long>(f->file_size),
-//	                status.ToString().c_str(),
-//	                versions_->LevelSummary(&tmp));
+	    	
+	        Logger0.log0(options.infoLog, "Moved #%d to level-%d %d bytes %s: %s\n",
+	                f.number,
+	                c.level() + 1,
+	                f.fileSize,
+	                status,
+	                versions.levelSummary());
 	    } else {
 	    	CompactionState compact = new CompactionState(c);
-	    	try {
-	    		status = doCompactionWork(compact);
-	    	} catch (Exception e) {
-	    		//TODO
-	    	}
+	    	status = doCompactionWork(compact);
+	    	
 	        if (!status.ok()) {
 	          recordBackgroundError(status);
 	        }
@@ -1038,8 +1035,7 @@ public class DBImpl implements DB {
 	    } else if (shuttingDown.get() != null) { //shutting_down_.Acquire_Load()
 	        // Ignore compaction errors found during shutting down
 	    } else {
-//	        Log(options_.info_log,
-//	            "Compaction error: %s", status.ToString().c_str());
+	        Logger0.log0(options.infoLog, "Compaction error: %s", status);
 	    }
 	    
 	    if (isManual) {
@@ -1148,12 +1144,12 @@ public class DBImpl implements DB {
 			s = iter.status();
 			iter = null;
 			if (s.ok()) {
-//				Log(options_.info_log,
-//				          "Generated table #%llu@%d: %lld keys, %lld bytes",
-//				          (unsigned long long) output_number,
-//				          compact->compaction->level(),
-//				          (unsigned long long) current_entries,
-//				          (unsigned long long) current_bytes);
+				Logger0.log0(options.infoLog,
+				          "Generated table #%d@%d: %d keys, %d bytes",
+				          outputNumber,
+				          compact.compaction.level(),
+				          currentEntries,
+				          currentBytes);
 			}
 		}
 		
@@ -1166,36 +1162,37 @@ public class DBImpl implements DB {
 	 * @return
 	 */
 	Status installCompactionResults(CompactionState compact) {
-		//TODO
 		mutex.assertHeld();
-//		  Log(options_.info_log,  "Compacted %d@%d + %d@%d files => %lld bytes",
-//			      compact->compaction->num_input_files(0),
-//			      compact->compaction->level(),
-//			      compact->compaction->num_input_files(1),
-//			      compact->compaction->level() + 1,
-//			      static_cast<long long>(compact->total_bytes));
+		Logger0.log0(options.infoLog,  "Compacted %d@%d + %d@%d files => %d bytes",
+			      compact.compaction.numInputFiles(0),
+			      compact.compaction.level(),
+			      compact.compaction.numInputFiles(1),
+			      compact.compaction.level() + 1,
+			      compact.totalBytes);
+		
+		// Add compaction outputs
 		compact.compaction.addInputDeletions(compact.compaction.edit());
 		int level = compact.compaction.level();
 		for (int i = 0; i < compact.outputs.size(); i++) {
 			CompactionState.Output out = compact.outputs.get(i);
 			compact.compaction.edit().addFile(level+1, out.number, out.fileSize, out.smallest, out.largest);
 		}
+		
 		return versions.logAndApply(compact.compaction.edit(), mutex);
 	}
 	
-	/*
+	/**
 	 * EXCLUSIVE_LOCKS_REQUIRED(mutex)
 	 */
-	Status doCompactionWork(CompactionState compact) throws Exception {
-		//TODO
+	Status doCompactionWork(CompactionState compact) {
 		long startMillis = env.nowMillis();
 		long immMillis = 0;  // millis spent doing imm compactions
 		
-//	  Log(options_.info_log,  "Compacting %d@%d + %d@%d files",
-//		      compact->compaction->num_input_files(0),
-//		      compact->compaction->level(),
-//		      compact->compaction->num_input_files(1),
-//		      compact->compaction->level() + 1);
+		Logger0.log0(options.infoLog,  "Compacting %d@%d + %d@%d files",
+			      compact.compaction.numInputFiles(0),
+			      compact.compaction.level(),
+			      compact.compaction.numInputFiles(1),
+			      compact.compaction.level() + 1);
 		
 		assert(versions.numLevelFiles(compact.compaction.level()) > 0);
 		assert(compact.builder == null);
@@ -1209,10 +1206,9 @@ public class DBImpl implements DB {
 		// Release mutex while we're actually doing the compaction work
 		mutex.unlock();
 		
-		
 		Iterator0 input = versions.makeInputIterator(compact.compaction);
 		input.seekToFirst();
-		Status status = Status.defaultStatus();
+		Status status = Status.ok0();
 		ParsedInternalKey ikey = new ParsedInternalKey();
 		ByteBuf currentUserKey = ByteBufFactory.defaultByteBuf();
 		boolean hasCurrentUserKey = false;
@@ -1280,7 +1276,7 @@ public class DBImpl implements DB {
 						break;
 				}
 				
-				if (compact.builder.numEntries() == 0) { //TODO: BUGS?
+				if (compact.builder.numEntries() == 0) {
 					compact.currentOutput().smallest.decodeFrom(key);
 				}
 				compact.currentOutput().largest.decodeFrom(key);
@@ -1330,9 +1326,7 @@ public class DBImpl implements DB {
 			recordBackgroundError(status);
 		}
 		
-//		  VersionSet::LevelSummaryStorage tmp;
-//		  Log(options_.info_log,
-//		      "compacted to: %s", versions_->LevelSummary(&tmp));
+		Logger0.log0(options.infoLog, "compacted to: %s", versions.levelSummary());
 		return status;
 	}
 	
@@ -1414,15 +1408,61 @@ public class DBImpl implements DB {
 		return internalComparator.userComparator();
 	}
 	
-	// Record a sample of bytes read at the specified internal key.
-	  // Samples are taken approximately once every config::kReadBytesPeriod
-	  // bytes.
+	/**
+	 * Record a sample of bytes read at the specified internal key.
+	 * Samples are taken approximately once every config::kReadBytesPeriod bytes.
+	 * @param key
+	 */
 	public void recordReadSample(Slice key) {
-		//TODO
+		mutex.lock();
+		try {
+			if (versions.current().recordReadSample(key)) {
+			    maybeScheduleCompaction();
+			}
+		} finally {
+			mutex.unlock();
+		}
 	}
 	
-	public Iterator0 newDBIterator(Comparator0 userKeyComparator, Iterator0 internalCursor, long squence, int seed) {
-		//TODO
-		return null;
+	Iterator0 newInternalIterator(ReadOptions options,
+            FuncOutputLong latestSnapshot,
+            FuncOutputInt seed0) {
+		IterState cleanup = new IterState();	
+		mutex.lock();
+		latestSnapshot.setValue(versions.lastSequence());
+
+		// Collect together all needed child iterators
+		ArrayList<Iterator0> list = new ArrayList<>();
+		list.add(memtable.newIterator());
+		memtable.ref();
+		if (memtable != null) {
+			list.add(memtable.newIterator());
+				memtable.ref();
+		}
+		versions.current().addIterators(options, list);
+		Iterator0 internalIter =
+				Merger.newMergingIterator(internalComparator, (Iterator0[])list.toArray(), list.size());
+		versions.current().ref();
+
+		cleanup.mutex = mutex;
+		cleanup.mem = memtable;
+		cleanup.imm = immtable;
+		cleanup.version = versions.current();
+		internalIter.registerCleanup(new CleanupIteratorState(cleanup));
+
+		seed0.setValue(++seed);
+		mutex.unlock();
+		return internalIter;
+	}
+
+	
+	public Iterator0 newIterator(ReadOptions options) {
+		FuncOutputLong latestSnapshot = new FuncOutputLong();
+		FuncOutputInt seed0 = new FuncOutputInt();
+		Iterator0 iter = newInternalIterator(options, latestSnapshot, seed0);
+		return DBIter.newDBIterator(
+		      this, userComparator(), iter,
+		      (options.snapshot != null ? ((Snapshot)(options.snapshot)).number : latestSnapshot.getValue()),
+		      seed0.getValue());
 	}
 }

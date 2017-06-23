@@ -97,7 +97,7 @@ public class EnvImpl implements Env {
 				dis = new DataInputStream(new FileInputStream(new File(filename)));
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
-				return Status.ioError(filename+" SequentialFileImpl open failed: "+e.getMessage());
+				return Status.ioError(filename+" SequentialFileImpl.open failed: "+e);
 			}
 		}
 		
@@ -127,13 +127,15 @@ public class EnvImpl implements Env {
 				result.init(scratch, 0, r);
 				if (r < 0) {
 					// We leave status as ok if we hit the end of the file
+					result.init(scratch, 0, 0);
 				} else if (r < n) {
 					// A partial read with an error: return a non-ok status
 				    s = Status.ioError(filename+" partial read");
 				}
+				result.init(scratch, 0, r);
 				return s;
 			} catch (IOException e) {
-				return Status.ioError(filename+" read failed: "+e.getMessage());
+				return Status.ioError(filename+" SequentialFileImpl.read failed: "+e);
 			}
 		}
 		
@@ -142,7 +144,7 @@ public class EnvImpl implements Env {
 				dis.skip(n);
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" read failed: "+e.getMessage());
+				return Status.ioError(filename+" SequentialFileImpl.skip failed: "+e.getMessage());
 			}
 		}
 	}
@@ -160,7 +162,7 @@ public class EnvImpl implements Env {
 				dis = new DataInputStream(new FileInputStream(new File(filename)));
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
-				return Status.ioError(filename+" RandomAccessFileImpl open failed: "+e.getMessage());
+				return Status.ioError(filename+" RandomAccessFileImpl.open failed: "+e);
 			}
 		}
 		
@@ -185,10 +187,11 @@ public class EnvImpl implements Env {
 				dis.skip(offset);
 				int r = dis.read(scratch, 0, n);
 				if (r < n)
-					return Status.ioError(filename+" RandomAccessFileImpl read failed: partial read");
+					return Status.ioError(filename+" RandomAccessFileImpl.read failed: partial read");
+				result.init(scratch, 0, r);
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" RandomAccessFileImpl read failed: "+e.getMessage());
+				return Status.ioError(filename+" RandomAccessFileImpl.read failed: "+e);
 			}
 		}
 	}
@@ -209,7 +212,7 @@ public class EnvImpl implements Env {
 				buffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" MmapReadableFile open failed: "+e.getMessage());
+				return Status.ioError(filename+" MmapReadableFile.open failed: "+e);
 			}
 		}
 		
@@ -231,10 +234,11 @@ public class EnvImpl implements Env {
 		
 		public Status read(long offset, int n, Slice result, byte[] scratch) {
 			if (offset + n > fileSize)
-				return Status.ioError(filename+" RandomAccessFileImpl read failed: exceed file size");
+				return Status.ioError(filename+" RandomAccessFileImpl.read failed: exceed file size");
 			
 			buffer.position((int)offset);
 			buffer.get(scratch, 0, n);
+			result.init(scratch, 0, n);
 			return Status.ok0();
 		}
 	}
@@ -256,7 +260,7 @@ public class EnvImpl implements Env {
 				dos = new DataOutputStream(fos);
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
-				return Status.ioError(filename+" writable open failed: "+e.getMessage());
+				return Status.ioError(filename+" WritableFileImpl.open failed: "+e);
 			}
 		}
 		
@@ -265,7 +269,7 @@ public class EnvImpl implements Env {
 				dos.write(data.data, data.offset, data.size());
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" writable append failed: "+e.getMessage());
+				return Status.ioError(filename+" WritableFileImpl.append failed: "+e.getMessage());
 			}
 		}
 		
@@ -281,7 +285,7 @@ public class EnvImpl implements Env {
 				}
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" writable closed failed: "+e.getMessage());
+				return Status.ioError(filename+" WritableFileImpl.closed failed: "+e.getMessage());
 			}
 		}
 		
@@ -290,7 +294,7 @@ public class EnvImpl implements Env {
 				dos.flush();
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" writable flush failed: "+e.getMessage());
+				return Status.ioError(filename+" WritableFileImpl.flush failed: "+e.getMessage());
 			}
 		}
 		
@@ -299,9 +303,9 @@ public class EnvImpl implements Env {
 				fos.getFD().sync();
 				return Status.ok0();
 			} catch (SyncFailedException e) {
-				return Status.ioError(filename+" writable sync failed: "+e.getMessage());
+				return Status.ioError(filename+" WritableFileImpl.sync failed: "+e.getMessage());
 			} catch (IOException e) {
-				return Status.ioError(filename+" writable sync failed: "+e.getMessage());
+				return Status.ioError(filename+" WritableFileImpl.sync failed: "+e.getMessage());
 			}
 		}
 		
@@ -422,7 +426,7 @@ public class EnvImpl implements Env {
 			Files.delete(FileSystems.getDefault().getPath(fname));
 			return Status.ok0();
 		} catch (IOException e) {
-			return Status.ioError(fname+" delete failed: "+e.getMessage());
+			return Status.ioError(fname+" deleteFile failed: "+e);
 		}
 	}
 
@@ -432,7 +436,7 @@ public class EnvImpl implements Env {
 			Files.createDirectory(FileSystems.getDefault().getPath(dirname));
 			return Status.ok0();
 		} catch (IOException e) {
-			return Status.ioError(dirname+" create dir failed: "+e.getMessage());
+			return Status.ioError(dirname+" createDir failed: "+e);
 		}
 	}
 
@@ -442,7 +446,7 @@ public class EnvImpl implements Env {
 			Files.delete(FileSystems.getDefault().getPath(dirname));
 			return Status.ok0();
 		} catch (IOException e) {
-			return Status.ioError(dirname+" delete failed: "+e.getMessage());
+			return Status.ioError(dirname+" deleteDir failed: "+e);
 		}
 	}
 
@@ -453,7 +457,7 @@ public class EnvImpl implements Env {
 			fileSize.setValue(size);
 			return Status.ok0();
 		} catch (IOException e) {
-			return Status.ioError(fname+" get file size failed: "+e.getMessage());
+			return Status.ioError(fname+" getFileSize failed: "+e);
 		}
 	}
 
@@ -463,7 +467,7 @@ public class EnvImpl implements Env {
 		if (ret) 
 			return Status.ok0();
 		else 
-			return Status.ioError(src+" rename to "+target+" failed");
+			return Status.ioError(src+" renameFile to "+target+" failed");
 	}
 
 	static class FileLock0Impl extends FileLock0 {
@@ -485,7 +489,7 @@ public class EnvImpl implements Env {
         	return Status.ok0();
 		} catch (IOException e) {
 			 lock0.setValue(null);
-			 return Status.ioError(fname+" lock failed: "+e.getMessage());
+			 return Status.ioError(fname+" lockFile failed: "+e);
 		} finally {
 			if (os != null) {
 				try {
@@ -504,7 +508,7 @@ public class EnvImpl implements Env {
 			try {
 				l.lock.release();
 			} catch (IOException e) {
-				return Status.ioError(l.fname+" unlock failed: "+e.getMessage());
+				return Status.ioError(l.fname+" unlockFile failed: "+e);
 			}
 		}
 		return Status.ok0();
@@ -612,9 +616,7 @@ public class EnvImpl implements Env {
 			deleteFile(fname);
 		}
 		return s;
-	}
-
-	
+	}	
 
 	@Override
 	public Status writeStringToFile(Slice data, String fname) {

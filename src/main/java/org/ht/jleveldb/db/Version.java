@@ -14,6 +14,7 @@ import org.ht.jleveldb.db.format.InternalKeyComparator;
 import org.ht.jleveldb.db.format.LookupKey;
 import org.ht.jleveldb.db.format.ParsedInternalKey;
 import org.ht.jleveldb.db.format.ValueType;
+import org.ht.jleveldb.table.Table;
 import org.ht.jleveldb.table.TwoLevelIterator;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Coding;
@@ -55,18 +56,22 @@ public class Version {
 	
 	public void addIterators(ReadOptions options, List<Iterator0> iters) {
 		// Merge all level zero files together since they may overlap
-		for (int i = 0; i < files[0].size(); i++) {
+		for (int i = 0; i < files[0].size(); i++)
 		    iters.add(vset.tcache.newIterator(options, files[0].get(i).number, files[0].get(i).fileSize));
-		}
 
 		// For levels > 0, we can use a concatenating iterator that sequentially
 		// walks through the non-overlapping files in the level, opening them
 		// lazily.
 		for (int level = 1; level < DBFormat.kNumLevels; level++) {
-		    if (!files[level].isEmpty()) {
+		    if (!files[level].isEmpty())
 		    	iters.add(newConcatenatingIterator(options, level));
-		    }
 		}
+	}
+	
+	public Iterator0 newConcatenatingIterator(ReadOptions options, int level) {
+		return TwoLevelIterator.newTwoLevelIterator(
+			      new LevelFileNumIterator(vset.icmp, files[level]), 
+			      VersionSetGlobal.getFileIterator, vset.tcache, options);
 	}
 	
 	
@@ -82,9 +87,16 @@ public class Version {
 		Comparator0 ucmp;
 		Slice userKey;
 		ByteBuf value;
+		
+		public Saver(SaverState state, Comparator0 ucmp, Slice userKey, ByteBuf value) {
+			this.state = state;
+			this.ucmp = ucmp;
+			this.userKey = userKey;
+			this.value = value;
+		}
 	}
 	
-	TableCache.HandleResult saveValue = new TableCache.HandleResult() {
+	Table.HandleResult valueSaver = new Table.HandleResult() {
 		public void run(Object arg, Slice ikey, Slice v) {
 			Saver s = (Saver)arg;
 			ParsedInternalKey parsedKey = new ParsedInternalKey();
@@ -93,39 +105,40 @@ public class Version {
 			} else {
 				if (s.ucmp.compare(parsedKey.userKey, s.userKey) == 0) {
 					s.state = (parsedKey.type == ValueType.Value) ? SaverState.kFound : SaverState.kDeleted;
-					if (s.state == SaverState.kFound) {
+					if (s.state == SaverState.kFound)
 						s.value.assign(v.data(), v.size());
-					}
 			    }
 			}
 		}
 	};
-		
-	Comparator<FileMetaData> newestFirst = new Comparator<FileMetaData>() {
+
+	
+	static Comparator<FileMetaData> newestFirst = new Comparator<FileMetaData>() {
 		public int compare(FileMetaData o1, FileMetaData o2) {
 			return -1 * Long.compare(o1.number, o2.number);
 		}
 	};
 	
-	/** 
-	 * Lookup the value for key.  If found, store it in *val and
-	 * return OK.  Else return a non-OK status.  Fills *stats.
-	 * REQUIRES: lock is not held
-	 */
 	public static class GetStats {
 		public FileMetaData seekFile;
 		int seekFileLevel;
 	}
+	
+	/**
+	 * Lookup the value for key.  If found, store it in {@code value}. Fills {@code stats}.</br></br>
+	 * 
+	 * <b>REQUIRES: lock is not held</b>
+	 * @param options
+	 * @param k
+	 * @param value [OUTPUT]
+	 * @param stats [OUTPUT]
+	 * @return OK if found, else non-OK.
+	 */
 	public Status get(ReadOptions options, LookupKey k, ByteBuf value, GetStats stats) {
 		Slice ikey = k.internalKey();
 		Slice userKey = k.userKey();
 		Comparator0 ucmp = vset.icmp.userComparator();
-		Status s;
-
-		stats.seekFile = null;
-		stats.seekFileLevel = -1;
-		FileMetaData lastFileRead = null;
-		int lastFileReadLevel = -1;
+		Status s = Status.ok0();
 
 		// We can search level-by-level since entries never hop across
 		// levels.  Therefore we are guaranteed that if we find data
@@ -143,6 +156,7 @@ public class Version {
 		    	// Level-0 files may overlap each other.  Find all files that
 		    	// overlap user_key and process them in order from newest to oldest.
 		    	//tmp.reserve(numFiles);
+		    	tmp.clear();
 		    	for (int i = 0; i < numFiles; i++) {
 		    		FileMetaData f = levelFiles.get(i);
 		    		if (ucmp.compare(userKey, f.smallest.userKey()) >= 0 &&
@@ -150,8 +164,10 @@ public class Version {
 		    			tmp.add(f);
 		    		}
 		    	}
+		    	
 		    	if (tmp.isEmpty()) 
-		    		continue;
+		    		//go to next level
+		    		continue; 
 
 		    	Collections.sort(tmp, newestFirst); //std::sort(tmp.begin(), tmp.end(), NewestFirst);
 		    	levelFiles = tmp; //files = &tmp[0];
@@ -164,17 +180,24 @@ public class Version {
 		    		numFiles = 0;
 		    	} else {
 		    		tmp2 = levelFiles.get(index);
-		    		
 		    		if (ucmp.compare(userKey, tmp2.smallest.userKey()) < 0) {
 		    			// All of "tmp2" is past any data for userKey
-		    			files = null;
+		    			levelFiles = null;
 		    			numFiles = 0;
 		    		} else {
-		    			levelFiles = tmp2; //TODO: BUG
+		    			tmp.clear();
+		    			tmp.add(tmp2);
+		    			levelFiles = tmp;
 		    			numFiles = 1;
 		    		}
 		    	}
 		    }
+		    
+
+			stats.seekFile = null;
+			stats.seekFileLevel = -1;
+			FileMetaData lastFileRead = null;
+			int lastFileReadLevel = -1;
 
 		    for (int i = 0; i < numFiles; ++i) {
 		    	if (lastFileRead != null && stats.seekFile == null) {
@@ -187,37 +210,36 @@ public class Version {
 		    	lastFileRead = f;
 		    	lastFileReadLevel = level;
 
-		    	Saver saver = new Saver();
-		    	saver.state = SaverState.kNotFound;
-		    	saver.ucmp = ucmp;
-		    	saver.userKey = userKey;
-		    	saver.value = value;
-		    	s = vset.tcache.get(options, f.number, f.fileSize, ikey, saver, saveValue);
+		    	Saver saver = new Saver(SaverState.kNotFound, ucmp, userKey, value);
+		    	s = vset.tcache.get(options, f.number, f.fileSize, ikey, saver, valueSaver);
 		    	if (!s.ok()) {
 		    		return s;
 		    	}
+		    	
 		    	switch (saver.state) {
 		        case kNotFound:
 		        	break;      // Keep searching in other files
 		        case kFound:
 		        	return s;
 		        case kDeleted:
-		        	s = Status.notFound(null);  // TODO: may throws null pointer exception, Use empty error message for speed
-		          return s;
+		        	s = Status.notFound();  // May throws null pointer exception, Use empty error message for speed
+		        	return s;
 		        case kCorrupt:
-		          s = Status.corruption("corrupted key for "+userKey.encodeToString());
-		        return s;
+		        	s = Status.corruption("corrupted key for "+userKey.encodeToString());
+		        	return s;
 		    	}
 		    }
 		}
 
-		return Status.notFound(null);  // Use an empty error message for speed
+		return Status.notFound();
 	}
 	
-	/** 
-	 * Adds "stats" into the current state.  Returns true if a new
-	 * compaction may need to be triggered, false otherwise.
-	 * REQUIRES: lock is held
+	/**
+	 * Adds {@code stats} into the current state.</br></br>
+	 * 
+	 * <b>REQUIRES: lock is held</b>
+	 * @param stats
+	 * @return {@code true} if a new compaction may need to be triggered, {@code false} otherwise.
 	 */
 	public boolean updateStats(GetStats stats) {
 		FileMetaData f = stats.seekFile;
@@ -235,10 +257,13 @@ public class Version {
 	/** 
 	 * Record a sample of bytes read at the specified internal key.
 	 * Samples are taken approximately once every config::kReadBytesPeriod
-	 * bytes.  </br></br>Returns true if a new compaction may need to be triggered.</br>
-	 * REQUIRES: lock is held
+	 * bytes.  </br></br>
+	 * 
+	 * Returns true if a new compaction may need to be triggered.</br></br>
+	 * 
+	 * <b>REQUIRES: lock is held</b>
 	 */
-	CallBack stateCallback = new CallBack() {
+	static CallBack stateCallback = new CallBack() {
 	    public boolean run(Object arg, int level, FileMetaData f) {
 	    	State0 state = (State0)(arg);
 	    	state.matches++;
@@ -393,17 +418,10 @@ public class Version {
 	public int numFiles(int level) { 
 		return files[level].size(); 
 	}
-	
-	public Iterator0 newConcatenatingIterator(ReadOptions options, int level) {
-		return TwoLevelIterator.newTwoLevelIterator(
-			      new LevelFileNumIterator(vset.icmp, files[level]), 
-			      VersionSetGlobal.getFileIterator, vset.tcache, options);
-	}
-	
 
 	
 	void forEachOverlapping(Slice userKey, Slice internalKey, Object arg, CallBack func) {
-		// TODO(sanjay): Change Version::Get() to use this function.
+		// TODO(sanjay): Change Version::get() to use this function.
 		Comparator0 ucmp = vset.icmp.userComparator();
 
 		  // Search level-0 in order from newest to oldest.
@@ -488,6 +506,7 @@ public class Version {
 
 		  // Backing store for value().  Holds the file number and size.
 		byte[] valueBuf = new byte[16];
+		Slice value0 = new Slice(valueBuf, 0, valueBuf.length);
 		
 		public LevelFileNumIterator(InternalKeyComparator icmp, ArrayList<FileMetaData> flist) {
 			this.icmp = icmp;
@@ -517,7 +536,7 @@ public class Version {
 		    assert(valid());
 		    Coding.encodeFixedNat64(valueBuf, 0, flist.get(index).number);
 		    Coding.encodeFixedNat64(valueBuf, 8, flist.get(index).fileSize);
-		    return new Slice(valueBuf, 0, valueBuf.length);
+		    return value0;
 		}
 		
 		@Override

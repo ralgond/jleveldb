@@ -1,7 +1,8 @@
 package org.ht.jleveldb.db.format;
 
-import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.Slice;
+import org.ht.jleveldb.util.Strings;
 
 public class ParsedInternalKey {
 	public Slice userKey;
@@ -23,10 +24,7 @@ public class ParsedInternalKey {
 		return userKey.size() + 8;
 	}
 	
-	// Append the serialization of "key" to buf.
-	public void append(ByteBuf buf) {
-		
-	}
+	private final static long kSequenceNumberMask = ~(0x0FFL << (64 - 8));
 	
 	// Attempt to parse an internal key from "internal_key".  On success,
 	// stores the parsed data in "*result", and returns true.
@@ -37,9 +35,9 @@ public class ParsedInternalKey {
 		if (n < 8) 
 			return false;
 		
-		long num = 0;// = DecodeFixed64(internal_key.data() + n - 8);
-	    byte c = (byte)(num & 0xff);
-	    sequence = num >> 8;
+		long num = Coding.decodeFixedNat64(internalKey.data, internalKey.offset+n-8);
+	    byte c = (byte)(num & 0xffL);
+	    sequence = ((num >> 8) & kSequenceNumberMask);
 		if (c == ValueType.Deletion.type()) {
 			type = ValueType.Deletion;
 		} else if (c == ValueType.Value.type()) {
@@ -47,13 +45,12 @@ public class ParsedInternalKey {
 		} else {
 			return false;
 		}
-	    userKey = new Slice(internalKey.data(), 8, n - 8);
+	    userKey = new Slice(internalKey.data(), internalKey.offset, n - 8);
 	    
 	    return true;
 	}
 	
 	public String debugString() {
-		//TODO
-		return null;
+		return Strings.escapeString(userKey) + String.format("' @ %d : %d", sequence, type.type);
 	}
 };

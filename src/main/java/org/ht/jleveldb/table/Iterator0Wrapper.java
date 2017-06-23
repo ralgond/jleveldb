@@ -9,8 +9,13 @@ public class Iterator0Wrapper {
 	boolean valid;
 	Slice key;
 
-	public Iterator0Wrapper(Iterator0 iter) {
-		this.iter = iter;
+	
+	public Iterator0Wrapper() {
+		
+	}
+	
+	public Iterator0Wrapper(Iterator0 iter0) {
+		set(iter0);
 	}
 	
 	Iterator0 iter() { 

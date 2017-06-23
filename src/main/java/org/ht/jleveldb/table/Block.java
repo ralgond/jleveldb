@@ -114,7 +114,7 @@ public class Block {
 			this.current = restarts;
 			this.restartIndex = numRestarts;
 			assert(this.numRestarts > 0);
-			this.status = Status.defaultStatus();
+			this.status = Status.ok0();
 		}
 		
 		public boolean valid() {

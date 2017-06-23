@@ -18,7 +18,7 @@ import org.ht.jleveldb.util.Slice;
 //zero, and no Table file will be produced.
 public class Builder {
 	public static Status buildTable(String dbname, Env env, Options options, 
-			TableCache tcache, Iterator0 iter, FileMetaData meta) throws Exception {
+			TableCache tcache, Iterator0 iter, FileMetaData meta) {
 		Status s = null;
 		meta.fileSize = 0;
 		iter.seekToFirst();

@@ -8,6 +8,10 @@ import org.ht.jleveldb.Status;
 import org.ht.jleveldb.table.Format.BlockContents;
 import org.ht.jleveldb.table.Format.BlockHandle;
 import org.ht.jleveldb.table.Format.Footer;
+import org.ht.jleveldb.table.TwoLevelIterator.BlockFunction;
+import org.ht.jleveldb.util.BytewiseComparatorImpl;
+import org.ht.jleveldb.util.Cache;
+import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.FuncOutput;
 import org.ht.jleveldb.util.Slice;
 
@@ -18,16 +22,16 @@ public class Table {
 			filter.delete(); //delete filter;
 			filter = null;
 		    filterData = null; //delete [] filter_data;
-		    //sdelete index_block;
+		    indexBlock.delete();
+		    indexBlock = null; //delete index_block;
 		}
-		 
-
+		
 		Options options;
 		Status status;
 		RandomAccessFile0 file;
 		long cacheId;
 		FilterBlockReader filter;
-		byte[] filterData; //const char* filter_data
+		byte[] filterData;
 
 		BlockHandle metaindexHandle = new BlockHandle();  // Handle to metaindex_block: saved from footer
 		Block indexBlock; //Block* index_block; 
@@ -43,23 +47,143 @@ public class Table {
 		rep.delete();
 	}
 	
+
+	/**
+	 *  Convert an index iterator value (i.e., an encoded BlockHandle)
+	 *  into an iterator over the contents of the corresponding block.
+	 * @param arg
+	 * @param options
+	 * @param indexValue
+	 * @return
+	 */
+	static Iterator0 blockReader(Object arg, ReadOptions options, Slice indexValue) {
+		Table table = (Table)(arg);
+		Cache blockCache = table.rep.options.blockCache;
+		Block block = null;
+		Cache.Handle cacheHandle = null;
+
+		BlockHandle handle = new BlockHandle();
+		Slice input = indexValue.clone();
+		Status s = handle.decodeFrom(input);
+		// We intentionally allow extra stuff in index_value so that we
+		// can add more features in the future.
+
+		if (s.ok()) {
+		    BlockContents contents = new BlockContents();
+		    if (blockCache != null) {
+		    	byte[] cache_key_buffer = new byte[16];
+		    	Coding.encodeFixedNat64(cache_key_buffer, 0, table.rep.cacheId);
+		    	Coding.encodeFixedNat64(cache_key_buffer, 8, handle.offset());
+		    	Slice key = new Slice(cache_key_buffer, 0, 16);
+		    	cacheHandle = blockCache.lookup(key);
+		    	if (cacheHandle != null) {
+		    		block = (Block)(blockCache.value(cacheHandle));
+		    	} else {
+		    		s = Format.readBlock(table.rep.file, options, handle, contents);
+		    		if (s.ok()) {
+		    			block = new Block(contents);
+		    			if (contents.cachable && options.fillCache) {
+		    				cacheHandle = blockCache.insert(key, block, (int)block.size(), deleteCachedBlock);
+		    			}
+		    		}
+		    	}
+		    } else {
+		    	s = Format.readBlock(table.rep.file, options, handle, contents);
+		    	if (s.ok()) {
+		    		block = new Block(contents);
+		    	}
+		    }
+		}
+
+		Iterator0 iter = null;
+		if (block != null) {
+		    iter = block.newIterator(table.rep.options.comparator);
+		    if (cacheHandle == null) {
+		    	iter.registerCleanup(new DeleteBlock(block));
+		    } else {
+		    	iter.registerCleanup(new ReleaseBlock(blockCache, cacheHandle));
+		    }
+		} else {
+		    iter = Iterator0.newErrorIterator(s);
+		}
+		return iter;
+	}
 	
-	  // Returns a new iterator over the table contents.
-	  // The result of NewIterator() is initially invalid (caller must
-	  // call one of the Seek methods on the iterator before using it).
+	static BlockFunction blockReaderCallback = new BlockFunction() {
+		public Iterator0 run(Object arg, ReadOptions options, Slice indexValue) {
+			return blockReader(arg, options, indexValue);
+		}
+	};
+	
+	static class DeleteBlock implements Runnable {
+		Block block;
+		
+		public DeleteBlock(Block block) {
+			this.block = block;
+		}
+		
+		public void run() {
+			if (block == null)
+				return;
+			block.delete();
+			block = null;
+		}
+	}
+	
+	static class ReleaseBlock implements Runnable {
+		Cache cache;
+		Cache.Handle handle;
+		
+		public ReleaseBlock(Cache cache, Cache.Handle handle) {
+			this.cache = cache;
+			this.handle = handle;
+		}
+		
+		public void run() {
+			if (cache == null || handle == null)
+				return;
+			
+			cache.release(handle);
+			cache = null;
+			handle = null;
+		}
+	}
+	
+	static Cache.Deleter deleteCachedBlock = new Cache.Deleter() {
+		public void run(Slice key, Object value) {
+			Block block = (Block)(value);
+			if (block == null)
+				return;
+			block.delete();
+			block = null;
+		}
+	};
+
+	/**
+	 * Returns a new iterator over the table contents.</br>
+	 * The result of newIterator() is initially invalid (caller must 
+	 * call one of the seek methods on the iterator before using it).
+	 * @param options
+	 * @return
+	 */
 	public Iterator0 newIterator(ReadOptions options) {
-		//TODO
-		return null;
+		return TwoLevelIterator.newTwoLevelIterator(
+			      rep.indexBlock.newIterator(rep.options.comparator),
+			      blockReaderCallback, this, options);
 	}
 
-	  // Given a key, return an approximate byte offset in the file where
-	  // the data for that key begins (or would begin if the key were
-	  // present in the file).  The returned value is in terms of file
-	  // bytes, and so includes effects like compression of the underlying data.
-	  // E.g., the approximate offset of the last key in the table will
-	  // be close to the file length.
+	  // 
+	/**
+	 * Given a key, return an approximate byte offset in the file where 
+	 * the data for that key begins (or would begin if the key were 
+	 * present in the file).  The returned value is in terms of file
+	 * bytes, and so includes effects like compression of the underlying data.</br>
+	 * E.g., the approximate offset of the last key in the table will
+	 * be close to the file length.
+	 * @param key
+	 * @return
+	 */
 	public long approximateOffsetOf(Slice key) {
-		//TODO
 		Iterator0 indexIter = rep.indexBlock.newIterator(rep.options.comparator);
 		indexIter.seek(key);
 		long result;
@@ -87,12 +211,12 @@ public class Table {
 	  
 	  
 	  
-	interface HandleResult {
-		void run(Slice k, Slice v);
+	public interface HandleResult {
+		void run(Object arg, Slice k, Slice v);
 	}
 	
-	Status internalGet(ReadOptions options, Slice k, HandleResult handleResult) {
-		 Status s = Status.defaultStatus();
+	public Status internalGet(ReadOptions options, Slice k, Object arg, HandleResult handleResult) {
+		 Status s = Status.ok0();
 		 Iterator0 iiter = rep.indexBlock.newIterator(rep.options.comparator);
 		 iiter.seek(k);
 		 if (iiter.valid()) {
@@ -107,7 +231,7 @@ public class Table {
 		    	  Iterator0 blockIter = blockReader(this, options, iiter.value());
 		    	  blockIter.seek(k);
 		    	  if (blockIter.valid()) {
-		    		  handleResult.run(blockIter.key(), blockIter.value());
+		    		  handleResult.run(arg, blockIter.key(), blockIter.value());
 		    	  }
 		    	  s = blockIter.status();
 		    	  blockIter = null; //delete block_iter;
@@ -121,11 +245,55 @@ public class Table {
 	}
 	
 	void readMeta(Footer footer) {
-		//TODO
+		if (rep.options.filterPolicy == null) {
+		    return;  // Do not need any metadata
+		}
+
+		// TODO(sanjay): Skip this if footer.metaindex_handle() size indicates
+		// it is an empty block.
+		ReadOptions opt = new ReadOptions();
+		if (rep.options.paranoidChecks) {
+		    opt.verifyChecksums = true;
+		}
+		BlockContents contents = new BlockContents();
+		if (!Format.readBlock(rep.file, opt, footer.metaindexHandle(), contents).ok()) {
+		    // Do not propagate errors since meta info is not needed for operation
+		    return;
+		}
+		Block meta = new Block(contents);
+
+		Iterator0 iter = meta.newIterator(BytewiseComparatorImpl.getInstance());
+		String key = "filter.";
+		key += (rep.options.filterPolicy.name());
+		iter.seek(new Slice(key));
+		if (iter.valid() && iter.key().equals(new Slice(key))) {
+		    readFilter(iter.value());
+		}
+		iter.delete(); //delete iter;
+		meta.delete(); //delete meta;
 	}
 	
 	void readFilter(Slice filterHandleValue) {
-		//TODO
+		Slice v = filterHandleValue.clone();
+		BlockHandle filterHandle = new BlockHandle();
+		if (!filterHandle.decodeFrom(v).ok()) {
+			return;
+		}
+
+		// We might want to unify with ReadBlock() if we start
+		// requiring checksum verification in Table::Open.
+		ReadOptions opt = new ReadOptions();
+		if (rep.options.paranoidChecks) {
+		    opt.verifyChecksums = true;
+		}
+		BlockContents block = new BlockContents();
+		if (!Format.readBlock(rep.file, opt, filterHandle, block).ok()) {
+		    return;
+		}
+		if (block.heapAllocated) {
+		    rep.filterData = block.data.data();     // Will need to delete later
+		}
+		rep.filter = new FilterBlockReader(rep.options.filterPolicy, block.data);
 	}
 		  
 	
@@ -183,11 +351,5 @@ public class Table {
 		 }
 		 
 		 return s;
-	}
-	
-	
-	static Iterator0 blockReader(Object arg, ReadOptions options, Slice indexValue) {
-		//TODO
-		return null;
 	}
 }

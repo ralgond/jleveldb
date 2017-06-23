@@ -11,26 +11,10 @@ public class BytewiseComparatorImpl extends Comparator0 {
 	public int compare(Slice a, Slice b) {
 		return compare(a.data, a.offset, a.size(), b.data, b.offset, b.size());
 	}
-	
-	final public static int memcmp(byte[] a, int aoff, byte[] b, int boff, int size) {
-		for (int i = 0; i < size; i++) {
-			if (a[aoff+i] < b[boff+i])
-				return -1;
-			else if (a[aoff+i] > b[boff+i])
-				return 1;
-		}
-		return 0;
-	}
-	
+
 	@Override
 	public int compare(byte[] a, int aoff, int asize, byte[] b, int boff, int bsize) {
-		int minLen = Integer.min(asize, bsize);
-		int r = memcmp(a, aoff, b, boff, minLen);
-		if (r == 0) {
-		    if (asize < bsize) r = -1;
-		    else if (asize > bsize) r = +1;
-		}
-		return r;
+		return ByteUtils.bytewiseCompare(a, aoff, asize, b, boff, bsize);
 	}
 
 	@Override
@@ -54,9 +38,9 @@ public class BytewiseComparatorImpl extends Comparator0 {
 	        int diffByte = (start.getByte(diffIndex) & 0xff);
 	        if (diffByte < 0xff &&
 	            diffByte + 1 < (limit.getByte(diffIndex) & 0xff)) {
-	          start.setByte(diffIndex, start.getByte(diffIndex));
-	          start.resize(diffIndex + 1);
-	          assert(compare(new Slice(start), limit) < 0);
+	        	start.setByte(diffIndex, (byte)((start.getByte(diffIndex)+1)&0XFF));
+	        	start.resize(diffIndex + 1);
+	        	assert(compare(new Slice(start), limit) < 0);
 	        }
 	    }
 	}

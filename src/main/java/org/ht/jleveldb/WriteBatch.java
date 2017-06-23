@@ -3,11 +3,15 @@ package org.ht.jleveldb;
 import org.ht.jleveldb.db.WriteBatchInternal;
 import org.ht.jleveldb.db.format.ValueType;
 import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.Slice;
 
 public class WriteBatch {
 
+	public WriteBatch() {
+		clear();
+	}
 	/**
 	 * Store the mapping "key->value" in the database.
 	 * @param key
@@ -35,7 +39,7 @@ public class WriteBatch {
 	 */
 	public void clear() {
 		rep.clear();
-		rep.resize(WriteBatchInternal.HEADER); //TODO: save room
+		rep.resize(WriteBatchInternal.kHEADER);
 	}
 	
 	/**
@@ -50,11 +54,13 @@ public class WriteBatch {
 	
 	public Status iterate(Handler handler) {
 		Slice input = new Slice(rep);
-		if (input.size() < WriteBatchInternal.HEADER) {
+		if (input.size() < WriteBatchInternal.kHEADER) {
 			return Status.corruption("malformed WriteBatch (too small)");
 		}
 		
-		input.removePrefix(WriteBatchInternal.HEADER);
+		input.removePrefix(WriteBatchInternal.kHEADER);
+		
+		
 		Slice key = new Slice();
 		Slice value = new Slice();
 		int found = 0;
@@ -66,12 +72,14 @@ public class WriteBatch {
 			if (tag == ValueType.Value.type()) {
 				if (Coding.getLengthPrefixedSlice(input, key) &&
 						Coding.getLengthPrefixedSlice(input, value)) {
+					//System.out.printf("====>[PUT] key=%s, value=%s\n", key.encodeToString(), value.encodeToString());
 					handler.put(key, value);
 				} else {
 					return Status.corruption("bad WriteBatch Put");
 				}
 			} else if (tag == ValueType.Deletion.type()) {
 				 if (Coding.getLengthPrefixedSlice(input, key)) {
+					 //System.out.printf("====>[DEL] key=%s\n", key.encodeToString());
 					 handler.delete(key);
 				 } else {
 			          return Status.corruption("bad WriteBatch Delete");
@@ -87,5 +95,5 @@ public class WriteBatch {
 		}
 	}
 
-	public ByteBuf rep;
+	public ByteBuf rep = ByteBufFactory.defaultByteBuf();
 }

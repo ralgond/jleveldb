@@ -1,71 +1,266 @@
 package org.ht.jleveldb.db;
 
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.Comparator;
 
 import org.ht.jleveldb.Iterator0;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.db.format.InternalKeyComparator;
 import org.ht.jleveldb.db.format.LookupKey;
+import org.ht.jleveldb.db.format.ParsedInternalKeySlice;
 import org.ht.jleveldb.db.format.ValueType;
 import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.ByteBufFactory;
+import org.ht.jleveldb.util.Coding;
+import org.ht.jleveldb.util.FuncOutput;
 import org.ht.jleveldb.util.Slice;
 
 public class MemTable {
-	public MemTable(InternalKeyComparator c) {
-		this.comparator = new KeyComparator(c);
+	
+	static class KeyValueSlice {
+		public byte[] data;
+		public int keyOffset;
+		public int internalKeySize;
+		public int valueOffset;
+		public int valueSize;
+		
+		public KeyValueSlice(byte[] data, int keyOffset, int internalKeySize, int valueOffset, int valueSize) {
+			this.data = data;
+			this.keyOffset = keyOffset;
+			this.internalKeySize = internalKeySize;
+			this.valueOffset = valueOffset;
+			this.valueSize = valueSize;
+		}
+		
+		final public Slice internalKeySlice() {
+			return new Slice(data, keyOffset, internalKeySize);
+		}
+		
+		final public Slice value() {
+			return new Slice(data, valueOffset, valueSize);
+		}
 	}
 	
-	
-	static class KeyComparator {
+	static class TableKeyComparator implements Comparator<ParsedInternalKeySlice>{
 		InternalKeyComparator comparator;
-		public KeyComparator(InternalKeyComparator comparator) {
+		
+		public TableKeyComparator(InternalKeyComparator comparator) {
 			this.comparator = comparator;
 		}
 		
-	    public int operator(ByteBuf a, ByteBuf b) {
-	    	//TODO
-	    	return 0;
+	    public int compare(ParsedInternalKeySlice a, ParsedInternalKeySlice b) {
+	    	// Internal keys are encoded as length-prefixed strings.
+	    	// Slice a = getLengthPrefixedSlice(adata, 0);
+	    	// Slice b = getLengthPrefixedSlice(bdata, 0);
+	    	return comparator.compare(a, b);
 	    }
 	}
 	
-	Map<ByteBuf, ByteBuf> table = new TreeMap<ByteBuf, ByteBuf>();
+	static class MemTableIterator extends Iterator0 {
+		
+		SkipListMap<ParsedInternalKeySlice, KeyValueSlice>.Iterator1 iter;
+		
+		public MemTableIterator(SkipListMap<ParsedInternalKeySlice, KeyValueSlice> table) {
+			iter = table.iterator1();
+		}
+		
+		public void delete() {
+			iter = null;
+		}
+		
+		public boolean valid() {
+			return iter.valid();
+		}
+		
+		public void seekToFirst() {
+			iter.seekToFirst();
+		}
+		
+		public void seekToLast() {
+			iter.seekToLast();
+		}
+		
+		public void seek(Slice target0) {
+			ParsedInternalKeySlice target = (ParsedInternalKeySlice)target0;
+			iter.seek(target);
+		}
+		
+		public void next() {
+			iter.next();
+		}
+		
+		public void prev() {
+			iter.prev();
+		}
+		
+		public Slice key() {
+			return iter.key();
+		}
+		
+		public Slice value() {
+			return iter.value().value();
+		}
+		
+		public Status status() {
+			return Status.ok0();
+		}
+	}
 	
-	KeyComparator comparator;
+	TableKeyComparator comparator;
+	int refs;
+	SkipListMap<ParsedInternalKeySlice,KeyValueSlice> table;
+	long approximateMemory = 0;
+		
+	public MemTable(InternalKeyComparator c) {
+		comparator = new TableKeyComparator(c);
+		refs = 0;
+		table = new SkipListMap<ParsedInternalKeySlice,KeyValueSlice>(12, 4, comparator);
+	}
 	
+	public void delete() {
+		assert(refs == 0);
+		table = null;
+	}
 	
-	// Returns an estimate of the number of bytes of data in use by this
-	  // data structure. It is safe to call when MemTable is being modified.
+	/**
+	 *  Increase reference count.
+	 */
+	public void ref() { 
+		++refs; 
+	}
+
+	/** 
+	 * Drop reference count.  Delete if no more references exist.
+	 */
+	public void unref() {
+		--refs;
+	    assert(refs >= 0);
+	    if (refs <= 0) {
+	    	delete();
+	    }
+	}
+
+	/**
+	 * Returns an estimate of the number of bytes of data in use by this data structure. </br>
+	 * It is safe to call when MemTable is being modified.</br>
+	 */
 	public long approximateMemoryUsage() {
-		return 0;
+		return approximateMemory;
 	}
-	  
-	  
-	  // Return an iterator that yields the contents of the memtable.
-	  //
-	  // The caller must ensure that the underlying MemTable remains live
-	  // while the returned iterator is live.  The keys returned by this
-	  // iterator are internal keys encoded by AppendInternalKey in the
-	  // db/format.{h,cc} module.
+	
+	public int entrySize() {
+		return table.size();
+	}
+	
+	/**
+	 * Return an iterator that yields the contents of the memtable.</br></br>
+	 * 
+	 * The caller must ensure that the underlying MemTable remains live
+	 * while the returned iterator is live.  The keys returned by this
+	 * iterator are internal keys encoded by AppendInternalKey in the
+	 * db/format.{h,cc} module.</br></br>
+	 */
 	public Iterator0 newIterator() {
-		//TODO
-		return null;
+		return new MemTableIterator(table);
 	}
 	
-	  // Add an entry into memtable that maps key to value at the
-	  // specified sequence number and with the specified type.
-	  // Typically value will be empty if type==kTypeDeletion.
+	/**
+	 * Add an entry into memtable that maps key to value at the
+	 * specified sequence number and with the specified type.</br>
+	 * Typically value will be empty if type==kTypeDeletion.</br></br>
+	 * 
+	 * @param seq
+	 * @param type ValueType
+	 * @param key Slice
+	 * @param value Slice
+	 */
 	public void add(long seq, ValueType type, Slice key, Slice value) {
-		//TODO
+		// Format:
+		//   output : {internalKeySize:varint32, key:byte[internalKeySize], valSize:varint32, value:byte[valSize]}
+		//   internalKey : {data:byte[size], (seq&type):uint64}
+		
+		int keyOffset = -1;
+		int keySize = key.size();
+		int valueOffset = -1;
+		int valueSize = value.size();
+		int internalKeySize = keySize + 8;
+		int encodedLen = Coding.varNatLength(internalKeySize) + internalKeySize + Coding.varNatLength(valueSize) + valueSize;
+		
+		ByteBuf buf = ByteBufFactory.defaultByteBuf();
+		buf.init(new byte[encodedLen], encodedLen);
+		buf.writeVarNat32(internalKeySize);
+		keyOffset = buf.position();
+		buf.append(key.data, key.offset, key.size());
+		buf.writeFixedNat64((seq << 8) | (type.type() & 0xFFL));
+		buf.writeVarNat32(valueSize);
+		valueOffset = buf.position();
+		buf.append(value.data, value.offset, value.size());
+		assert(buf.size() == encodedLen);
+		
+		approximateMemory += buf.capacity();
+		
+		KeyValueSlice kvs = new KeyValueSlice(buf.data(), keyOffset, internalKeySize, valueOffset, valueSize);
+		ParsedInternalKeySlice keySlice = new ParsedInternalKeySlice(seq, type, buf.data(), keyOffset, keySize);
+		table.put(keySlice, kvs);
+	}
+	
+	/**
+	 * If memtable contains a value for key, store it in *value and return true.</br>
+	 * If memtable contains a deletion for key, store a NotFound() error in *status and return true.</br>
+	 * Else, return false.</br></br>
+	 * 
+	 * @param key
+	 * @param value
+	 * @param s
+	 * @return
+	 */
+	public boolean get(LookupKey key, ByteBuf value, FuncOutput<Status> s) {
+		if (value != null)
+			value.clear();
+		ParsedInternalKeySlice memkey = key.memtableKey();
+		SkipListMap<ParsedInternalKeySlice,KeyValueSlice>.Iterator1 iter = table.iterator1();
+		iter.seek(memkey);
+		if (iter.valid()) {
+			ParsedInternalKeySlice ikey = iter.key();
+		    //System.out.println("seek result: "+ikey);
+		    if (comparator.comparator.userComparator().compare(ikey, key.userKey()) == 0) {
+		    	// Correct user key
+		    	if (ikey.valueType != null) {
+			    	switch (ikey.valueType) {
+			        case Value: {
+			        	Slice v = iter.value().value();
+			        	value.assign(v.data(), v.offset, v.size());
+			        	return true;
+			        }
+			        case Deletion:
+			        	s.setValue(Status.notFound(null));
+			        	return true;
+			    	}
+		    	}
+		    }
+		}
+		return false;
 	}
 	
 	
-	  // If memtable contains a value for key, store it in *value and return true.
-	  // If memtable contains a deletion for key, store a NotFound() error
-	  // in *status and return true.
-	  // Else, return false.
-	public boolean get(LookupKey key, ByteBuf value, Status s) {
-		//TODO
-		return false;
+	/**
+	 * Encode a suitable internal key target for "target" and return it.</br>
+	 * Uses scratch as scratch space.</br>
+	 * 
+	 * @param scratch [OUTPUT]
+	 * @param target
+	 */
+	static void EncodeKey(ByteBuf scratch, Slice target) {
+		scratch.clear();
+		scratch.writeVarNat32(target.size());
+		scratch.append(target.data(), target.size());
+	}
+	
+	
+	static Slice getLengthPrefixedSlice(byte[] data, int offset) {
+		Slice tmp = new Slice(data, offset, 5);
+		int len = Coding.getVarNat32Ptr(tmp);  // +5: we assume "p" is not corrupted
+		offset = tmp.offset;
+		tmp.init(data, offset, len);
+		return tmp;
 	}
 }

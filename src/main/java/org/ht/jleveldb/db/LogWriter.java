@@ -4,7 +4,7 @@ import org.ht.jleveldb.Status;
 import org.ht.jleveldb.WritableFile;
 import org.ht.jleveldb.db.LogFormat.RecordType;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.Crc32c;
+import org.ht.jleveldb.util.Crc32C;
 import org.ht.jleveldb.util.Slice;
 
 public class LogWriter {
@@ -21,7 +21,7 @@ public class LogWriter {
 		byte[] tmp = new byte[1];
 		for (int i = 0; i <= LogFormat.kMaxRecordType; i++) {
 			tmp[0] = (byte)i;
-			typeCrc[i] = Crc32c.value(tmp, 0, 1);
+			typeCrc[i] = Crc32C.value(tmp, 0, 1);
 		}
 	}
 	
@@ -105,8 +105,8 @@ public class LogWriter {
 		buf[6] = (byte)(t.getType() & 0xff);
 
 		// Compute the crc of the record type and the payload.
-		long crc = Crc32c.extend(typeCrc[t.getType()], ptr, 0, (int)n);
-		crc = Crc32c.mask(crc);                 // Adjust for storage
+		long crc = Crc32C.extend(typeCrc[t.getType()], ptr, 0, (int)n);
+		crc = Crc32C.mask(crc);                 // Adjust for storage
 		Coding.encodeFixedNat32Long(buf, 0, 4, crc);
 
 		// Write the header and the payload

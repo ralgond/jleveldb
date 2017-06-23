@@ -34,6 +34,14 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 	
 	@Override
+	public void init(byte[] data, int size) {
+		this.data = data;
+		writeIndex = 0;
+		readIndex = 0;
+		capacity = size;
+	}
+	
+	@Override
 	final public byte getByte(int idx) {
 		if (idx < 0 || idx >= writeIndex)
 			throw new BufferOverflowException();
@@ -54,11 +62,17 @@ public class DefaultByteBuf implements ByteBuf {
 	
 	@Override
 	public void assign(byte[] data, int offset, int size) {
-		writeIndex = 0;
-		readIndex = 0;
+		clear();
 		append(data, offset, size);
 	}
 
+	@Override
+	public ByteBuf clone() {
+		ByteBuf ret = new DefaultByteBuf();
+		ret.assign(data, 0, size());
+		return ret;
+	}
+	
 	@Override
 	public byte[] copyData() {
 		byte[] ret = new byte[writeIndex];
@@ -67,20 +81,20 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 	
 	@Override
-	public String encodeToString() {
+	final public String encodeToString() {
 		if (data == null)
 			return new String();
 		return new String(data, 0, size());
 	}
 
 	@Override
-	public void clear() {
+	final public void clear() {
 		writeIndex = 0;
 		readIndex = 0;
 	}
 
 	@Override
-	public boolean isDirect() {
+	final public boolean isDirect() {
 		return false;
 	}
 
@@ -114,35 +128,38 @@ public class DefaultByteBuf implements ByteBuf {
 		b.capacity = capacity0;
 	}
 	
-	//TODO: test
 	@Override
-	public void resize(int size) {
-		if (size < 0)
+	public void resize(int n) {
+		resize(n, (byte)0);
+	}
+	
+	@Override
+	public void resize(int n, byte value) {
+		if (n < 0)
 			return;
 		
-		int newcapacity = calculateCapacity(size);
-		byte[] newData = new byte[newcapacity];
-		if (writeIndex > size)
-			writeIndex = size;
-		if (size() > 0)
-			System.arraycopy(data, 0, newData, 0, size());
-		data = newData;
-		capacity = newcapacity;
 		readIndex = 0;
-	}
-	
-	//TODO: test
-	@Override
-	public void resize(int bytes, byte value) {
-		int oldSize = size();
-		resize(bytes);
-		if (size() > oldSize) {
-			for (int i = oldSize; i < size(); i++)
-				data[i] = value;
+		if (n < size()) {
+			writeIndex = n;
+			return;
 		}
+		
+		int oldSize = size();
+		int newcapacity = calculateCapacity(n);
+		if (newcapacity > capacity()) {
+			byte[] newData = new byte[newcapacity];
+			if (size() > 0)
+				System.arraycopy(data, 0, newData, 0, size());
+			data = newData;
+			capacity = newcapacity;
+		}
+		
+		for (int i = oldSize; i < n; i++)
+			data[i] = value;
+		writeIndex = n;
 	}
 	
-	int calculateCapacity(int size) {
+	final int calculateCapacity(int size) {
 		int newcapacity = 1;
 		while (newcapacity < size)
 			newcapacity = newcapacity << 1;
@@ -152,7 +169,7 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 
 	@Override
-	public void require(int bytes) {
+	final public void require(int bytes) {
 		if (bytes <= 0)
 			return;
 		
@@ -168,12 +185,32 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 	
 	@Override
-	public void append(byte[] buf, int size) {
+	public boolean equals(Object o) {
+		DefaultByteBuf b= (DefaultByteBuf)o;
+		
+		if (size() == 0 && size() == b.size())
+			return true;
+		
+		if (data != null && b.data != null && size() == b.size()) {
+			int size = size();
+			byte[] bdata = b.data;
+			for (int i = 0; i < size; i++) {
+				if (data[i] != bdata[i])
+					return false;
+			}
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	@Override
+	final public void append(byte[] buf, int size) {
 		append(buf, 0 ,size);
 	}
 	
 	@Override
-	public void append(byte[] buf, int offset, int size) {
+	final public void append(byte[] buf, int offset, int size) {
 		require(size);
 		if (size <= 0)
 			return;
@@ -183,66 +220,63 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 
 	@Override
-	public void writeFixedNat32(int value) {
+	final public void writeFixedNat32(int value) {
 		require(4);
 		Coding.encodeFixedNat32(data, writeIndex, writeIndex+4, value);
 		writeIndex += 4;
 	}
 	
 	@Override
-	public void writeFixedNat32Long(long value) {
+	final public void writeFixedNat32Long(long value) {
 		require(4);
 		Coding.encodeFixedNat32Long(data, writeIndex, writeIndex+4, value);
 		writeIndex += 4;
 	}
 
 	@Override
-	public void writeFixedNat64(long value) {
+	final public void writeFixedNat64(long value) {
 		require(8);
 		Coding.encodeFixedNat64(data, writeIndex, writeIndex+8, value);
 		writeIndex += 8;
 	}
 
 	@Override
-	public void writeVarNat32(int value) {
+	final public void writeVarNat32(int value) {
 		byte[] tmp = new byte[8];
 		int offset = Coding.encodeVarNat32(tmp, 0, 8, value);
-		require(offset);
 		append(tmp, offset);
 	}
 
 	@Override
-	public void writeVarNat64(long value) {
+	final public void writeVarNat64(long value) {
 		byte[] tmp = new byte[16];
 		int offset = Coding.encodeVarNat64(tmp, 0, 16, value);
-		require(offset);
 		append(tmp, offset);
 	}
 	
-	
 
 	@Override
-	public void writeLengthPrefixedSlice(Slice value) {
+	final public void writeLengthPrefixedSlice(Slice value) {
 		writeVarNat32(value.size());
 		append(value.data, value.offset, value.size());
 	}
 	
 	@Override
-	public int readFixedNat32() {
+	final public int readFixedNat32() {
 		int ret = Coding.decodeFixedNat32(data, readIndex, capacity);
 		readIndex += 4;
 		return ret;
 	}
 	
 	@Override
-	public long readFixedNat64() {
+	final public long readFixedNat64() {
 		long ret = Coding.decodeFixedNat64(data, readIndex, capacity);
 		readIndex += 8;
 		return ret;
 	}
 	
 	@Override
-	public int readVarNat32() {
+	final public int readVarNat32() {
 		readSlice.clear();
 		readSlice.init(data, readIndex, capacity);
 		int ret = Coding.getVarNat32Ptr(readSlice);
@@ -251,7 +285,7 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 
 	@Override
-	public long readVarNat64() {
+	final public long readVarNat64() {
 		readSlice.clear();
 		readSlice.init(data, readIndex, capacity);
 		long ret = Coding.getVarNat64Ptr(readSlice);
@@ -260,7 +294,7 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 	
 	@Override
-	public Slice readLengthPrefixedSlice() {
+	final public Slice readLengthPrefixedSlice() {
 		int size = readVarNat32();
 		Slice slice = new Slice();
 		slice.init(new byte[size], 0, size);
@@ -270,7 +304,7 @@ public class DefaultByteBuf implements ByteBuf {
 	}
 	
 	@Override
-	public void addByte(Byte b) {
+	final public void addByte(byte b) {
 		require(1);
 		data[writeIndex++] = b;
 	}

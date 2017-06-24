@@ -5,6 +5,10 @@ import java.util.concurrent.locks.ReentrantLock;
 public class Mutex {
 	ReentrantLock lock;
 	
+	public Mutex() {
+		lock = new ReentrantLock();
+	}
+	
 	public void lock() {
 		lock.lock();
 	}

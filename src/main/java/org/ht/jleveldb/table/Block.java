@@ -4,6 +4,7 @@ import org.ht.jleveldb.Iterator0;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.table.Format.BlockContents;
 import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.Comparator0;
 import org.ht.jleveldb.util.Integer0;
@@ -71,6 +72,24 @@ public class Block {
 		Slice value;
 		Status status;
 		
+		public Iter(Comparator0 comparator,
+			       byte[] data,
+			       int restarts,
+			       int numRestarts) {
+			this.comparator = comparator;
+			this.data = data;
+			this.restarts = restarts;
+			this.numRestarts = numRestarts;
+			
+			this.current = restarts;
+			this.restartIndex = numRestarts;
+			key = ByteBufFactory.defaultByteBuf();
+			value = new Slice();
+			assert(this.numRestarts > 0);
+			this.status = Status.ok0();
+		}
+		
+		
 		public void delete() {
 			comparator = null;
 			data = null;
@@ -103,19 +122,6 @@ public class Block {
 		    value = new Slice(data, offset, 0);//value_ = Slice(data_ + offset, 0);
 		}
 		  
-		public Iter(Comparator0 comparator,
-			       byte[] data,
-			       int restarts,
-			       int numRestarts) {
-			this.comparator = comparator;
-			this.data = data;
-			this.restarts = restarts;
-			this.numRestarts = numRestarts;
-			this.current = restarts;
-			this.restartIndex = numRestarts;
-			assert(this.numRestarts > 0);
-			this.status = Status.ok0();
-		}
 		
 		public boolean valid() {
 			return current < restarts; 

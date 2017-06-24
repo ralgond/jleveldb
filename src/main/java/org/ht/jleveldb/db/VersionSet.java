@@ -1,7 +1,6 @@
 package org.ht.jleveldb.db;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +28,7 @@ import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Boolean0;
 import org.ht.jleveldb.util.Long0;
 import org.ht.jleveldb.util.IntLongPair;
+import org.ht.jleveldb.util.ListUtils;
 import org.ht.jleveldb.util.Mutex;
 import org.ht.jleveldb.util.Slice;
 
@@ -111,7 +111,8 @@ public class VersionSet {
 			this.base = base;
 			cmp = new BySmallestKey(vset.icmp);
 			for (int level = 0; level < DBFormat.kNumLevels; level++) {
-			      levels[level].addedFiles = new TreeSet<FileMetaData>(cmp);
+				levels[level] = new LevelState();
+				levels[level].addedFiles = new TreeSet<FileMetaData>(cmp);
 			}
 		}
 		
@@ -200,7 +201,7 @@ public class VersionSet {
 		    	int startIdx = 0;
 		    	for (FileMetaData fmd : added) {
 		    		// Add all smaller files listed in base_
-		    		int upperIdx = upperBound(baseFiles, fmd, cmp);
+		    		int upperIdx = ListUtils.upperBound(baseFiles, fmd, cmp);
 		    		if (upperIdx > startIdx) {
 		    			for (int i = startIdx; i < upperIdx && i < baseFilesSize; i++)
 		    				maybeAddFile(v, level, baseFiles.get(startIdx));
@@ -233,23 +234,6 @@ public class VersionSet {
 		}
 	}
 	
-	public static <T> int upperBound(ArrayList<T> l, T target, Comparator<T> cmp) {
-		int offset = 0;
-		int size = l.size();
-		List<T> view = l.subList(offset, offset+size);
-		int ret = Collections.binarySearch(view, target, cmp);
-		while (ret >= 0) {
-			//System.out.printf("offset=%d, size=%d, ret=%d\n", offset, size, ret);
-			offset += (ret + 1);
-			size -= (ret + 1);
-			view = l.subList(offset, offset+size);
-			ret = Collections.binarySearch(view, target, cmp);
-		}
-		
-		int insertionPoint = -1 * (ret + 1);
-		
-		return (insertionPoint == size ? l.size() : insertionPoint + offset);
-	}
 	
 	/**
 	 * Apply *edit to the current version to form a new descriptor that
@@ -376,7 +360,7 @@ public class VersionSet {
 		}
 		currentFileName.resize(currentFileName.size() - 1); //may has bugs, should test
 		
-		String dscname = dbname + "/" + current;
+		String dscname = dbname + "/" + currentFileName.encodeToString();
 		Object0<SequentialFile> file0 = new Object0<SequentialFile>();
 		s = env.newSequentialFile(dscname, file0);
 		SequentialFile file = file0.getValue();
@@ -474,7 +458,7 @@ public class VersionSet {
 		    	saveManifest.setValue(true);
 		    }
 		}
-		return null;
+		return s;
 	}
 	
 	/**

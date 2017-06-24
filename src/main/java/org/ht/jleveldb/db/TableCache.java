@@ -50,14 +50,29 @@ public class TableCache {
 			handle = null;
 		}
 	}
+	
+	public TableCache(String dbname, Options options, int entries) {
+		env = options.env;
+		this.dbname = dbname;
+		this.options = options.cloneOptions();
+		cache = Cache.newLRUCache(entries);
+	}
 
-	  // Return an iterator for the specified file number (the corresponding
-	  // file length must be exactly "file_size" bytes).  If "tableptr" is
-	  // non-NULL, also sets "*tableptr" to point to the Table object
-	  // underlying the returned iterator, or NULL if no Table object underlies
-	  // the returned iterator.  The returned "*tableptr" object is owned by
-	  // the cache and should not be deleted, and is valid for as long as the
-	  // returned iterator is live.
+	/**
+	 * Return an iterator for the specified file number (the corresponding
+	 * file length must be exactly "file_size" bytes).  If "tableptr" is
+	 * non-NULL, also sets "*tableptr" to point to the Table object
+	 * underlying the returned iterator, or NULL if no Table object underlies
+	 * the returned iterator.  The returned "*tableptr" object is owned by 
+	 * the cache and should not be deleted, and is valid for as long as the 
+	 * returned iterator is live.
+	 * 
+	 * @param options
+	 * @param fileNumber
+	 * @param fileSize
+	 * @param table0
+	 * @return
+	 */
 	public Iterator0 newIterator(ReadOptions options,
             long fileNumber,
             long fileSize,
@@ -87,8 +102,17 @@ public class TableCache {
 		return newIterator(options, fileNumber, fileSize, null);
 	}
 	
-	  // If a seek to internal key "k" in specified file finds an entry,
-	  // call (*handle_result)(arg, found_key, found_value).
+	/**
+	 * If a seek to internal key "k" in specified file finds an entry,
+	 * call (*handle_result)(arg, found_key, found_value).
+	 * @param options
+	 * @param fileNumber
+	 * @param fileSize
+	 * @param k
+	 * @param arg
+	 * @param saver
+	 * @return
+	 */
 	public Status get(ReadOptions options,
 	             long fileNumber,
 	             long fileSize,

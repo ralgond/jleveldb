@@ -36,5 +36,5 @@ public class SnapshotList {
 		s.next.prev=  s.prev;
 	}
 	
-	Snapshot list;
+	Snapshot list = new Snapshot();
 }

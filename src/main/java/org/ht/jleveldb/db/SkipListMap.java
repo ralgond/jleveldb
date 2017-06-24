@@ -152,6 +152,7 @@ public class SkipListMap<K, V> {
 	public SkipListMap(int maxLevel) {
 		this.maxLevel = maxLevel;
 		this.head = new Node<K,V>(maxLevel);
+		this.tail = head;
 	}
 	
 	public SkipListMap(int maxLevel, int branching, Comparator<K> comp) {
@@ -273,8 +274,6 @@ public class SkipListMap<K, V> {
 			size--;
 			if (result.node.next(0) == null) {
 				tail = result.node.prev(0);
-				if (tail == head)
-					tail = null;
 			}
 		}
 		

@@ -4,6 +4,7 @@ import org.ht.jleveldb.Iterator0;
 import org.ht.jleveldb.ReadOptions;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Slice;
 
 public class TwoLevelIterator extends Iterator0 {
@@ -25,8 +26,17 @@ public class TwoLevelIterator extends Iterator0 {
 		return new TwoLevelIterator(indexIter, blockFunction, arg, options);
 	}
 	
+	BlockFunction blockFunction;
+	Object arg;
+	ReadOptions options;
+	Status status = Status.ok0();
+	Iterator0Wrapper indexIter = new Iterator0Wrapper();
+	Iterator0Wrapper dataIter = new Iterator0Wrapper(); // May be NULL
+	// If dataIter is non-NULL, then "dataBlockHandle" holds the
+	// "index_value" passed to blockFunction to create the dataIter.
+	ByteBuf dataBlockHandle = ByteBufFactory.defaultByteBuf();
+	
 	public TwoLevelIterator(Iterator0 indexIter0, BlockFunction blockFunction, Object arg, ReadOptions options) {
-		this.indexIter = new Iterator0Wrapper();
 		this.indexIter.set(indexIter0);
 		this.blockFunction = blockFunction;
 		this.arg = arg;
@@ -56,21 +66,24 @@ public class TwoLevelIterator extends Iterator0 {
 	public void seekToFirst() {
 		indexIter.seekToFirst();
 		initDataBlock();
-		if (dataIter.iter() != null) dataIter.seekToFirst();
+		if (dataIter.iter() != null) 
+			dataIter.seekToFirst();
 		skipEmptyDataBlocksForward();
 	}
 	
 	public void seekToLast() {
 		indexIter.seekToLast();
 		initDataBlock();
-		if (dataIter.iter() != null) dataIter.seekToLast();
+		if (dataIter.iter() != null) 
+			dataIter.seekToLast();
 		skipEmptyDataBlocksBackward();
 	}
 	
 	public void seek(Slice target) {
 		indexIter.seek(target);
 		initDataBlock();
-		if (dataIter.iter() != null) dataIter.seek(target);
+		if (dataIter.iter() != null) 
+			dataIter.seek(target);
 		skipEmptyDataBlocksForward();
 	}
 	
@@ -99,11 +112,11 @@ public class TwoLevelIterator extends Iterator0 {
 	public Status status() {
 		// It'd be nice if status() returned a const Status& instead of a Status
 	    if (!indexIter.status().ok()) {
-	      return indexIter.status();
+	    	return indexIter.status();
 	    } else if (dataIter.iter() != null && !dataIter.status().ok()) {
-	      return dataIter.status();
+	    	return dataIter.status();
 	    } else {
-	      return status;
+	    	return status;
 	    }
 	}
 
@@ -159,13 +172,5 @@ public class TwoLevelIterator extends Iterator0 {
 		}
 	}
 	  
-	BlockFunction blockFunction;
-	Object arg;
-	ReadOptions options;
-	Status status;
-	Iterator0Wrapper indexIter;
-	Iterator0Wrapper dataIter; // May be NULL
-	// If data_iter_ is non-NULL, then "data_block_handle_" holds the
-	// "index_value" passed to block_function_ to create the data_iter_.
-	ByteBuf dataBlockHandle;
+	
 }

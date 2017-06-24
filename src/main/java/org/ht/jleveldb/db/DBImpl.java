@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +37,7 @@ import org.ht.jleveldb.table.Merger;
 import org.ht.jleveldb.table.TableBuilder;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
+import org.ht.jleveldb.util.Cache;
 import org.ht.jleveldb.util.Comparator0;
 import org.ht.jleveldb.util.CondVar;
 import org.ht.jleveldb.util.Object0;
@@ -47,6 +49,81 @@ import org.ht.jleveldb.util.Slice;
 
 public class DBImpl implements DB {
 
+	
+	Env env;
+	InternalKeyComparator internalComparator;
+	InternalFilterPolicy internalFilterPolicy;
+	Options options;
+	boolean ownsInfoLog;
+	boolean ownsCache;
+	String dbname;
+	
+	/**
+	 * tcache provides its own synchronization
+	 */
+	TableCache tcache;
+	
+	/**
+	 * Lock over the persistent DB state.  non-null iff successfully acquired.
+	 */
+	FileLock0 dbLock = null;
+	
+	Mutex mutex;
+	AtomicReference<Object> shuttingDown;
+	CondVar bgCv;	// Signalled when background work finishes
+	MemTable memtable = null;
+	MemTable immtable = null;   // Memtable being compacted
+	AtomicReference<Object> hasImm = new AtomicReference<Object>(); // So bg thread can detect non-null imm
+	WritableFile logFile = null;
+	long logFileNumber = 0;
+	LogWriter logWriter = null;
+	int seed = 0;
+	
+	// Queue of writers.
+	Deque<Writer> writers = new LinkedList<>();
+	WriteBatch tmpBatch;
+	
+	SnapshotList snapshots = new SnapshotList();
+	
+	/**
+	 * Set of table files to protect from deletion because they are
+	 * part of ongoing compactions.
+	 */
+	TreeSet<Long> pendingOutputs = new TreeSet<>();
+	
+	/**
+	 * Has a background compaction been scheduled or is running?
+	 */
+	boolean bgCompactionScheduled;
+	
+	class ManualCompaction {
+		public int level;
+		public boolean done;
+		public InternalKey begin;   // null means beginning of key range
+		public InternalKey end;     // NULL means end of key range
+		public InternalKey tmpStorage;    // Used to keep track of compaction progress
+	}
+	ManualCompaction manualCompaction;
+	
+	VersionSet versions;
+	
+	// Have we encountered a background error in paranoid mode?
+	Status bgError = Status.ok0();
+	
+	class CompactionStats {
+		public long millis;
+		public long bytesRead;
+		public long bytesWritten;
+		
+		void add(CompactionStats c) {
+			millis += c.millis;
+			bytesRead += c.bytesRead;
+			bytesWritten += c.bytesWritten;
+		}
+	}
+	CompactionStats stats[] = new CompactionStats[DBFormat.kNumLevels];
+	
+	
 	/**
 	 * Information kept for every waiting writer
 	 */
@@ -108,8 +185,89 @@ public class DBImpl implements DB {
 		}
 	}
 	
+	int clipToRange (int src, int minValue, int maxValue) {
+		return (int)clipToRange((long)src, (long)minValue, (long)maxValue);
+	}
+	
+	long clipToRange (long src, long minValue, long maxValue) {
+		long ret = src;
+		if (ret > maxValue)
+			ret = maxValue;
+		if (ret < minValue)
+			ret = minValue;
+		return ret;
+	}
+	
+	final static int kNumNonTableCacheFiles = 10;
+	
+	Options sanitizeOptions(String dbname,
+            InternalKeyComparator icmp,
+            InternalFilterPolicy ipolicy,
+            Options src) {
+		Options result = src.cloneOptions();
+		result.comparator = icmp;
+		result.filterPolicy = (src.filterPolicy != null) ? ipolicy : null;
+		result.maxOpenFiles = 		clipToRange(result.maxOpenFiles,    64 + kNumNonTableCacheFiles, 50000);
+		result.writeBufferSize =  	clipToRange(result.writeBufferSize, 64<<10,                      1<<30);
+		result.maxFileSize =		clipToRange(result.maxFileSize,     1<<20,                       1<<30);
+		result.blockSize 	=		clipToRange(result.blockSize,       1<<10,                       4<<20);
+		
+		Object0<Logger0> log0 = new Object0<>();
+		if (result.infoLog == null) {
+		    // Open a log file in the same directory as the db
+		    src.env.createDir(dbname);  // In case it does not exist
+		    src.env.renameFile(FileName.getInfoLogFileName(dbname), FileName.getOldInfoLogFileName(dbname));
+		    Status s = src.env.newLogger(FileName.getInfoLogFileName(dbname), log0);
+		    if (!s.ok()) {
+		       // No place suitable for logging
+		       result.infoLog = null;
+		    }
+		    result.infoLog = log0.getValue();
+		    
+		    if (result.blockCache == null) {
+		        result.blockCache = Cache.newLRUCache(8 << 20);
+		    }
+		}
+		
+		return result;
+	}
+	
+	void init(Options rawOptions, String dbname) {
+		env = rawOptions.env;
+		internalComparator = new InternalKeyComparator(rawOptions.comparator);
+		internalFilterPolicy = new InternalFilterPolicy(rawOptions.filterPolicy);
+		options = sanitizeOptions(dbname, internalComparator, internalFilterPolicy, rawOptions);
+		ownsInfoLog = (options.infoLog != rawOptions.infoLog);
+		ownsCache = (options.blockCache != rawOptions.blockCache);
+		this.dbname = dbname;
+		dbLock = null;
+		shuttingDown = null;
+		mutex = new Mutex();
+		bgCv = mutex.newCondVar();
+		memtable = null;
+		immtable = null;
+		logFile = null;
+		logFileNumber = 0;
+		logWriter = null;
+		seed = 0;
+		bgCompactionScheduled = false;
+		manualCompaction = null;
+		
+		
+		hasImm.set(null);
+		
+		// Reserve ten files or so for other uses and give the rest to TableCache.
+		int tableCacheSize = options.maxOpenFiles - kNumNonTableCacheFiles;
+		
+		tcache = new TableCache(dbname, options, tableCacheSize);
+
+		versions = new VersionSet(dbname, options, tcache, internalComparator);
+	}
+	
 	@Override
-	public Status open(Options options, String name) {
+	public Status open(Options rawOptions, String name) {
+		init(rawOptions, name);
+		
 		mutex.lock();
 		VersionEdit edit = new VersionEdit();
 		Boolean0 saveManifest = new Boolean0();
@@ -369,7 +527,7 @@ public class DBImpl implements DB {
 		
 		{
 		    LogWriter logWriter = new LogWriter(file.getValue());
-		    ByteBuf record = null;
+		    ByteBuf record = ByteBufFactory.defaultByteBuf();
 		    ndb.encodeTo(record);
 		    s = logWriter.addRecord(new Slice(record));
 		    if (s.ok()) {
@@ -436,13 +594,13 @@ public class DBImpl implements DB {
 		Long0 maxSequence = new Long0();
 		maxSequence.setValue(0);
 		
-		  // Recover from all newer log files than the ones named in the
-		  // descriptor (new log files may have been added by the previous
-		  // incarnation without registering them in the descriptor).
-		  //
-		  // Note that PrevLogNumber() is no longer used, but we pay
-		  // attention to it in case we are recovering a database
-		  // produced by an older version of leveldb.
+	    // Recover from all newer log files than the ones named in the
+	    // descriptor (new log files may have been added by the previous
+	    // incarnation without registering them in the descriptor).
+	    //
+	    // Note that PrevLogNumber() is no longer used, but we pay
+	    // attention to it in case we are recovering a database
+	    // produced by an older version of leveldb.
 		long minLog = versions.logNumber();
 		long prevLog = versions.prevLogNumber();
 		ArrayList<String> filenames = new ArrayList<>();
@@ -1336,78 +1494,7 @@ public class DBImpl implements DB {
 	}
 	
 	
-	Env env;
-	InternalKeyComparator internalComparator;
-	InternalFilterPolicy internalFilterPolicy;
-	Options options;
-	boolean ownsInfoLog;
-	boolean ownsCache;
-	String dbname;
 	
-	/**
-	 * tcache provides its own synchronization
-	 */
-	TableCache tcache;
-	
-	/**
-	 * Lock over the persistent DB state.  non-null iff successfully acquired.
-	 */
-	FileLock0 dbLock;
-	
-	Mutex mutex;
-	AtomicReference<Object> shuttingDown;
-	CondVar bgCv;	// Signalled when background work finishes
-	MemTable memtable;
-	MemTable immtable;   // Memtable being compacted
-	AtomicReference<Object> hasImm; // So bg thread can detect non-null imm
-	WritableFile logFile;
-	long logFileNumber;
-	LogWriter logWriter;
-	int seed;
-	
-	// Queue of writers.
-	Deque<Writer> writers;
-	WriteBatch tmpBatch;
-	
-	SnapshotList snapshots;
-	
-	/**
-	 * Set of table files to protect from deletion because they are
-	 * part of ongoing compactions.
-	 */
-	TreeSet<Long> pendingOutputs;
-	
-	/**
-	 * Has a background compaction been scheduled or is running?
-	 */
-	boolean bgCompactionScheduled;
-	
-	class ManualCompaction {
-		public int level;
-		public boolean done;
-		public InternalKey begin;   // null means beginning of key range
-		public InternalKey end;     // NULL means end of key range
-		public InternalKey tmpStorage;    // Used to keep track of compaction progress
-	}
-	ManualCompaction manualCompaction;
-	
-	VersionSet versions;
-	
-	// Have we encountered a background error in paranoid mode?
-	Status bgError;
-	
-	class CompactionStats {
-		public long millis;
-		public long bytesRead;
-		public long bytesWritten;
-		
-		void add(CompactionStats c) {
-			millis += c.millis;
-			bytesRead += c.bytesRead;
-			bytesWritten += c.bytesWritten;
-		}
-	}
-	CompactionStats stats[] = new CompactionStats[DBFormat.kNumLevels];
 	
 	public Comparator0 userComparator() {
 		return internalComparator.userComparator();

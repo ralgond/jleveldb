@@ -42,11 +42,9 @@ public class Format {
 		}
 		
 		public Status decodeFrom(Slice input) {
-			if ((offset = Coding.getVarNat64(input)) > 0 && (size = Coding.getVarNat64(input)) > 0) {
-				return Status.ok0();
-			} else {
-				return Status.corruption("bad block handle");
-			}
+			offset = Coding.getVarNat64(input);
+			size = Coding.getVarNat64(input);
+			return Status.ok0();
 		}
 
 		// Maximum encoding length of a BlockHandle
@@ -57,8 +55,8 @@ public class Format {
 	}
 	
 	public static class Footer {
-		BlockHandle metaindexHandle;
-		BlockHandle indexHandle;
+		BlockHandle metaindexHandle = new BlockHandle();
+		BlockHandle indexHandle = new BlockHandle();
 		
 		// The block handle for the metaindex block of the table
 		final public BlockHandle metaindexHandle() { 
@@ -84,15 +82,15 @@ public class Format {
 			indexHandle.encodeTo(dst);
 			dst.resize(2 * BlockHandle.MaxEncodedLength);  // Padding
 			dst.writeFixedNat32Long((kTableMagicNumber & 0xffffffffL));
-			dst.writeFixedNat32Long((kTableMagicNumber >> 32));
+			dst.writeFixedNat32Long((kTableMagicNumber >> 32) & 0xffffffffL);
 			assert(dst.size() == originalSize + kEncodedLength);
 		}
 		
 		public Status decodeFrom(Slice input) {
 			byte[] data = input.data();
 			int magicOffset = kEncodedLength - 8; //const char* magic_ptr = input->data() + kEncodedLength - 8;
-			long magic_lo = (Coding.decodeFixedNat32(data, magicOffset) & 0xffffffffL);
-			long magic_hi = (Coding.decodeFixedNat32(data, magicOffset + 4) & 0xffffffffL);
+			long magic_lo = (Coding.decodeFixedNat32Long(data, magicOffset) & 0xffffffffL);
+			long magic_hi = (Coding.decodeFixedNat32Long(data, magicOffset + 4) & 0xffffffffL);
 			long magic = ((magic_hi << 32) | magic_lo);
 			if (magic != kTableMagicNumber) {
 				return Status.corruption("not an sstable (bad magic number)");

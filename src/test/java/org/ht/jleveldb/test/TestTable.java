@@ -34,6 +34,7 @@ import org.ht.jleveldb.util.BytewiseComparatorImpl;
 import org.ht.jleveldb.util.Comparator0;
 import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Integer0;
+import org.ht.jleveldb.util.ListUtils;
 import org.ht.jleveldb.util.Random0;
 import org.ht.jleveldb.util.Slice;
 import org.ht.jleveldb.util.Snappy;
@@ -172,14 +173,14 @@ public class TestTable {
 		  ByteBuf contents = ByteBufFactory.defaultByteBuf();
 	};
 	
-	static class ComparatorByteBuf implements Comparator<ByteBuf> {
+	static class ByteBufComparator implements Comparator<ByteBuf> {
 		Comparator0 cmp;
 
-		public ComparatorByteBuf() {
+		public ByteBufComparator() {
 			cmp = BytewiseComparatorImpl.getInstance();
 		}
 		
-		public ComparatorByteBuf(Comparator0 c) {
+		public ByteBufComparator(Comparator0 c) {
 			cmp = c;
 		}
 		
@@ -188,6 +189,25 @@ public class TestTable {
 		}
 	};
 	
+	static ByteBufComparator defaultByteBufComparator = new ByteBufComparator();
+	
+	static class ByteBufKeyMapEntryComparator implements Comparator<Map.Entry<ByteBuf,ByteBuf>> {
+		Comparator0 cmp;
+
+		public ByteBufKeyMapEntryComparator() {
+			cmp = BytewiseComparatorImpl.getInstance();
+		}
+		
+		public ByteBufKeyMapEntryComparator(Comparator0 c) {
+			cmp = c;
+		}
+		
+		public int compare(Map.Entry<ByteBuf,ByteBuf> a, Map.Entry<ByteBuf,ByteBuf> b) {
+		    return cmp.compare(a.getKey(), b.getKey());
+		}
+	};
+	
+	static ByteBufKeyMapEntryComparator defaultByteBufKeyMapEntryComparator = new ByteBufKeyMapEntryComparator();
 	
 	// Helper class for tests to unify the interface between
 	// BlockBuilder/TableBuilder and Block/Table.
@@ -195,7 +215,7 @@ public class TestTable {
 		public TreeMap<ByteBuf, ByteBuf> data;
 		
 		public Constructor(Comparator0 cmp) {
-			data = new TreeMap<ByteBuf, ByteBuf>(new ComparatorByteBuf(cmp));
+			data = new TreeMap<ByteBuf, ByteBuf>(new ByteBufComparator(cmp));
 		}
 
 		public void add(ByteBuf key,Slice value) {
@@ -247,8 +267,10 @@ public class TestTable {
 		}
 		
 		public Status finishImpl(Options options, TreeMap<ByteBuf, ByteBuf> dataMap) {
-		    block.delete();;
-		    block = null;
+			if (block != null) {
+			    block.delete();
+			    block = null;
+			}
 		    BlockBuilder builder = new BlockBuilder(options);
 
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
@@ -315,10 +337,14 @@ public class TestTable {
 		}
 
 		void reset() {
-		    table.delete();
-		    source.delete();
-		    table = null;
-		    source = null;
+			if (table != null) {
+				table.delete();
+				table = null;
+			}
+			if (source != null) {
+			    source.delete();
+			    source = null;
+			}
 		}
 
 		StringSource source;
@@ -393,7 +419,7 @@ public class TestTable {
 	
 		public MemTableConstructor(Comparator0 cmp) {
 			super(cmp);
-			internalComparator = (InternalKeyComparator)cmp;
+			internalComparator = new InternalKeyComparator(cmp);
 		    memtable = new MemTable(internalComparator);
 		    memtable.ref();
 		}
@@ -403,7 +429,8 @@ public class TestTable {
 		}
 		
 		public Status finishImpl(Options options, TreeMap<ByteBuf, ByteBuf> dataMap) {
-		    memtable.unref();
+			if (memtable != null)
+				memtable.unref();
 		    memtable = new MemTable(internalComparator);
 		    memtable.ref();
 		    int seq = 1;
@@ -468,6 +495,7 @@ public class TestTable {
 		    try {
 		    	status = LevelDB.destroyDB(name, options);
 		    } catch (Exception e) {
+		    	e.printStackTrace();
 		    	status = Status.otherError(""+e);
 		    }
 		    assertTrue(status.ok());
@@ -480,8 +508,10 @@ public class TestTable {
 		    	status = LevelDB.newDB(options, name, db0);
 		    	db = db0.getValue();
 		    } catch (Exception e) {
+		    	e.printStackTrace();
 		    	status = Status.otherError(""+e);
 		    }
+		    System.out.println(status);
 		    assertTrue(status.ok());
 		}
 
@@ -591,12 +621,9 @@ public class TestTable {
 		    testForwardScan(keys, dataMap);
 		    testBackwardScan(keys, dataMap);
 		    testRandomAccess(rnd, keys, dataMap);
-		  }
-
-
+		}
 		
-		public void testForwardScan(ArrayList<ByteBuf> keys,
-                TreeMap<ByteBuf,ByteBuf> dataMap) {
+		public void testForwardScan(ArrayList<ByteBuf> keys, TreeMap<ByteBuf,ByteBuf> dataMap) {
 			Iterator0 iter = constructor.newIterator();
 			assertTrue(!iter.valid());
 			iter.seekToFirst();
@@ -608,11 +635,11 @@ public class TestTable {
 			assertEquals(toString(it), toString(iter));
 			
 			assertTrue(!iter.valid());
+			
 			iter.delete();
 		}
 		
-		public void testBackwardScan(ArrayList<ByteBuf> keys,
-				 TreeMap<ByteBuf,ByteBuf> dataMap) {
+		public void testBackwardScan(ArrayList<ByteBuf> keys, TreeMap<ByteBuf,ByteBuf> dataMap) {
 			Iterator0 iter = constructor.newIterator();
 			assertTrue(!iter.valid());
 			iter.seekToLast();
@@ -624,7 +651,8 @@ public class TestTable {
 			assertEquals(toString(it), toString(iter));
 			
 			assertTrue(!iter.valid());
-			iter.delete();;
+			
+			iter.delete();
 		}
 		
 		static String toString(Iterator<Map.Entry<ByteBuf, ByteBuf>> it) {
@@ -658,6 +686,7 @@ public class TestTable {
 		static boolean kVerbose = false;
 		
 		
+		@SuppressWarnings("unchecked")
 		void testRandomAccess(Random0 rnd, ArrayList<ByteBuf> keys, TreeMap<ByteBuf,ByteBuf> dataMap) {
 			
 			Iterator0 iter = constructor.newIterator();
@@ -674,64 +703,61 @@ public class TestTable {
 				int toss = (int)rnd.uniform(5);
 				
 				switch (toss) {
-				case 0: {
-					if (iter.valid()) {
-						if (kVerbose) 
-							System.err.println("Next");
-						iter.next();
-						modelPos.incrementAndGet(1);
-						assertEquals(toString(l, modelPos), toString(iter));
+					case 0: {
+						if (iter.valid()) {
+							if (kVerbose) System.err.println("Next");
+							iter.next();
+							modelPos.incrementAndGet(1);
+							assertEquals(toString(l, modelPos), toString(iter));
+						}
+						break;
 					}
-					break;
-				}
+					
+					case 1: {
+						if (kVerbose) System.err.println("SeekToFirst");
+						iter.seekToFirst();
+						modelPos.setValue(0);
+						assertEquals(toString(l, modelPos), toString(iter));
+						break;
+					}
+					
+					case 2: {
+						ByteBuf key = pickRandomKey(rnd, keys);
+						Map.Entry<ByteBuf, ByteBuf> target = 
+								(Map.Entry<ByteBuf, ByteBuf>)dataMap.get(key); //modelPos = data.lower_bound(key);
+						modelPos.setValue(ListUtils.lowerBound(l, target, defaultByteBufKeyMapEntryComparator));
+						if (kVerbose) System.err.printf("Seek '%s'\n", Strings.escapeString(key));
+						iter.seek(new Slice(key));
+						assertEquals(toString(l, modelPos), toString(iter));
+						break;
+					}
+					
+					case 3: {
+						if (iter.valid()) {
+							if (kVerbose) System.err.println("Prev\n");
+							iter.prev();
+							if (modelPos.getValue() == 0) {
+								modelPos.setValue(l.size());  // Wrap around to invalid value
+							} else {
+								modelPos.incrementAndGet(-1);
+							}
+							assertEquals(toString(l, modelPos), toString(iter));
+						}
+						break;
+					}
 				
-				case 1: {
-					if (kVerbose) 
-						System.err.println("SeekToFirst");
-					iter.seekToFirst();
-					modelPos.setValue(0);
-					assertEquals(toString(l, modelPos), toString(iter));
-					break;
-				}
-				
-				case 2: {
-					ByteBuf key = pickRandomKey(rnd, keys);
-					//TODO: modelPos = data.lower_bound(key);
-					if (kVerbose) 
-						System.err.printf("Seek '%s'\n", Strings.escapeString(key));
-					iter.seek(new Slice(key));
-					assertEquals(toString(l, modelPos), toString(iter));
-					break;
-				}
-				
-				case 3: {
-					if (iter.valid()) {
-						if (kVerbose) 
-							System.err.println("Prev\n");
-						iter.prev();
-						if (modelPos.getValue() == 0) {
-							modelPos.setValue(l.size());  // Wrap around to invalid value
+					case 4: {
+						if (kVerbose) System.err.printf("SeekToLast\n");
+						iter.seekToLast();
+						if (keys.isEmpty()) {
+							modelPos.setValue(l.size());;
 						} else {
-							modelPos.incrementAndGet(-1);
+							Map.Entry<ByteBuf, ByteBuf> last = l.get(l.size()-1); //modelPos = data.lower_bound(last);
+							modelPos.setValue(ListUtils.lowerBound(l, last, defaultByteBufKeyMapEntryComparator));
 						}
 						assertEquals(toString(l, modelPos), toString(iter));
+						break;
 					}
-					break;
-				}
-			
-				case 4: {
-					if (kVerbose) 
-						System.err.printf("SeekToLast\n");
-					iter.seekToLast();
-					if (keys.isEmpty()) {
-						modelPos.setValue(l.size());;
-					} else {
-						ByteBuf last = l.get(l.size()-1).getKey().clone();
-						//TODO: modelPos = data.lower_bound(last);
-					}
-					assertEquals(toString(l, modelPos), toString(iter));
-					break;
-				}
 				}
 			}
 			iter.delete();
@@ -746,25 +772,23 @@ public class TestTable {
 		    	int index = (int)rnd.uniform(keys.size());
 		    	ByteBuf result = keys.get(index);
 		    	switch ((int)rnd.uniform(3)) {
-		        case 0:
-		        	// Return an existing key
-		        	break;
-		        case 1: {
-		        	// Attempt to return something smaller than an existing key
-		        	 
-		        	if (result.size() > 0) {
-		        		int val = (result.getByte(result.size()-1) & 0xff);
-		        		if (val > 0x00) {
-		        			result.setByte(result.size()-1, (byte)(val--));
-		        		}
-		        	}
-		        	break;
-		        }
-		        case 2: {
-		        	// Return something larger than an existing key
-		        	increment(options.comparator, result);
-		        	break;
-		        }
+			        case 0:
+			        	// Return an existing key
+			        	break;
+			        case 1: {
+			        	// Attempt to return something smaller than an existing key
+			        	if (result.size() > 0) {
+			        		int val = (result.getByte(result.size()-1) & 0xff);
+			        		if (val > 0x00)
+			        			result.setByte(result.size()-1, (byte)(val--));
+			        	}
+			        	break;
+			        }
+			        case 2: {
+			        	// Return something larger than an existing key
+			        	increment(options.comparator, result);
+			        	break;
+			        }
 		        }
 		        return result;
 		    }
@@ -986,7 +1010,7 @@ public class TestTable {
 		return Snappy.compress(in.data(), in.offset, in.size(), out);
 	}
 	
-	@Test
+	//TODO
 	public void testTableTestApproximateOffsetOfCompressed() {
 		if (!SnappyCompressionSupported()) {
 		    System.err.println("skipping compression tests");

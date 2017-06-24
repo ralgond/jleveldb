@@ -8,6 +8,10 @@ public class Snapshot {
 	
 	public SnapshotList list;
 	
+	public Snapshot() {
+		
+	}
+	
 	public Snapshot(long number, SnapshotList list) {
 		this.number = number;
 		this.list = list;

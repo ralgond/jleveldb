@@ -97,6 +97,7 @@ public class EnvImpl implements Env {
 				dis = new DataInputStream(new FileInputStream(new File(filename)));
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
+				e.printStackTrace();
 				return Status.ioError(filename+" SequentialFileImpl.open failed: "+e);
 			}
 		}
@@ -486,7 +487,8 @@ public class EnvImpl implements Env {
 			os = new FileOutputStream(new File(fname));
         	FileChannel channel = os.getChannel();
         	lock0.setValue(new FileLock0Impl(fname, channel.tryLock()));
-        	return Status.ok0();
+        	
+        	return lock0.getValue() != null ? Status.ok0() : Status.otherError(fname+" lockFile failed");
 		} catch (IOException e) {
 			 lock0.setValue(null);
 			 return Status.ioError(fname+" lockFile failed: "+e);

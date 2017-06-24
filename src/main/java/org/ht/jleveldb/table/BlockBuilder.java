@@ -4,9 +4,17 @@ import java.util.ArrayList;
 
 import org.ht.jleveldb.Options;
 import org.ht.jleveldb.util.ByteBuf;
+import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Slice;
 
 public class BlockBuilder {
+	Options options;
+	ByteBuf buffer; // Destination buffer
+	ArrayList<Integer> restarts; // Restart points
+	int counter; // Number of entries emitted since restart
+	boolean finished; // Has Finish() been called?
+	ByteBuf lastKey;
+	
 	public BlockBuilder(Options options) {
 		assert(options.blockRestartInterval >= 1);
 		this.options = options.cloneOptions();
@@ -14,6 +22,8 @@ public class BlockBuilder {
 		finished = false;
 		restarts = new ArrayList<Integer>();
 		restarts.add(0);
+		buffer = ByteBufFactory.defaultByteBuf();
+		lastKey = ByteBufFactory.defaultByteBuf();
 	}
 	
 	public void reset() {
@@ -82,10 +92,5 @@ public class BlockBuilder {
 		return buffer.size() == 0;
 	}
 	
-	Options options;
-	ByteBuf buffer; // Destination buffer
-	ArrayList<Integer> restarts; // Restart points
-	int counter; // Number of entries emitted since restart
-	boolean finished; // Has Finish() been called?
-	ByteBuf lastKey;
+
 }

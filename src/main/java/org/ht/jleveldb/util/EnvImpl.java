@@ -361,7 +361,7 @@ public class EnvImpl implements Env {
 //	}
 	
 	@Override
-	public Status newSequentialFile(String fname, FuncOutput<SequentialFile> result) {
+	public Status newSequentialFile(String fname, Object0<SequentialFile> result) {
 		SequentialFileImpl file = new SequentialFileImpl(fname);
 		Status s = file.open();
 		if (s.ok())
@@ -370,7 +370,7 @@ public class EnvImpl implements Env {
 	}
 
 	@Override
-	public Status newRandomAccessFile(String fname, FuncOutput<RandomAccessFile0> result) {
+	public Status newRandomAccessFile(String fname, Object0<RandomAccessFile0> result) {
 		MmapReadableFile f1 = new MmapReadableFile(fname);
 		Status s = f1.open();
 		if (s.ok()) {
@@ -387,7 +387,7 @@ public class EnvImpl implements Env {
 	}
 
 	@Override
-	public Status newWritableFile(String fname, FuncOutput<WritableFile> result) {
+	public Status newWritableFile(String fname, Object0<WritableFile> result) {
 		WritableFileImpl f = new WritableFileImpl(fname, false); //FILE* f = fopen(fname.c_str(), "w");
 		Status s = f.open();
 		if (s.ok())
@@ -396,7 +396,7 @@ public class EnvImpl implements Env {
 	}
 
 	@Override
-	public Status newAppendableFile(String fname, FuncOutput<WritableFile> result) {
+	public Status newAppendableFile(String fname, Object0<WritableFile> result) {
 		WritableFileImpl f = new WritableFileImpl(fname, true); //FILE* f = fopen(fname.c_str(), "a");
 		Status s = f.open();
 		if (s.ok())
@@ -451,7 +451,7 @@ public class EnvImpl implements Env {
 	}
 
 	@Override
-	public Status getFileSize(String fname, FuncOutputLong fileSize) {
+	public Status getFileSize(String fname, Long0 fileSize) {
 		try {
 			long size = Files.size(FileSystems.getDefault().getPath(fname));
 			fileSize.setValue(size);
@@ -480,7 +480,7 @@ public class EnvImpl implements Env {
 	}
 	
 	@Override
-	public Status lockFile(String fname, FuncOutput<FileLock0> lock0) {
+	public Status lockFile(String fname, Object0<FileLock0> lock0) {
 		FileOutputStream os = null;
 		try {
 			os = new FileOutputStream(new File(fname));
@@ -578,7 +578,7 @@ public class EnvImpl implements Env {
 	}
 	
 	@Override
-	public Status newLogger(String fname, FuncOutput<Logger0> logger) {
+	public Status newLogger(String fname, Object0<Logger0> logger) {
 		logger.setValue(new Logger0Impl());
 		return Status.ok0();
 	}
@@ -598,7 +598,7 @@ public class EnvImpl implements Env {
 	}
 	
 	Status doWriteStringToFile(Slice data, String fname, boolean shouldSync) {
-		FuncOutput<WritableFile> file0 = new FuncOutput<WritableFile>();
+		Object0<WritableFile> file0 = new Object0<WritableFile>();
 		Status s = newWritableFile(fname, file0);
 		if (!s.ok()) {
 			return s;

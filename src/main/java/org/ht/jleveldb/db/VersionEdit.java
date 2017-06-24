@@ -10,7 +10,7 @@ import org.ht.jleveldb.db.format.DBFormat;
 import org.ht.jleveldb.db.format.InternalKey;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.FuncOutputInt;
+import org.ht.jleveldb.util.Integer0;
 import org.ht.jleveldb.util.IntLongPair;
 import org.ht.jleveldb.util.IntObjectPair;
 import org.ht.jleveldb.util.Slice;
@@ -191,7 +191,7 @@ public class VersionEdit {
 		
 		Slice str = new Slice();
 		
-		FuncOutputInt result0 = new FuncOutputInt();
+		Integer0 result0 = new Integer0();
 		
 		while (msg == null) {
 			try {
@@ -356,7 +356,7 @@ public class VersionEdit {
 		}
 	}
 	
-	static boolean getLevel(Slice input, FuncOutputInt level) {
+	static boolean getLevel(Slice input, Integer0 level) {
 		int v = Coding.getVarNat32(input);
 		if (v < DBFormat.kNumLevels) {
 		    level.setValue(v);

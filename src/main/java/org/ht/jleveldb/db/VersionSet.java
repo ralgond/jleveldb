@@ -25,9 +25,9 @@ import org.ht.jleveldb.table.Table;
 import org.ht.jleveldb.table.TwoLevelIterator;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputBoolean;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Object0;
+import org.ht.jleveldb.util.Boolean0;
+import org.ht.jleveldb.util.Long0;
 import org.ht.jleveldb.util.IntLongPair;
 import org.ht.jleveldb.util.Mutex;
 import org.ht.jleveldb.util.Slice;
@@ -295,7 +295,7 @@ public class VersionSet {
 			assert(descriptorFile == null);
 			newManifestFile = FileName.getDescriptorFileName(dbname, manifestFileNumber);
 			edit.setNextFile(nextFileNumber);
-			FuncOutput<WritableFile> descriptorFile0 = new FuncOutput<WritableFile>();
+			Object0<WritableFile> descriptorFile0 = new Object0<WritableFile>();
 			s = env.newWritableFile(newManifestFile, descriptorFile0);
 			descriptorFile = descriptorFile0.getValue();
 			if (s.ok()) {
@@ -363,7 +363,7 @@ public class VersionSet {
 	 * Recover the last saved descriptor from persistent storage.
 	 * @return saveManifest
 	 */
-	public Status recover(FuncOutputBoolean saveManifest) {
+	public Status recover(Boolean0 saveManifest) {
 		// Read "CURRENT" file, which contains a pointer to the current manifest file
 		ByteBuf currentFileName = ByteBufFactory.defaultByteBuf();
 		Status s = env.readFileToString(FileName.getCurrentFileName(dbname), currentFileName);
@@ -377,7 +377,7 @@ public class VersionSet {
 		currentFileName.resize(currentFileName.size() - 1); //may has bugs, should test
 		
 		String dscname = dbname + "/" + current;
-		FuncOutput<SequentialFile> file0 = new FuncOutput<SequentialFile>();
+		Object0<SequentialFile> file0 = new Object0<SequentialFile>();
 		s = env.newSequentialFile(dscname, file0);
 		SequentialFile file = file0.getValue();
 		if (!s.ok()) {
@@ -815,7 +815,7 @@ public class VersionSet {
 		    	} else {
 		    		// "ikey" falls in the range for this table.  Add the
 		    		// approximate offset of "ikey" within the table.
-		    		FuncOutput<Table> table0 = new FuncOutput<Table>();
+		    		Object0<Table> table0 = new Object0<Table>();
 		    		Iterator0 iter = tcache.newIterator(new ReadOptions(), 
 		    				files.get(i).number, files.get(i).fileSize, table0);
 		    		if (table0.getValue() != null) {
@@ -847,9 +847,9 @@ public class VersionSet {
 		if (!options.reuseLogs) {
 			    return false;
 		}
-		FuncOutput<FileType> manifestType = new FuncOutput<FileType>();
-		FuncOutputLong manifestNumber = new FuncOutputLong();
-		FuncOutputLong manifestSize = new FuncOutputLong();
+		Object0<FileType> manifestType = new Object0<FileType>();
+		Long0 manifestNumber = new Long0();
+		Long0 manifestSize = new Long0();
 		if (!FileName.parseFileName(dscbase, manifestNumber, manifestType) ||
 			      manifestType.getValue() != FileType.DescriptorFile ||
 			      !env.getFileSize(dscname, manifestSize).ok() ||
@@ -860,7 +860,7 @@ public class VersionSet {
 
 		assert(descriptorFile == null);
 		assert(descriptorLog == null);
-		FuncOutput<WritableFile> descriptorFile0 = new FuncOutput<WritableFile>();
+		Object0<WritableFile> descriptorFile0 = new Object0<WritableFile>();
 		Status r = env.newAppendableFile(dscname, descriptorFile0);
 		descriptorFile = descriptorFile0.getValue();
 		if (!r.ok()) {

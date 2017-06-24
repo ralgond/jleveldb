@@ -16,8 +16,8 @@ import org.ht.jleveldb.db.format.ValueType;
 import org.ht.jleveldb.table.Table;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Object0;
+import org.ht.jleveldb.util.Long0;
 import org.ht.jleveldb.util.Slice;
 
 public class Dumpfile {
@@ -29,7 +29,7 @@ public class Dumpfile {
 	// Returns a non-OK result if fname does not name a leveldb storage
 	// file, or if the file cannot be read.
 	public static Status dumpFile(Env env, String fname, WritableFile dst) {
-		FuncOutput<FileType> ftype0 = new FuncOutput<FileType>();
+		Object0<FileType> ftype0 = new Object0<FileType>();
 		if (!guessType(fname, ftype0)) {
 		    return Status.invalidArgument(fname + ": unknown file type");
 		}
@@ -64,7 +64,7 @@ public class Dumpfile {
 	// Print contents of a log file. (*func)() is called on every record.
 	static Status printLogContents(Env env, String fname,
 			LogReadCallback callback,  WritableFile dst) {
-		FuncOutput<SequentialFile> file0 = new FuncOutput<SequentialFile>();
+		Object0<SequentialFile> file0 = new Object0<SequentialFile>();
 		Status s = env.newSequentialFile(fname, file0);
 		if (!s.ok()) {
 			return s;
@@ -171,9 +171,9 @@ public class Dumpfile {
 	}
 		
 	static Status dumpTable(Env env, String fname, WritableFile dst) {
-		  FuncOutputLong fileSize = new FuncOutputLong();
-		  FuncOutput<RandomAccessFile0> file0 = new FuncOutput<RandomAccessFile0>();
-		  FuncOutput<Table> table0 = new FuncOutput<Table>();
+		  Long0 fileSize = new Long0();
+		  Object0<RandomAccessFile0> file0 = new Object0<RandomAccessFile0>();
+		  Object0<Table> table0 = new Object0<Table>();
 		  Status s = env.getFileSize(fname, fileSize);
 		  if (s.ok()) {
 			  s = env.newRandomAccessFile(fname, file0);
@@ -183,7 +183,7 @@ public class Dumpfile {
 		    // comparator used in this database. However this should not cause
 		    // problems since we only use Table operations that do not require
 		    // any comparisons.  In particular, we do not call Seek or Prev.
-		    s = Table.open(new Options(null), file0.getValue(), fileSize.getValue(), table0);
+		    s = Table.open(new Options(), file0.getValue(), fileSize.getValue(), table0);
 		  }
 		  if (!s.ok()) {
 			  if (table0.getValue() != null)
@@ -244,7 +244,7 @@ public class Dumpfile {
 	
 	
 	
-	static boolean guessType(String fname, FuncOutput<FileType> type) {
+	static boolean guessType(String fname, Object0<FileType> type) {
 		  int pos = fname.lastIndexOf('/'); //size_t pos = fname.rfind('/');
 		  String basename;
 		  if (pos < 0) {
@@ -252,7 +252,7 @@ public class Dumpfile {
 		  } else {
 			  basename = fname.substring(pos+1); //basename = std::string(fname.data() + pos + 1, fname.size() - pos - 1);
 		  }
-		  FuncOutputLong ignored = new FuncOutputLong();
+		  Long0 ignored = new Long0();
 		  return FileName.parseFileName(basename, ignored, type);
 	}
 }

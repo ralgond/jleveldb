@@ -1,5 +1,6 @@
 package org.ht.jleveldb;
 
+import org.ht.jleveldb.util.BytewiseComparatorImpl;
 import org.ht.jleveldb.util.Cache;
 import org.ht.jleveldb.util.Comparator0;
 
@@ -17,7 +18,7 @@ public class Options {
 	 * here has the same name and orders keys *exactly* the same as the
 	 * comparator provided to previous open calls on the same DB.
 	 */
-	public final Comparator0 comparator;
+	public Comparator0 comparator;
 	
 	/**
 	 * If {@code true}, the database will be created if it is missing.</br></br>
@@ -173,11 +174,16 @@ public class Options {
 	  public FilterPolicy filterPolicy;
 	  
 	  public Options(Comparator0 comparator) {
-		  this.comparator = comparator;
+		 this();
+		 this.comparator = comparator;
+	  }
+	  
+	  public Options() {
+		  comparator = BytewiseComparatorImpl.getInstance();
 		  createIfMissing = false;
 		  errorIfExists = false;
 		  paranoidChecks = false;
-		  env = null;
+		  env = LevelDB.defaultEnv();
 		  infoLog = null;
 		  
 		  writeBufferSize = 4*1024*1024;

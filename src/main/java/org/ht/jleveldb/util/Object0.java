@@ -1,10 +1,14 @@
 package org.ht.jleveldb.util;
 
-public class FuncOutput<T> {
+public class Object0<T> {
 	T value;
 	
-	public FuncOutput() {
+	public Object0() {
 		value = null;
+	}
+	
+	public Object0(T value) {
+		this.value = value;
 	}
 	
 	public void setValue(T value) {

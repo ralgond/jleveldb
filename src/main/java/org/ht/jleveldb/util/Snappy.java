@@ -1,7 +1,7 @@
 package org.ht.jleveldb.util;
 
 public class Snappy {
-	public static boolean getUncompressedLength(byte[] data, int offset, int n, FuncOutputInt length) {
+	public static boolean getUncompressedLength(byte[] data, int offset, int n, Integer0 length) {
 		//TODO:
 		return false;
 	}

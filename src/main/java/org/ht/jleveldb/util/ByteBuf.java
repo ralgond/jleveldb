@@ -45,6 +45,10 @@ public interface ByteBuf {
 	
 	void append(byte[] buf, int offset, int size);
 	
+	void append(ByteBuf buf);
+	
+	void assign(String s);
+	
 	void addByte(byte b);
 	
 	/**

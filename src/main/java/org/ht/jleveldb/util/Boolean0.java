@@ -1,6 +1,6 @@
 package org.ht.jleveldb.util;
 
-public class FuncOutputBoolean {
+public class Boolean0 {
 	boolean value;
 	
 	public boolean getValue() {

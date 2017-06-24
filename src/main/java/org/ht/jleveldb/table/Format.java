@@ -7,7 +7,7 @@ import org.ht.jleveldb.Status;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.Crc32C;
-import org.ht.jleveldb.util.FuncOutputInt;
+import org.ht.jleveldb.util.Integer0;
 import org.ht.jleveldb.util.Slice;
 import org.ht.jleveldb.util.Snappy;
 
@@ -183,7 +183,7 @@ public class Format {
     			result.cachable = true;
     		}
     	} else if (data[n] == CompressionType.kSnappyCompression.getType()) {
-    		FuncOutputInt ulength0 = new FuncOutputInt();
+    		Integer0 ulength0 = new Integer0();
 	    	if (!Snappy.getUncompressedLength(data, 0, n, ulength0)) {
 	    		buf = null;
 	    		return Status.corruption("corrupted compressed block contents");

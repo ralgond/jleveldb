@@ -1,7 +1,7 @@
 package org.ht.jleveldb;
 
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Long0;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 public class FileName {
@@ -72,7 +72,7 @@ public class FileName {
 		return dbname + "/LOG.old";
 	}
 	
-	static boolean consumeDecimalNumber(FuncOutput<String> in, FuncOutputLong val) {
+	public static boolean consumeDecimalNumber(Object0<String> in, Long0 val) {
 		long v = 0;
 		int digits = 0;
 		char[] ary = in.getValue().toCharArray();
@@ -109,8 +109,8 @@ public class FileName {
 	//  dbname/MANIFEST-[0-9]+
 	//  dbname/[0-9]+.(log|sst|ldb)
 	public static boolean parseFileName(String fname,
-			FuncOutputLong number,
-			FuncOutput<FileType> type) {
+			Long0 number,
+			Object0<FileType> type) {
 		number.setValue(0);
 		type.setValue(null);
 		String rest = fname;
@@ -125,8 +125,8 @@ public class FileName {
 			type.setValue(FileType.InfoLogFile);
 		} else if (fname.startsWith("MANIFEST-")) {
 			rest = rest.substring("MANIFEST-".length());
-			FuncOutputLong num = new FuncOutputLong();
-			FuncOutput<String> rest0 = new FuncOutput<String>();
+			Long0 num = new Long0();
+			Object0<String> rest0 = new Object0<String>();
 			rest0.setValue(rest);
 			if (!consumeDecimalNumber(rest0, num)) {
 				return false;
@@ -140,8 +140,8 @@ public class FileName {
 		} else {
 			// Avoid strtoull() to keep filename format independent of the
 			// current locale
-			FuncOutputLong num = new FuncOutputLong();
-			FuncOutput<String> rest0 = new FuncOutput<String>();
+			Long0 num = new Long0();
+			Object0<String> rest0 = new Object0<String>();
 			rest0.setValue(rest);
 			if (!consumeDecimalNumber(rest0, num)) {
 				return false;

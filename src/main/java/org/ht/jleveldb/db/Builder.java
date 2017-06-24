@@ -8,7 +8,7 @@ import org.ht.jleveldb.ReadOptions;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.WritableFile;
 import org.ht.jleveldb.table.TableBuilder;
-import org.ht.jleveldb.util.FuncOutput;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 //Build a Table file from the contents of *iter.  The generated file
@@ -25,7 +25,7 @@ public class Builder {
 		
 		String fname = FileName.getTableFileName(dbname, meta.number);
 		if (iter.valid()) {
-			FuncOutput<WritableFile> fileFuncOut = new FuncOutput<>();
+			Object0<WritableFile> fileFuncOut = new Object0<>();
 			s = env.newWritableFile(fname, fileFuncOut);
 			if (!s.ok())
 				return s;

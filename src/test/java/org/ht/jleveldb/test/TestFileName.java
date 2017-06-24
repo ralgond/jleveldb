@@ -4,8 +4,8 @@ import java.util.ArrayList;
 
 import org.ht.jleveldb.FileName;
 import org.ht.jleveldb.FileType;
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Object0;
+import org.ht.jleveldb.util.Long0;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -27,8 +27,8 @@ public class TestFileName {
 	
 	@Test
 	public void testParse() {
-		FuncOutput<FileType> type0 = new FuncOutput<FileType>();
-		FuncOutputLong number0 = new FuncOutputLong();
+		Object0<FileType> type0 = new Object0<FileType>();
+		Long0 number0 = new Long0();
 
 		  // Successful parses
 		  ArrayList<ParseResult> cases = new ArrayList<>();

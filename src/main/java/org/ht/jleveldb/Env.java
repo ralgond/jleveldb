@@ -3,8 +3,8 @@ package org.ht.jleveldb;
 import java.util.List;
 
 import org.ht.jleveldb.util.ByteBuf;
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Long0;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 public interface Env {
@@ -14,7 +14,7 @@ public interface Env {
 	 * @param result
 	 * @return
 	 */
-	Status newSequentialFile(String fname, FuncOutput<SequentialFile> result);
+	Status newSequentialFile(String fname, Object0<SequentialFile> result);
 	
 	/**
 	 * The returned file may be concurrently accessed by multiple threads.
@@ -23,7 +23,7 @@ public interface Env {
 	 * @param result
 	 * @return
 	 */
-	Status newRandomAccessFile(String fname, FuncOutput<RandomAccessFile0> result);
+	Status newRandomAccessFile(String fname, Object0<RandomAccessFile0> result);
 	 
 	/**
 	 * The returned file will only be accessed by one thread at a time.
@@ -32,7 +32,7 @@ public interface Env {
 	 * @param result
 	 * @return
 	 */
-	Status newWritableFile(String fname,  FuncOutput<WritableFile> result);
+	Status newWritableFile(String fname,  Object0<WritableFile> result);
 	
 	/**
 	 * The returned file will only be accessed by one thread at a time.</br></br>
@@ -46,7 +46,7 @@ public interface Env {
 	 * @param result
 	 * @return
 	 */
-	Status newAppendableFile(String fname, FuncOutput<WritableFile> result);
+	Status newAppendableFile(String fname, Object0<WritableFile> result);
 	
 	/**
 	 * Returns true iff the named file exists.
@@ -92,7 +92,7 @@ public interface Env {
 	 * @param fileSize [OUTPUT]
 	 * @return
 	 */
-	Status getFileSize(String fname, FuncOutputLong fileSize);
+	Status getFileSize(String fname, Long0 fileSize);
 	
 	/**
 	 * Rename file src to target.
@@ -121,7 +121,7 @@ public interface Env {
 	 * @param lock
 	 * @return
 	 */
-	Status lockFile(String fname, FuncOutput<FileLock0> lock);
+	Status lockFile(String fname, Object0<FileLock0> lock);
 	
 	/**
 	 * Release the lock acquired by a previous successful call to LockFile.</br>
@@ -154,7 +154,7 @@ public interface Env {
 	 * @param logger
 	 * @return
 	 */
-	Status newLogger(String fname, FuncOutput<Logger0> logger);
+	Status newLogger(String fname, Object0<Logger0> logger);
 	
 	/**
 	 * Only useful for computing deltas of time.

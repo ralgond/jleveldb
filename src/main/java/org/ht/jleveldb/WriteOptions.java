@@ -33,5 +33,17 @@ public class WriteOptions {
 		this.sync = sync;
 	}
 	
+	private static WriteOptions defaultOne = new WriteOptions();
+	private static WriteOptions syncOne = new WriteOptions();
+	static {
+		syncOne.setSync(true);
+	}
 	
+	public static WriteOptions defaultOne() {
+		return defaultOne;
+	}
+	
+	public static WriteOptions syncOne() {
+		return syncOne;
+	}
 }

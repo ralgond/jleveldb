@@ -218,6 +218,17 @@ public class DefaultByteBuf implements ByteBuf {
 		System.arraycopy(buf, offset, data, writeIndex, size);
 		writeIndex += size;
 	}
+	
+	@Override
+	final public void append(ByteBuf buf) {
+		append(buf.data(), 0, buf.size());
+	}
+	
+	@Override
+	public void assign(String s) {
+		byte[] b = s.getBytes();
+		assign(b, 0, b.length);
+	}
 
 	@Override
 	final public void writeFixedNat32(int value) {

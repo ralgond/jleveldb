@@ -10,7 +10,7 @@ import org.ht.jleveldb.Status;
 import org.ht.jleveldb.table.Table;
 import org.ht.jleveldb.util.Cache;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.FuncOutput;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 public class TableCache {
@@ -61,11 +61,11 @@ public class TableCache {
 	public Iterator0 newIterator(ReadOptions options,
             long fileNumber,
             long fileSize,
-            FuncOutput<Table> table0) {
+            Object0<Table> table0) {
 		if (table0 != null)
 			table0.setValue(null);
 
-		FuncOutput<Cache.Handle> handle0 = new FuncOutput<Cache.Handle>();
+		Object0<Cache.Handle> handle0 = new Object0<Cache.Handle>();
 		Status s = findTable(fileNumber, fileSize, handle0);
 		if (!s.ok()) {
 		    return Iterator0.newErrorIterator(s);
@@ -95,7 +95,7 @@ public class TableCache {
 	             Slice k,
 	             Object arg,
 	             Table.HandleResult saver) {
-		FuncOutput<Cache.Handle> handle0 = new FuncOutput<Cache.Handle>();
+		Object0<Cache.Handle> handle0 = new Object0<Cache.Handle>();
 		Status s = findTable(fileNumber, fileSize, handle0);
 		if (s.ok()) {
 			Cache.Handle handle = handle0.getValue();
@@ -120,7 +120,7 @@ public class TableCache {
 	Options options;
 	Cache cache;
 	
-	Status findTable(long fileNumber, long fileSize, FuncOutput<Cache.Handle> handle) {
+	Status findTable(long fileNumber, long fileSize, Object0<Cache.Handle> handle) {
 		Status s = Status.ok0();
 		byte buf[] = new byte[kUint64Size];
 		Coding.encodeFixedNat64(buf, 0, kUint64Size);
@@ -128,7 +128,7 @@ public class TableCache {
 		handle.setValue(cache.lookup(key));
 		if (handle.getValue() == null) {
 		    String fname = FileName.getTableFileName(dbname, fileNumber);
-		    FuncOutput<RandomAccessFile0> file0 = new FuncOutput<RandomAccessFile0>();
+		    Object0<RandomAccessFile0> file0 = new Object0<RandomAccessFile0>();
 		    
 		    s = env.newRandomAccessFile(fname, file0);
 		    if (!s.ok()) {
@@ -138,7 +138,7 @@ public class TableCache {
 		    	}
 		    }
 		    
-		    FuncOutput<Table> table0 = new FuncOutput<Table>();
+		    Object0<Table> table0 = new Object0<Table>();
 		    if (s.ok()) {
 		    	s = Table.open(options, file0.getValue(), fileSize, table0);
 		    }

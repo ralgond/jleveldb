@@ -11,7 +11,7 @@ import org.ht.jleveldb.db.format.ValueType;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.FuncOutput;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 public class MemTable {
@@ -213,7 +213,7 @@ public class MemTable {
 	 * @param s
 	 * @return
 	 */
-	public boolean get(LookupKey key, ByteBuf value, FuncOutput<Status> s) {
+	public boolean get(LookupKey key, ByteBuf value, Object0<Status> s) {
 		if (value != null)
 			value.clear();
 		ParsedInternalKeySlice memkey = key.memtableKey();

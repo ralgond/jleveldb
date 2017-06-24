@@ -1,4 +1,4 @@
-package org.ht.jleveldb.db;
+package org.ht.jleveldb;
 
 public class Snapshot {
 	public long number; // const after creation

@@ -24,7 +24,7 @@ public class BytewiseComparatorImpl extends Comparator0 {
 
 	@Override
 	public void findShortestSeparator(ByteBuf start, Slice limit) {
-	    // Find length of common prefix
+	    // Find length of common prefix for start and limit.
 	    int minLength = Integer.min(start.size(), limit.size());
 	    int diffIndex = 0;
 	    while ((diffIndex < minLength) &&
@@ -36,9 +36,8 @@ public class BytewiseComparatorImpl extends Comparator0 {
 	        // Do not shorten if one string is a prefix of the other
 	    } else {
 	        int diffByte = (start.getByte(diffIndex) & 0xff);
-	        if (diffByte < 0xff &&
-	            diffByte + 1 < (limit.getByte(diffIndex) & 0xff)) {
-	        	start.setByte(diffIndex, (byte)((start.getByte(diffIndex)+1)&0XFF));
+	        if (diffByte < 0xff && diffByte + 1 < (limit.getByte(diffIndex) & 0xff)) {
+	        	start.setByte(diffIndex, (byte)(diffByte + 1));
 	        	start.resize(diffIndex + 1);
 	        	assert(compare(new Slice(start), limit) < 0);
 	        }
@@ -47,7 +46,7 @@ public class BytewiseComparatorImpl extends Comparator0 {
 
 	@Override
 	public void findShortSuccessor(ByteBuf key) {
-	    // Find first character that can be incremented
+	    // Find first character that can be incremented.
 	    int n = key.size();
 	    for (int i = 0; i < n; i++) {
 	    	int b = (key.getByte(i) & 0x0ff);

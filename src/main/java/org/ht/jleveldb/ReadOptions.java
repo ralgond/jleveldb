@@ -1,7 +1,5 @@
 package org.ht.jleveldb;
 
-import org.ht.jleveldb.db.Snapshot;
-
 public class ReadOptions {
 	/**
 	 * If true, all data read from underlying storage will be

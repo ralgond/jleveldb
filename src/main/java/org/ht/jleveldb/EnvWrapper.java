@@ -3,8 +3,8 @@ package org.ht.jleveldb;
 import java.util.List;
 
 import org.ht.jleveldb.util.ByteBuf;
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Long0;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 /**
@@ -21,23 +21,27 @@ public class EnvWrapper implements Env {
 		target = env;
 	}
 	
+	public Env target() {
+		return target;
+	}
+	
 	@Override
-	public Status newSequentialFile(String fname, FuncOutput<SequentialFile> result) {
+	public Status newSequentialFile(String fname, Object0<SequentialFile> result) {
 		return target.newSequentialFile(fname, result);
 	}
 
 	@Override
-	public Status newRandomAccessFile(String fname, FuncOutput<RandomAccessFile0> result) {
+	public Status newRandomAccessFile(String fname, Object0<RandomAccessFile0> result) {
 		return target.newRandomAccessFile(fname, result);
 	}
 
 	@Override
-	public Status newWritableFile(String fname, FuncOutput<WritableFile> result) {
+	public Status newWritableFile(String fname, Object0<WritableFile> result) {
 		return target.newWritableFile(fname, result);
 	}
 
 	@Override
-	public Status newAppendableFile(String fname, FuncOutput<WritableFile> result) {
+	public Status newAppendableFile(String fname, Object0<WritableFile> result) {
 		return target.newAppendableFile(fname, result);
 	}
 
@@ -67,7 +71,7 @@ public class EnvWrapper implements Env {
 	}
 
 	@Override
-	public Status getFileSize(String fname, FuncOutputLong fileSize) {
+	public Status getFileSize(String fname, Long0 fileSize) {
 		return target.getFileSize(fname, fileSize);
 	}
 
@@ -77,7 +81,7 @@ public class EnvWrapper implements Env {
 	}
 
 	@Override
-	public Status lockFile(String fname, FuncOutput<FileLock0> lock) {
+	public Status lockFile(String fname, Object0<FileLock0> lock) {
 		return target.lockFile(fname, lock);
 	}
 
@@ -97,7 +101,7 @@ public class EnvWrapper implements Env {
 	}
 
 	@Override
-	public Status newLogger(String fname, FuncOutput<Logger0> logger) {
+	public Status newLogger(String fname, Object0<Logger0> logger) {
 		return target.newLogger(fname, logger);
 	}
 

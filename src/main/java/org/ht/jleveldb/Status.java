@@ -38,6 +38,14 @@ public final class Status {
 		return code == Code.Ok;
 	}
 	
+	public boolean isOtherError() {
+		return code == Code.OtherError;
+	}
+	
+	public boolean isNotFound() {
+		return code == Code.NotFound;
+	}
+	
 	@Override
 	public String toString() {
 		return String.format("{%s,%s}", code.name(), message);

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -15,8 +16,11 @@ import org.ht.jleveldb.FileLock0;
 import org.ht.jleveldb.FileName;
 import org.ht.jleveldb.FileType;
 import org.ht.jleveldb.Options;
+import org.ht.jleveldb.Range;
 import org.ht.jleveldb.ReadOptions;
 import org.ht.jleveldb.SequentialFile;
+import org.ht.jleveldb.Snapshot;
+import org.ht.jleveldb.SnapshotList;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.WritableFile;
 import org.ht.jleveldb.WriteBatch;
@@ -34,10 +38,10 @@ import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Comparator0;
 import org.ht.jleveldb.util.CondVar;
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputBoolean;
-import org.ht.jleveldb.util.FuncOutputInt;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Object0;
+import org.ht.jleveldb.util.Boolean0;
+import org.ht.jleveldb.util.Integer0;
+import org.ht.jleveldb.util.Long0;
 import org.ht.jleveldb.util.Mutex;
 import org.ht.jleveldb.util.Slice;
 
@@ -104,17 +108,18 @@ public class DBImpl implements DB {
 		}
 	}
 	
-	public Status Open(Options options, String name) {
+	@Override
+	public Status open(Options options, String name) {
 		mutex.lock();
 		VersionEdit edit = new VersionEdit();
-		FuncOutputBoolean saveManifest = new FuncOutputBoolean();
+		Boolean0 saveManifest = new Boolean0();
 		saveManifest.setValue(false);
 		Status s = recover(edit, saveManifest);
 		if (s.ok() && memtable == null) {
 			// Create new log and a corresponding memtable.
 			long newLogNumber = versions.newFileNumber();
 			
-			FuncOutput<WritableFile> result = new FuncOutput<WritableFile>();
+			Object0<WritableFile> result = new Object0<WritableFile>();
 			s = env.newWritableFile(dbname, result);
 			if (s.ok()) {
 				edit.setLogNumber(newLogNumber);
@@ -171,7 +176,7 @@ public class DBImpl implements DB {
 			
 			Status status = makeRoomForWrite(batch == null);
 			long lastSequence = versions.lastSequence();
-			FuncOutput<Writer> lastWriter = new FuncOutput<Writer>();
+			Object0<Writer> lastWriter = new Object0<Writer>();
 			lastWriter.setValue(w);
 			if (status.ok() && batch != null) {
 				// null batch is for compactions
@@ -235,7 +240,7 @@ public class DBImpl implements DB {
 
 	@Override
 	public Status get(ReadOptions options, Slice key, ByteBuf value) {
-		FuncOutput<Status> s = new FuncOutput<Status>();
+		Object0<Status> s = new Object0<Status>();
 		s.setValue(Status.ok0());
 		mutex.lock();
 		try {
@@ -314,7 +319,7 @@ public class DBImpl implements DB {
 		}
 	}
 	
-	Iterator0 newInternalCursor(ReadOptions options, FuncOutputLong latestSnapshot, FuncOutputInt outSeed) {
+	Iterator0 newInternalCursor(ReadOptions options, Long0 latestSnapshot, Integer0 outSeed) {
 		IterState cleanup = new IterState();
 		mutex.lock();
 		try {
@@ -356,7 +361,7 @@ public class DBImpl implements DB {
 		ndb.setLastSequence(0);
 		
 		String manifest = FileName.getDescriptorFileName(dbname, 1);
-		FuncOutput<WritableFile> file = new FuncOutput<>();
+		Object0<WritableFile> file = new Object0<>();
 		Status s = env.newWritableFile(manifest, file);
 		if (!s.ok()) {
 			return s;
@@ -394,7 +399,7 @@ public class DBImpl implements DB {
 	 * @param saveManifest
 	 * @return
 	 */
-	Status recover(VersionEdit edit, FuncOutputBoolean saveManifest) {
+	Status recover(VersionEdit edit, Boolean0 saveManifest) {
 		mutex.assertHeld();
 		
 		  // Ignore error from CreateDir since the creation of the DB is
@@ -402,7 +407,7 @@ public class DBImpl implements DB {
 		  // may already exist from a previous failed creation attempt.
 		env.createDir(dbname);
 		assert(dbLock == null);
-		FuncOutput<FileLock0> dbLockOut = new FuncOutput<>();
+		Object0<FileLock0> dbLockOut = new Object0<>();
 		
 		Status s = env.lockFile(FileName.getLockFileName(dbname), dbLockOut);
 		if (!s.ok()) {
@@ -428,7 +433,7 @@ public class DBImpl implements DB {
 		if (!s.ok()) {
 			return s;
 		}
-		FuncOutputLong maxSequence = new FuncOutputLong();
+		Long0 maxSequence = new Long0();
 		maxSequence.setValue(0);
 		
 		  // Recover from all newer log files than the ones named in the
@@ -447,8 +452,8 @@ public class DBImpl implements DB {
 		}
 		TreeSet<Long> expected = new TreeSet<Long>();
 		versions.addLiveFiles(expected);
-		FuncOutputLong number = new FuncOutputLong();
-		FuncOutput<FileType> type = new FuncOutput<>();
+		Long0 number = new Long0();
+		Object0<FileType> type = new Object0<>();
 		ArrayList<Long> logs = new ArrayList<Long>();
 		for (int i = 0; i < filenames.size(); i++) {
 		    if (FileName.parseFileName(filenames.get(i), number, type)) {
@@ -509,8 +514,8 @@ public class DBImpl implements DB {
 		
 		ArrayList<String> filenames = new ArrayList<>();
 		env.getChildren(dbname, filenames); // Ignoring errors on purpose
-		FuncOutputLong number = new FuncOutputLong();
-		FuncOutput<FileType> type = new FuncOutput<>();
+		Long0 number = new Long0();
+		Object0<FileType> type = new Object0<>();
 		
 		for (int i = 0; i < filenames.size(); i++) {
 		    if (FileName.parseFileName(filenames.get(i), number, type)) {
@@ -620,13 +625,13 @@ public class DBImpl implements DB {
 	 * @param maxSequence
 	 * @return
 	 */
-	Status recoverLogFile(final long logNumber, boolean lastLog, FuncOutputBoolean saveManifest,
-            VersionEdit edit, FuncOutputLong maxSequence) {
+	Status recoverLogFile(final long logNumber, boolean lastLog, Boolean0 saveManifest,
+            VersionEdit edit, Long0 maxSequence) {
 		mutex.assertHeld();
 		
 		// Open the log file
 		String fname = FileName.getLogFileName(dbname, logNumber);
-		FuncOutput<SequentialFile> fileFuncOut = new FuncOutput<>();
+		Object0<SequentialFile> fileFuncOut = new Object0<>();
 		Status status = env.newSequentialFile(fname, fileFuncOut);
 		SequentialFile file = fileFuncOut.getValue();
 		if (!status.ok()) {
@@ -704,8 +709,8 @@ public class DBImpl implements DB {
 		    assert(logWriter == null);
 		    assert(memtable == null);
 		    
-		    FuncOutputLong lfileSize = new FuncOutputLong();
-		    FuncOutput<WritableFile> logFile0 = new FuncOutput<>();
+		    Long0 lfileSize = new Long0();
+		    Object0<WritableFile> logFile0 = new Object0<>();
 		    
 		    if (env.getFileSize(fname, lfileSize).ok() && env.newAppendableFile(fname, logFile0).ok()) {
 		    	logFile = logFile0.getValue();
@@ -831,7 +836,7 @@ public class DBImpl implements DB {
 				      // Attempt to switch to a new memtable and trigger compaction of old
 				      assert(versions.prevLogNumber() == 0);
 				      long newLogNumber = versions.newFileNumber();
-				      FuncOutput<WritableFile> lfile = new FuncOutput<>();
+				      Object0<WritableFile> lfile = new Object0<>();
 				      s = env.newWritableFile(FileName.getLogFileName(dbname, newLogNumber), lfile);
 				      if (!s.ok()) {
 				    	  // Avoid chewing through file number space in a tight loop.
@@ -860,7 +865,7 @@ public class DBImpl implements DB {
 		}
 	}
 	
-	WriteBatch buildBatchGroup(FuncOutput<Writer> lastWriterOut) {
+	WriteBatch buildBatchGroup(Object0<Writer> lastWriterOut) {
 		assert(!writers.isEmpty());
 		Writer first = writers.peekFirst();
 		WriteBatch result = first.batch;
@@ -1097,7 +1102,7 @@ public class DBImpl implements DB {
 		
 		// Make the output file
 		String fname = FileName.getTableFileName(dbname, fileNumber);
-		FuncOutput<WritableFile> resultOutFile = new FuncOutput<WritableFile>();
+		Object0<WritableFile> resultOutFile = new Object0<WritableFile>();
 		Status s = env.newWritableFile(fname, resultOutFile);
 		compact.outFile = resultOutFile.getValue();
 		if (s.ok())
@@ -1425,8 +1430,8 @@ public class DBImpl implements DB {
 	}
 	
 	Iterator0 newInternalIterator(ReadOptions options,
-            FuncOutputLong latestSnapshot,
-            FuncOutputInt seed0) {
+            Long0 latestSnapshot,
+            Integer0 seed0) {
 		IterState cleanup = new IterState();	
 		mutex.lock();
 		latestSnapshot.setValue(versions.lastSequence());
@@ -1457,12 +1462,137 @@ public class DBImpl implements DB {
 
 	
 	public Iterator0 newIterator(ReadOptions options) {
-		FuncOutputLong latestSnapshot = new FuncOutputLong();
-		FuncOutputInt seed0 = new FuncOutputInt();
+		Long0 latestSnapshot = new Long0();
+		Integer0 seed0 = new Integer0();
 		Iterator0 iter = newInternalIterator(options, latestSnapshot, seed0);
 		return DBIter.newDBIterator(
 		      this, userComparator(), iter,
 		      (options.snapshot != null ? ((Snapshot)(options.snapshot)).number : latestSnapshot.getValue()),
 		      seed0.getValue());
+	}
+	
+	public boolean getProperty(Slice property, ByteBuf value) {
+		value.clear();
+		mutex.lock();
+		try {
+			//TODO
+			return false;
+		} finally {
+			mutex.unlock();
+		}
+	}
+	
+	@Override
+	public Snapshot getSnapshot() {
+		mutex.lock();
+		try {
+			return snapshots.new0(versions.lastSequence());
+		} finally {
+			mutex.unlock();
+		}
+	}
+
+	public void releaseSnapshot(Snapshot snapshot) {
+		mutex.lock();
+		try {
+			snapshots.delete(snapshot);
+		} finally {
+			mutex.unlock();
+		}
+	}
+	
+	public void compactRange(Slice begin, Slice end) throws Exception {
+		int maxLevelWithFiles = 1;
+		mutex.lock();
+		try {
+			Version base = versions.current();
+			for (int level = 1; level < DBFormat.kNumLevels; level++) {
+				if (base.overlapInLevel(level, begin, end)) {
+					maxLevelWithFiles = level;
+				}
+			}
+		} finally {
+			mutex.unlock();
+		}
+		
+		TEST_CompactMemTable(); // TODO(sanjay): Skip if memtable does not overlap
+		for (int level = 0; level < maxLevelWithFiles; level++) {
+			TEST_CompactRange(level, begin, end);
+		}
+	}
+	
+	public void TEST_CompactRange(int level, Slice begin, Slice end) throws Exception {
+		assert(level >= 0);
+		assert(level + 1 < DBFormat.kNumLevels);
+
+		InternalKey begin_storage = null;
+		InternalKey end_storage = null;
+		
+		ManualCompaction manual = new ManualCompaction();
+		manual.level = level;
+		manual.done = false;
+		if (begin == null) {
+			manual.begin = null;
+		} else {
+			begin_storage = new InternalKey(begin, DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek);
+			manual.begin = begin_storage;
+		}
+		
+		if (end == null) {
+		    manual.end = null;
+		} else {
+		    end_storage = new InternalKey(end, 0, ValueType.Deletion); //end_storage = InternalKey(*end, 0, static_cast<ValueType>(0));
+		    manual.end = end_storage;
+		}
+		
+		mutex.lock();
+		try {
+			while (!manual.done && shuttingDown.get() != null && bgError.ok()) {
+			    if (manualCompaction == null) {  // Idle
+			    	manualCompaction = manual;
+			    	maybeScheduleCompaction();
+			    } else {  // Running either my compaction or another compaction.
+			    	bgCv.await();
+			    }
+			}
+			if (manualCompaction == manual) {
+				// Cancel my manual compaction since we aborted early for some reason.
+				manualCompaction = null;
+			}
+		} finally {
+			mutex.unlock();
+		}
+	}
+	
+	public Status TEST_CompactMemTable() throws Exception {
+		// NULL batch means just wait for earlier writes to be done
+		Status s = write(new WriteOptions(), null);
+		if (s.ok()) {
+		    // Wait until the compaction completes
+			mutex.lock();
+			try {
+				while (immtable != null && bgError.ok()) {
+					bgCv.await();
+				}
+				if (immtable != null) {
+					s = bgError;
+				}
+			} catch (Exception e) {
+				return Status.otherError(""+e);
+			} finally {
+				mutex.unlock();
+			}
+		}
+		return s;
+	}
+	
+	@Override
+	public void close() {
+		//TODO
+	}
+	
+	@Override
+	public void getApproximateSizes(List<Range> range, Long0 sizes) {
+		//TODO
 	}
 }

@@ -64,7 +64,7 @@ public class ShardedLRUCache extends Cache {
 		}
 		
 		public LRUHandle insert(LRUHandle h) {
-			FuncOutput<LRUHandle> prev = new FuncOutput<LRUHandle>();
+			Object0<LRUHandle> prev = new Object0<LRUHandle>();
 		    LRUHandle old = findPointer(h.key(), h.hash, prev);
 		    h.nextHash = (old == null ? null : old.nextHash);
 		    prev.getValue().nextHash = h;
@@ -80,7 +80,7 @@ public class ShardedLRUCache extends Cache {
 		}
 		
 		public LRUHandle remove(Slice key, int hash) {
-			FuncOutput<LRUHandle> prev = new FuncOutput<LRUHandle>();
+			Object0<LRUHandle> prev = new Object0<LRUHandle>();
 		    LRUHandle h = findPointer(key, hash, prev);
 		    if (h != null) {
 		    	prev.getValue().nextHash = h.nextHash;
@@ -92,7 +92,7 @@ public class ShardedLRUCache extends Cache {
 		// Return a pointer to slot that points to a cache entry that
 		// matches key/hash.  If there is no such cache entry, return a
 		// pointer to the trailing slot in the corresponding linked list.
-		LRUHandle findPointer(Slice key, int hash, FuncOutput<LRUHandle> prev) {
+		LRUHandle findPointer(Slice key, int hash, Object0<LRUHandle> prev) {
 		    LRUHandle ptr = list[hash & (length - 1)];
 		    assert(ptr != null);
 		    while (ptr.nextHash != null &&

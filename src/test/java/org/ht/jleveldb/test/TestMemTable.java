@@ -16,7 +16,7 @@ import org.ht.jleveldb.db.format.ValueType;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.BytewiseComparatorImpl;
-import org.ht.jleveldb.util.FuncOutput;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 public class TestMemTable {
@@ -45,7 +45,7 @@ public class TestMemTable {
 		//System.out.println("entry count: "+memtable.entrySize());
 		
 		boolean ret = false;
-		FuncOutput<Status> s = new FuncOutput<Status>();
+		Object0<Status> s = new Object0<Status>();
 		ByteBuf buf = ByteBufFactory.defaultByteBuf();
 		ret = memtable.get(new LookupKey(new Slice("1"), 1), buf, s);
 		//System.out.println("find 1, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());

@@ -13,8 +13,8 @@ import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.EnvImpl;
 import org.ht.jleveldb.util.FileUtils;
-import org.ht.jleveldb.util.FuncOutput;
-import org.ht.jleveldb.util.FuncOutputLong;
+import org.ht.jleveldb.util.Object0;
+import org.ht.jleveldb.util.Long0;
 import org.ht.jleveldb.util.Slice;
 
 public class TestEnvImpl {
@@ -32,7 +32,7 @@ public class TestEnvImpl {
 		assertTrue(s.ok());
 		
 		String fileName1 = dirname+"/testFile001";
-		FuncOutput<WritableFile> file0 = new FuncOutput<WritableFile>();
+		Object0<WritableFile> file0 = new Object0<WritableFile>();
 		env.newWritableFile(fileName1, file0);
 		String content = "123456";
 		Slice s1 = new Slice(content);
@@ -42,7 +42,7 @@ public class TestEnvImpl {
 		file0.getValue().delete();
 		file0.setValue(null);
 		
-		FuncOutputLong fileSize = new FuncOutputLong();
+		Long0 fileSize = new Long0();
 		env.getFileSize(fileName1, fileSize);
 		assertTrue(fileSize.getValue() == s1.size());
 		
@@ -86,7 +86,7 @@ public class TestEnvImpl {
 		env.readFileToString(fileName4, buf5);
 		assertTrue((new Slice(buf5)).encodeToString().equals(newContent));
 		
-		FuncOutput<RandomAccessFile0> file1 = new FuncOutput<RandomAccessFile0>();
+		Object0<RandomAccessFile0> file1 = new Object0<RandomAccessFile0>();
 		env.newRandomAccessFile(fileName4, file1);
 		Slice res = new Slice();
 		s = file1.getValue().read(5, 3, res , new byte[100]);
@@ -98,7 +98,7 @@ public class TestEnvImpl {
 		
 		
 		res.clear();
-		FuncOutput<SequentialFile> file2 = new FuncOutput<SequentialFile>();
+		Object0<SequentialFile> file2 = new Object0<SequentialFile>();
 		env.newSequentialFile(fileName4, file2);
 		file2.getValue().skip(5);
 		s = file2.getValue().read(3, res , new byte[100]);

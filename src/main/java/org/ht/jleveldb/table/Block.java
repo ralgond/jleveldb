@@ -6,7 +6,7 @@ import org.ht.jleveldb.table.Format.BlockContents;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.Comparator0;
-import org.ht.jleveldb.util.FuncOutputInt;
+import org.ht.jleveldb.util.Integer0;
 import org.ht.jleveldb.util.Slice;
 
 public class Block {
@@ -40,7 +40,7 @@ public class Block {
 		return size; 
 	}
 	
-	Iterator0 newIterator(Comparator0 comparator) {
+	public Iterator0 newIterator(Comparator0 comparator) {
 		if (size < 4) { //if (size_ < sizeof(uint32_t)) {
 		    return Iterator0.newErrorIterator(Status.corruption("bad block contents"));
 		}
@@ -138,9 +138,9 @@ public class Block {
 		    // with a key < target
 		    int left = 0;
 		    int right = numRestarts - 1;
-		    FuncOutputInt shared = new FuncOutputInt();
-		    FuncOutputInt nonShared = new FuncOutputInt();
-		    FuncOutputInt valueLength = new FuncOutputInt();
+		    Integer0 shared = new Integer0();
+		    Integer0 nonShared = new Integer0();
+		    Integer0 valueLength = new Integer0();
 		    Slice slice = new Slice();
 		    Slice midKey = new Slice();
 		    while (left < right) {
@@ -243,9 +243,9 @@ public class Block {
 		    Slice slice = new Slice(data,current, restarts - current);
 		    
 		    // Decode next entry
-		    FuncOutputInt shared = new FuncOutputInt();
-		    FuncOutputInt nonShared = new FuncOutputInt();
-		    FuncOutputInt valueLength = new FuncOutputInt();
+		    Integer0 shared = new Integer0();
+		    Integer0 nonShared = new Integer0();
+		    Integer0 valueLength = new Integer0();
 		    boolean ret = decodeEntry(slice, shared, nonShared, valueLength);
 		    if (!ret || key.size() < shared.getValue()) {
 		    	corruptionError();
@@ -264,9 +264,9 @@ public class Block {
 	}
 	
 	public static boolean decodeEntry(Slice slice, 
-			FuncOutputInt shared, 
-			FuncOutputInt nonShared,
-			FuncOutputInt valueLength) {
+			Integer0 shared, 
+			Integer0 nonShared,
+			Integer0 valueLength) {
 		if (slice.size() < 3) return false;
 		
 		shared.setValue(slice.data[slice.offset] & 0x0ff);

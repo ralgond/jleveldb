@@ -12,7 +12,7 @@ import org.ht.jleveldb.table.TwoLevelIterator.BlockFunction;
 import org.ht.jleveldb.util.BytewiseComparatorImpl;
 import org.ht.jleveldb.util.Cache;
 import org.ht.jleveldb.util.Coding;
-import org.ht.jleveldb.util.FuncOutput;
+import org.ht.jleveldb.util.Object0;
 import org.ht.jleveldb.util.Slice;
 
 public class Table {
@@ -236,15 +236,19 @@ public class Table {
 		    	  s = blockIter.status();
 		    	  blockIter = null; //delete block_iter;
 		    }
-		  }
-		  if (s.ok()) {
-		    s = iiter.status();
-		  }
-		  iiter = null; //delete iiter;
-		  return s;
+		}
+		 
+		if (s.ok())
+			s = iiter.status();
+		  
+		iiter.delete();
+		iiter = null; //delete iiter;
+		  
+		return s;
 	}
 	
-	void readMeta(Footer footer) {
+	
+	protected void readMeta(Footer footer) {
 		if (rep.options.filterPolicy == null) {
 		    return;  // Do not need any metadata
 		}
@@ -273,7 +277,8 @@ public class Table {
 		meta.delete(); //delete meta;
 	}
 	
-	void readFilter(Slice filterHandleValue) {
+	
+	protected void readFilter(Slice filterHandleValue) {
 		Slice v = filterHandleValue.clone();
 		BlockHandle filterHandle = new BlockHandle();
 		if (!filterHandle.decodeFrom(v).ok()) {
@@ -297,14 +302,12 @@ public class Table {
 	}
 		  
 	
-	public static Status open(Options options,
-            RandomAccessFile0 file,
-            long size,
-            FuncOutput<Table> table) {
+	public static Status open(Options options, RandomAccessFile0 file, 
+			long size, Object0<Table> table) {
+		
 		table.setValue(null);
-		if (size < Footer.kEncodedLength) {
+		if (size < Footer.kEncodedLength)
 			return Status.corruption("file is too short to be an sstable");
-		}
 		
 		byte footerSpace[] = new byte[Footer.kEncodedLength];
 		Slice footerInput = new Slice();
@@ -327,15 +330,14 @@ public class Table {
 		    	 opt.verifyChecksums = true;
 		     }
 		     s = Format.readBlock(file, opt, footer.indexHandle(), contents);
-		     if (s.ok()) {
+		     if (s.ok())
 		         indexBlock = new Block(contents);
-		     }
 		 }
 		 
 		 if (s.ok()) {
 			 // We've successfully read the footer and the index block: we're
 			 // ready to serve requests.
-			 Rep rep = new Table.Rep();
+			 Rep rep = new Rep();
 			 rep.options = options.cloneOptions();
 			 rep.file = file;
 			 rep.metaindexHandle = footer.metaindexHandle();

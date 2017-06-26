@@ -14,4 +14,9 @@ public class ByteBufFactory {
 		ret.assign(data, offset, size);
 		return ret;
 	}
+	
+	public static ByteBuf defaultByteBuf(String s) {
+		byte[] b = s.getBytes();
+		return defaultByteBuf(b, b.length);
+	}
 }

@@ -53,7 +53,7 @@ public class Crc32C implements Checksum {
 
 	// Return the crc whose masked representation is masked_crc.
 	public final static long unmask(long maskedCrc) {
-		long rot = maskedCrc - kMaskDelta;
+		long rot = ((maskedCrc - kMaskDelta) & 0xFFFFFFFFL);
 		return ((rot >> 17) | (rot << 15)) & 0xFFFFFFFFL;
 	}
 	
@@ -62,6 +62,10 @@ public class Crc32C implements Checksum {
 		Crc32C c = new Crc32C();
 		c.update(data, offset, n);
 		return c.getValue();
+	}
+	
+	public static long value(Slice s) {
+		return value(s.data, s.offset, s.size());
 	}
 	
   /** the current CRC value, bit-flipped */

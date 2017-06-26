@@ -5,6 +5,7 @@ import org.ht.jleveldb.util.ByteBufFactory;
 import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.Comparator0;
 import org.ht.jleveldb.util.Slice;
+import org.ht.jleveldb.util.Strings;
 
 /**
  * A comparator for internal keys that uses a specified comparator for
@@ -28,38 +29,43 @@ public class InternalKeyComparator extends Comparator0 {
 	 * 
 	 * 	aikey, bikey : {userKey:byte[size-8], seq_type:[8]}
 	 */
-	public int compare(Slice aikey, Slice bikey) {
-		int r = userComparator.compare(aikey.data, aikey.offset, aikey.size()-8, 
-				bikey.data, bikey.offset, bikey.size()-8);
+//	public int compare(Slice aikey, Slice bikey) {
+//		int r = userComparator.compare(aikey.data, aikey.offset, aikey.size()-8, 
+//				bikey.data, bikey.offset, bikey.size()-8);
+//		if (r == 0) {
+//		    long anum = Coding.decodeFixedNat64(aikey.data, aikey.limit - 8);
+//		    long bnum = Coding.decodeFixedNat64(bikey.data, bikey.limit - 8);
+//		    r = anum > bnum ? -1 : +1;
+//		    //System.out.println("anum="+anum+", bnum="+bnum+", r="+r);
+//		}
+//		return r;
+//	}
+	
+	public int compare(byte[] a, int aoff, int asize, byte[] b, int boff, int bsize) {
+//		Slice a0 = new Slice(a,aoff,asize-8);
+//		Slice b0 = new Slice(b,boff,bsize-8);
+//		System.out.printf("InternalKeyComparator, a0.size=%d\n", a0.size());
+//		if (asize > 0)
+//			System.out.printf("InternalKeyComparator, a[0]=%d, aoff=%d, asize=%d\n", (int)a[aoff+0], aoff, asize);
+//		if (asize > 1)
+//			System.out.printf("InternalKeyComparator, a[1]=%d, aoff=%d, asize=%d\n", (int)a[aoff+1], aoff, asize);
+		
+		int r = userComparator.compare(a, aoff, asize-8, b, boff, bsize-8);
+		
+//		System.out.printf("InternalKeyComparator, a=%s, b=%s, r=%d, cmp.class=%s\n",
+//				Strings.escapeString(a0), Strings.escapeString(b0), r, userComparator.getClass().getName());
+//		if (asize > 0)
+//			System.out.printf("InternalKeyComparator, a[0]=%d\n", a[aoff+0]&0xff);
+//		if (bsize > 0)
+//			System.out.printf("InternalKeyComparator, b[0]=%d\n", b[boff+0]&0xff);
+		
 		if (r == 0) {
-		    long anum = Coding.decodeFixedNat64(aikey.data, aikey.limit - 8);
-		    long bnum = Coding.decodeFixedNat64(bikey.data, bikey.limit - 8);
+		    long anum = Coding.decodeFixedNat64(a, aoff + asize - 8);
+		    long bnum = Coding.decodeFixedNat64(b, boff + bsize - 8);
 		    r = anum > bnum ? -1 : +1;
 		    //System.out.println("anum="+anum+", bnum="+bnum+", r="+r);
 		}
 		return r;
-	}
-	
-	/**
-	 * Order by:
-	 * 	increasing user key (according to user-supplied comparator)
-	 * 	decreasing sequence number
-	 * 	decreasing type (though sequence# should be enough to disambiguate)
-	 * 
-	 * 	a, b : {seq:long, valueType:ValueType, userKey:byte[size]}
-	 */
-	public int compare(ParsedInternalKeySlice a, ParsedInternalKeySlice b) {
-		// System.out.println("InternalKeyComparator.compare02");
-		int r = userComparator.compare(a.data, a.offset, a.size(), b.data, b.offset, b.size());
-		if (r == 0)
-		    r = (a.sequence > b.sequence) ? -1 : (a.sequence < b.sequence ? +1 : 0);
-		if (r == 0)
-			r = (a.valueType.type > b.valueType.type) ? -1 : (a.valueType.type < b.valueType.type ? +1 : 0);
-		return r;
-	}
-	
-	public int compare(byte[] a, int aoff, int asize, byte[] b, int boff, int bsize) {
-		throw new UnsupportedOperationException();
 	}
 	
 	public int compare(InternalKey a, InternalKey b) {

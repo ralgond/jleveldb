@@ -101,6 +101,7 @@ public class TestAutoCompact {
 			    	// Drop data
 			    }
 			    iter.delete();
+			    iter = null;
 			    // Wait a little bit to allow any triggered compactions to complete.
 			    LevelDB.defaultEnv().sleepForMilliseconds(1000);
 			    long size = size(key(0), key(n));

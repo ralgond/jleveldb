@@ -17,7 +17,7 @@ public enum ValueType {
     	return type;
     }
     
-    public static ValueType create(byte type) {
+    final public static ValueType create(byte type) {
     	if (type == Deletion.type)
     		return Deletion;
     	else if (type == Value.type)

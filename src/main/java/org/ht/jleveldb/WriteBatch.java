@@ -72,14 +72,13 @@ public class WriteBatch {
 			if (tag == ValueType.Value.type()) {
 				if (Coding.getLengthPrefixedSlice(input, key) &&
 						Coding.getLengthPrefixedSlice(input, value)) {
-					//System.out.printf("====>[PUT] key=%s, value=%s\n", key.encodeToString(), value.encodeToString());
 					handler.put(key, value);
 				} else {
+					Thread.dumpStack();
 					return Status.corruption("bad WriteBatch Put");
 				}
 			} else if (tag == ValueType.Deletion.type()) {
 				 if (Coding.getLengthPrefixedSlice(input, key)) {
-					 //System.out.printf("====>[DEL] key=%s\n", key.encodeToString());
 					 handler.delete(key);
 				 } else {
 			          return Status.corruption("bad WriteBatch Delete");

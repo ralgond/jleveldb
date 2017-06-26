@@ -38,7 +38,7 @@ public class TestBloom {
 		
 		public void add(Slice s) {
 			ByteBuf buf = ByteBufFactory.defaultByteBuf();
-		    buf.assign(s.data, s.size());
+		    buf.assign(s.data(), s.offset(), s.size());
 		    keys.add(buf);
 		}
 		

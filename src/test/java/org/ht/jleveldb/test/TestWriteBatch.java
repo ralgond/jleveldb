@@ -8,7 +8,7 @@ import org.ht.jleveldb.WriteBatch;
 import org.ht.jleveldb.db.MemTable;
 import org.ht.jleveldb.db.WriteBatchInternal;
 import org.ht.jleveldb.db.format.InternalKeyComparator;
-import org.ht.jleveldb.db.format.ParsedInternalKeySlice;
+import org.ht.jleveldb.db.format.ParsedInternalKey;
 import org.ht.jleveldb.util.BytewiseComparatorImpl;
 import org.ht.jleveldb.util.Slice;
 import org.junit.Test;
@@ -24,8 +24,10 @@ public class TestWriteBatch {
 		  int count = 0;
 		  Iterator0 iter = mem.newIterator();
 		  for (iter.seekToFirst(); iter.valid(); iter.next()) {
-			  ParsedInternalKeySlice ikey = (ParsedInternalKeySlice)iter.key();
-			  switch (ikey.valueType) {
+			  Slice ikey = iter.key();
+			  ParsedInternalKey pikey = new ParsedInternalKey();
+			  pikey.parse(ikey);
+			  switch (pikey.type) {
 		      case Value:
 		        state += "Put(";
 		        state += ikey.encodeToString();
@@ -42,7 +44,7 @@ public class TestWriteBatch {
 		        break;
 		    }
 		    state += "@";
-		    state += ikey.sequence;
+		    state += pikey.sequence;
 		  }
 		  iter.delete();
 		  if (!s.ok()) {

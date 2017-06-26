@@ -1,10 +1,22 @@
 package org.ht.jleveldb.table;
 
+import java.util.List;
+
 import org.ht.jleveldb.Iterator0;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.util.Comparator0;
 import org.ht.jleveldb.util.Slice;
 
+/**
+ * Return an iterator that provided the union of the data in
+ * children[0,n-1].  Takes ownership of the child iterators and
+ * will delete them when the result iterator is deleted.</br></br>
+ *
+ * The result does no duplicate suppression.  I.e., if a particular
+ * key is present in K child iterators, it will be yielded K times.</br></br>
+ *
+ * <b>REQUIRES: n >= 0</b>
+ */
 public class Merger {
 	static class MergingIterator extends Iterator0 {
 		// We might want to use a heap in case there are lots of children.
@@ -22,19 +34,23 @@ public class Merger {
 		};
 		Direction direction;
 		  
-		public MergingIterator(Comparator0 comparator, Iterator0[] children0, int n) {
+		public MergingIterator(Comparator0 comparator, List<Iterator0> children0) {
+			this.comparator = comparator;
+			n = children0.size();
 	        children = new Iterator0Wrapper[n];
-	        this.n = n;
 	        current = null;
 	        direction = Direction.kForward;
 	        for (int i = 0; i < n; i++) {
 	        	children[i] = new Iterator0Wrapper();
-	        	children[i].set(children0[i]);
+	        	children[i].set(children0.get(i));
 	        }
 	    }
 		
+		@Override
 		public void delete() {
-			
+			super.delete();
+			for (int i = 0; i < n; i++)
+				children[i].delete();
 		}
 		
 		public boolean valid() {
@@ -42,25 +58,25 @@ public class Merger {
 		}
 		
 		public void seekToFirst() {
-		    for (int i = 0; i < n; i++) {
+		    for (int i = 0; i < n; i++)
 		        children[i].seekToFirst();
-		    }
+
 		    findSmallest();
 		    direction = Direction.kForward;
 		}
 		
 		public void seekToLast() {
-		    for (int i = 0; i < n; i++) {
+		    for (int i = 0; i < n; i++)
 		        children[i].seekToLast();
-		    }
+
 		    findLargest();
 		    direction = Direction.kReverse;
 		}
 		
 		public void seek(Slice target) {
-		    for (int i = 0; i < n; i++) {
+		    for (int i = 0; i < n; i++)
 		        children[i].seek(target);
-		    }
+
 		    findSmallest();
 		    direction = Direction.kForward;
 		}
@@ -173,14 +189,15 @@ public class Merger {
 		}
 	}
 	
-	public static Iterator0 newMergingIterator(Comparator0 comparator, Iterator0[] children, int n) {
+	public static Iterator0 newMergingIterator(Comparator0 comparator, List<Iterator0> children) {
+		int n = children.size();
 		assert(n >= 0);
 		if (n == 0) {
 		    return Iterator0.newEmptyIterator();
 		} else if (n == 1) {
-		    return children[0];
+		    return children.get(0);
 		} else {
-		    return new MergingIterator(comparator, children, n);
+		    return new MergingIterator(comparator, children);
 		}
 	}
 }

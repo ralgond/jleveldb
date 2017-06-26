@@ -131,7 +131,7 @@ public class VersionEdit {
 	}
 	
 	public void encodeTo(ByteBuf dst) {
-		if (this.hasComparator) {
+		if (hasComparator) {
 			dst.writeVarNat32(Tag.kComparator.getValue());
 		    dst.writeLengthPrefixedSlice(new Slice(comparator));
 		}

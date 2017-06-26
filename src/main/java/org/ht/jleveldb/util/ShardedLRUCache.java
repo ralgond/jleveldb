@@ -33,7 +33,7 @@ public class ShardedLRUCache extends Cache {
 		int keyLength;
 		boolean inCache;      // Whether entry is in the cache.
 		int refs;      // References, including cache reference, if present.
-		int hash;      // Hash of key(); used for fast sharding and comparisons
+		long hash;      // Hash of key(); used for fast sharding and comparisons
 		Slice keyData;
 		
 		Slice key() {
@@ -55,12 +55,16 @@ public class ShardedLRUCache extends Cache {
 	static class HandleTable {
 		// The table consists of an array of buckets where each bucket is
 		// a linked list of cache entries that hash into the bucket.
-		int length;
+		long length;
 		int elems;
 		LRUHandle[] list = new LRUHandle[0];
 		
-		public LRUHandle lookup(Slice key, int hash) {
+		public LRUHandle lookup(Slice key, long hash) {
 		    return findPointer(key, hash, null);
+		}
+		
+		public HandleTable() {
+			resize();
 		}
 		
 		public LRUHandle insert(LRUHandle h) {
@@ -79,7 +83,7 @@ public class ShardedLRUCache extends Cache {
 		    return old;
 		}
 		
-		public LRUHandle remove(Slice key, int hash) {
+		public LRUHandle remove(Slice key, long hash) {
 			Object0<LRUHandle> prev = new Object0<LRUHandle>();
 		    LRUHandle h = findPointer(key, hash, prev);
 		    if (h != null) {
@@ -89,15 +93,24 @@ public class ShardedLRUCache extends Cache {
 		    return h;
 		}
 		
-		// Return a pointer to slot that points to a cache entry that
-		// matches key/hash.  If there is no such cache entry, return a
-		// pointer to the trailing slot in the corresponding linked list.
-		LRUHandle findPointer(Slice key, int hash, Object0<LRUHandle> prev) {
-		    LRUHandle ptr = list[hash & (length - 1)];
+		/**
+		 * Return a pointer to slot that points to a cache entry that
+		 * matches key/hash.  If there is no such cache entry, return a
+		 * pointer to the trailing slot in the corresponding linked list.
+		 * @param key
+		 * @param hash
+		 * @param prev
+		 * @return
+		 */
+		LRUHandle findPointer(Slice key, long hash, Object0<LRUHandle> prev) {
+		    //LRUHandle ptr = list[(int)(hash & (length - 1))];
+			LRUHandle ptr = list[(int)(hash % length)];
 		    assert(ptr != null);
-		    while (ptr.nextHash != null &&
-		           ptr.nextHash.hash != hash || !key.equals(ptr.nextHash.key())) {
-		    	ptr = ptr.nextHash;
+		    while (ptr.nextHash != null) {
+		        if (ptr.nextHash.hash == hash && key.equals(ptr.nextHash.key())) {
+		        	break;
+		        }
+		        ptr = ptr.nextHash;
 		    }
 		    if (prev != null)
 		    	prev.setValue(ptr);
@@ -118,8 +131,8 @@ public class ShardedLRUCache extends Cache {
 		    	LRUHandle h = list[i].nextHash;
 		    	while (h != null) {
 		    		LRUHandle next = h.nextHash;
-		    		int hash = h.hash;
-		    		LRUHandle ptr = newList[hash & (newLength - 1)];
+		    		long hash = h.hash;
+		    		LRUHandle ptr = newList[(int)(hash % newLength)];
 		    		h.nextHash = ptr.nextHash;
 		    		ptr.nextHash = h;
 		    		h = next;
@@ -163,7 +176,7 @@ public class ShardedLRUCache extends Cache {
 		}
 		
 		// Like Cache methods, but with an extra "hash" parameter.
-		public Cache.Handle insert(Slice key, int hash, Object value, int charge, Deleter deleter) {
+		public Cache.Handle insert(Slice key, long hash, Object value, int charge, Deleter deleter) {
 			mutex.lock();
 			try {
 				LRUHandle e = new LRUHandle();
@@ -199,7 +212,7 @@ public class ShardedLRUCache extends Cache {
 			}
 		}
 		
-		public Cache.Handle lookup(Slice key, int hash) {
+		public Cache.Handle lookup(Slice key, long hash) {
 			mutex.lock();
 			try {
 				LRUHandle e = table.lookup(key, hash);
@@ -336,19 +349,23 @@ public class ShardedLRUCache extends Cache {
 		}
 	}
 	
-	static int calcShard(int hash) {
-	    return hash >> (32 - kNumShardBits);
+	static int calcShard(long hash) {
+	    return (int)(hash >> (32 - kNumShardBits));
     }
 	
 	@Override
 	public Handle insert(Slice key, Object value, int charge, Deleter deleter) {
-		int hash = key.hashCode();
+		long hash = key.hashCode0();
+		if (hash < 0)
+			hash *= -1;
 		return shard[calcShard(hash)].insert(key, hash, value, charge, deleter);
 	}
 
 	@Override
 	public Handle lookup(Slice key) {
-	    int hash = key.hashCode();
+	    long hash = key.hashCode0();
+	    if (hash < 0)
+			hash *= -1;
 	    return shard[calcShard(hash)].lookup(key, hash);
 	}
 

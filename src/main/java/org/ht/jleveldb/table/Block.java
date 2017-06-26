@@ -11,16 +11,16 @@ import org.ht.jleveldb.util.Integer0;
 import org.ht.jleveldb.util.Slice;
 
 public class Block {
-	byte[] data; //const char* data_;
-	int size; //size_t size_;
-	int restartOffset; //uint32_t restart_offset_;     // Offset in data_ of restart array
-	boolean owned;                  // Block owns data_[]
+	Slice data;
+	int size;
+	int restartOffset;
+	boolean owned;
 	
 	public Block(BlockContents contents) {
-		data = contents.data.data();
-		size = contents.data.size();
+		data = contents.data;
+		size = data.size();
 		owned = contents.heapAllocated;
-		if (size < 4) { //size_ < sizeof(uint32_t)
+		if (data.size() < 4) { //size_ < sizeof(uint32_t)
 			size = 0; //Error marker
 		} else {
 			int maxRestartsAllowed = (size - 4) / 4; //size_t max_restarts_allowed = (size_-sizeof(uint32_t)) / sizeof(uint32_t);
@@ -28,7 +28,7 @@ public class Block {
 				// The size is too small for NumRestarts()
 				size = 0;
 			} else {
-			    restartOffset = size - (1 + numRestarts()) * 4; //restart_offset_ = size_ - (1 + NumRestarts()) * sizeof(uint32_t);
+			    restartOffset = data.offset + size - (1 + numRestarts()) * 4; //restart_offset_ = size_ - (1 + NumRestarts()) * sizeof(uint32_t);
 		    }
 		}
 	}
@@ -45,52 +45,58 @@ public class Block {
 		if (size < 4) { //if (size_ < sizeof(uint32_t)) {
 		    return Iterator0.newErrorIterator(Status.corruption("bad block contents"));
 		}
+		
 		int numRestarts = numRestarts();
+		
 		if (numRestarts == 0) {
 			return Iterator0.newEmptyIterator();
 		} else {
-		    return new Iter(comparator, data, restartOffset, numRestarts);
+		    return new Iter(comparator, data.data, data.offset, restartOffset, numRestarts);
 		}
 	}
 	
 	int numRestarts() {
 		assert(size >= 4); //assert(size_ >= sizeof(uint32_t));
-		return Coding.decodeFixedNat32(data, size - 4); //DecodeFixed32(data_ + size_ - sizeof(uint32_t));
+		return Coding.decodeFixedNat32(data.data, data.offset + size - 4); //DecodeFixed32(data_ + size_ - sizeof(uint32_t));
 	}
 	
 	static class Iter extends Iterator0 {
 		
 		Comparator0 comparator;
-		byte data[]; //  const char* const data_;      // underlying block contents
-		int restarts;     // Offset of restart array (list of fixed32)
-		int numRestarts; // Number of uint32_t entries in restart array
+		byte data[]; 			// Underlying block contents
+		int dataOffset;
+		int restartsOffset;     // Offset of restart array (list of fixed32)
+		int numRestarts; 		// Number of uint32 entries in restart array
 
-		  // current_ is offset in data_ of current entry.  >= restarts_ if !Valid
+		// current is offset in data of current entry.  >= restartsOffset if !valid()
 		int current;
-		int restartIndex;  // Index of restart block in which current_ falls
+		int restartIndex;  // Index of restart block in which current falls
 		ByteBuf key;
 		Slice value;
 		Status status;
 		
 		public Iter(Comparator0 comparator,
 			       byte[] data,
-			       int restarts,
+			       int dataOffset,
+			       int restartsOffset,
 			       int numRestarts) {
 			this.comparator = comparator;
 			this.data = data;
-			this.restarts = restarts;
+			this.dataOffset = dataOffset;
+			this.restartsOffset = restartsOffset;
 			this.numRestarts = numRestarts;
 			
-			this.current = restarts;
+			this.current = restartsOffset;
 			this.restartIndex = numRestarts;
 			key = ByteBufFactory.defaultByteBuf();
-			value = new Slice();
+			value = new Slice(data, dataOffset, 0);
 			assert(this.numRestarts > 0);
 			this.status = Status.ok0();
 		}
 		
 		
 		public void delete() {
+			super.delete();
 			comparator = null;
 			data = null;
 			key = null;
@@ -101,30 +107,34 @@ public class Block {
 		    return comparator.compare(a, b);
 		}
 		
-		 // Return the offset in data_ just past the end of the current entry.
+		final int compare(ByteBuf a, Slice b) {
+		    return comparator.compare(a, b);
+		}
+		
+		// Return the offset in data_ just past the end of the current entry.
 		final int nextEntryOffset() {
-			return value.offset + value.size(); //return (value_.data() + value_.size()) - data_;
+			//return value.offset + value.size(); //return (value_.data() + value_.size()) - data_;
+			return value.offset + value.size();
 		}
 		
 		final int getRestartPoint(int index) {
 		    assert(index < numRestarts);
 		    //DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t));
-		    return Coding.decodeFixedNat32(data, restarts + index * 4); 		
+		    return Coding.decodeFixedNat32(data, restartsOffset + index * 4) + dataOffset; 		
 		}
 		
 		void seekToRestartPoint(int index) {
 		    key.clear();
 		    restartIndex = index;
-		    // current_ will be fixed by ParseNextKey();
+		    // current will be fixed by parseNextKey();
 
-		    // ParseNextKey() starts at the end of value_, so set value_ accordingly
+		    // parseNextKey() starts at the end of value, so set value accordingly
 		    int offset = getRestartPoint(index);
-		    value = new Slice(data, offset, 0);//value_ = Slice(data_ + offset, 0);
+		    value = new Slice(data, offset, 0);	//value_ = Slice(data_ + offset, 0);
 		}
-		  
 		
 		public boolean valid() {
-			return current < restarts; 
+			return current < restartsOffset; 
 		}
 		
 		public void seekToFirst() {
@@ -134,7 +144,7 @@ public class Block {
 		
 		public void seekToLast() {
 			 seekToRestartPoint(numRestarts - 1);
-			 while (parseNextKey() && nextEntryOffset() < restarts) {
+			 while (parseNextKey() && nextEntryOffset() < restartsOffset) {
 			      // Keep skipping
 			 }
 		}
@@ -142,6 +152,7 @@ public class Block {
 		public void seek(Slice target) {
 			// Binary search in restart array to find the last restart point
 		    // with a key < target
+			
 		    int left = 0;
 		    int right = numRestarts - 1;
 		    Integer0 shared = new Integer0();
@@ -156,7 +167,7 @@ public class Block {
 		    	shared.setValue(0);
 		    	nonShared.setValue(0);
 		    	valueLength.setValue(0);
-		    	slice.init(data, regionOffset, restarts - regionOffset);
+		    	slice.init(data, regionOffset, restartsOffset - regionOffset);
 		    	boolean ret = decodeEntry(slice, shared, nonShared, valueLength);
 		    	if (!ret || shared.getValue() != 0) {
 		    		corruptionError();
@@ -182,7 +193,8 @@ public class Block {
 		        if (!parseNextKey()) {
 		        	return;
 		        }
-		        if (compare(new Slice(key), target) >= 0) {
+		        int cmpRet = compare(key, target);
+		        if (cmpRet >= 0) {
 		        	return;
 		        }
 		    }
@@ -201,7 +213,7 @@ public class Block {
 		    while (getRestartPoint(restartIndex) >= original) {
 		      if (restartIndex == 0) {
 		        // No more entries
-		        current = restarts;
+		        current = restartsOffset;
 		        restartIndex = numRestarts;
 		        return;
 		      }
@@ -229,7 +241,7 @@ public class Block {
 		}
 		
 		void corruptionError() {
-		    current = restarts;
+		    current = restartsOffset;
 		    restartIndex = numRestarts;
 		    status = Status.corruption("bad entry in block");
 		    key.clear();
@@ -238,21 +250,23 @@ public class Block {
 		
 		boolean parseNextKey() {
 		    current = nextEntryOffset();
-
-		    if (current >= restarts) {
+		    
+		    if (current >= restartsOffset) {
 		    	// No more entries to return.  Mark as invalid.
-		    	current = restarts;
+		    	current = restartsOffset;
 		    	restartIndex = numRestarts;
 		    	return false;
 		    }
 		    
-		    Slice slice = new Slice(data,current, restarts - current);
+		    Slice slice = new Slice(data, current, restartsOffset - current);
 		    
 		    // Decode next entry
 		    Integer0 shared = new Integer0();
 		    Integer0 nonShared = new Integer0();
 		    Integer0 valueLength = new Integer0();
+		    
 		    boolean ret = decodeEntry(slice, shared, nonShared, valueLength);
+		    
 		    if (!ret || key.size() < shared.getValue()) {
 		    	corruptionError();
 		    	return false;
@@ -260,6 +274,7 @@ public class Block {
 		    	key.resize(shared.getValue());
 		    	key.append(slice.data, slice.offset, nonShared.getValue());
 		    	value = new Slice(slice.data, slice.offset+nonShared.getValue(), valueLength.getValue());
+		    	
 		    	while (restartIndex + 1 < numRestarts &&
 		                getRestartPoint(restartIndex + 1) < current) {
 		           ++restartIndex;
@@ -273,7 +288,9 @@ public class Block {
 			Integer0 shared, 
 			Integer0 nonShared,
 			Integer0 valueLength) {
-		if (slice.size() < 3) return false;
+		
+		if (slice.size() < 3) 
+			return false;
 		
 		shared.setValue(slice.data[slice.offset] & 0x0ff);
 		nonShared.setValue(slice.data[slice.offset+1] & 0x0ff);

@@ -66,6 +66,8 @@ public class Slice {
 	}
 	
 	public String encodeToString() {
+		if (data == null || size() == 0)
+			return "";
 		return new String(data, offset, size());
 	}
 	
@@ -110,19 +112,19 @@ public class Slice {
 		}
 	}
 	
-	@Override
-	public int hashCode() {
-		if (data == null)
-            return 0;
-
-        int result = 1;
-        for (int i = offset; i < limit; i++) {
-        	long element = data[i];
-        	int elementHash = (int)(element ^ (element >>> 32));
-        	result = 31 * result + elementHash;
-        }
-
-        return result;
+	public long hashCode0() {
+//		if (data == null)
+//            return 0;
+//
+//        long result = 1;
+//        for (int i = offset; i < limit; i++) {
+//        	long element = (data[i] & 0xFF);
+//        	int elementHash = (int)(element ^ (element >>> 32));
+//        	result = 31 * result + elementHash;
+//        }
+//
+//        return result;
+		return Hash.hash0(data, offset, size(), 301);
 	}
 	
 	@Override

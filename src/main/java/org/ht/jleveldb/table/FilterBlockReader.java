@@ -46,7 +46,6 @@ public class FilterBlockReader {
 		    	return false;
 		    }
 		}
-		System.out.println("====>key: [3] "+key.encodeToString());
 		return true;  // Errors are treated as potential matches
 	}
 

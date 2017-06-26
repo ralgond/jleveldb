@@ -27,14 +27,14 @@ public class TestDBFormat {
 	
 	static Slice shorten(Slice s, Slice limit) {
 		ByteBuf result = ByteBufFactory.defaultByteBuf();
-		result.assign(s.data(), s.size());
+		result.assign(s.data(), s.offset(), s.size());
 		(new InternalKeyComparator(BytewiseComparatorImpl.getInstance())).findShortestSeparator(result, limit);
 		return new Slice(result);
 	}
 
 	static Slice shortSuccessor(Slice s) {
 		ByteBuf result = ByteBufFactory.defaultByteBuf();
-		result.assign(s.data(), s.size());
+		result.assign(s.data(), s.offset(), s.size());
 		(new InternalKeyComparator(BytewiseComparatorImpl.getInstance())).findShortSuccessor(result);
 		return new Slice(result);
 	}

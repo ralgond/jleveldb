@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.ht.jleveldb.Iterator0;
+import org.ht.jleveldb.Logger0;
 import org.ht.jleveldb.Env;
 import org.ht.jleveldb.FileName;
 import org.ht.jleveldb.FileType;
@@ -31,7 +32,20 @@ import org.ht.jleveldb.util.IntLongPair;
 import org.ht.jleveldb.util.ListUtils;
 import org.ht.jleveldb.util.Mutex;
 import org.ht.jleveldb.util.Slice;
+import org.ht.jleveldb.util.Strings;
 
+/**
+ * The representation of a DBImpl consists of a set of Versions.  The
+ * newest version is called "current".  Older versions may be kept
+ * around to provide a consistent view to live iterators.</br></br>
+ *
+ * Each Version keeps track of a set of Table files per level.  The
+ * entire set of versions is maintained in a VersionSet.</br></br>
+ *
+ * Version,VersionSet are thread-compatible, but require external
+ * synchronization on all accesses.</br></br>
+ *
+ */
 public class VersionSet {
 	public VersionSet(String dbname, Options options, TableCache tcache, InternalKeyComparator cmp) {
 		env = options.env;
@@ -48,6 +62,12 @@ public class VersionSet {
 	    descriptorLog = null;
 	    dummyVersions = new Version(this);
 	    current = null;
+	    
+	    compactPointer = new ByteBuf[DBFormat.kNumLevels];
+	    for (int i = 0; i < DBFormat.kNumLevels; i++) {
+	    	compactPointer[i] = ByteBufFactory.defaultByteBuf(); 
+	    }
+	    
 	    appendVersion(new Version(this));
 	}
 	
@@ -58,6 +78,15 @@ public class VersionSet {
 		descriptorFile.delete();
 	}
 	
+	int versionRef1 = 0;
+	int versionRef2 = 0;
+	public void incrVersionRef() {
+		versionRef1++;
+	}
+	
+	public void decrVersionRef() {
+		versionRef2++;
+	}
 	
 	void appendVersion(Version v) {
 		// Make "v" current
@@ -106,13 +135,14 @@ public class VersionSet {
 		BySmallestKey cmp;
 		
 		public Builder(VersionSet vset, Version base) {
-			base.ref();
 			this.vset = vset;
 			this.base = base;
+			base.ref();
 			cmp = new BySmallestKey(vset.icmp);
 			for (int level = 0; level < DBFormat.kNumLevels; level++) {
 				levels[level] = new LevelState();
 				levels[level].addedFiles = new TreeSet<FileMetaData>(cmp);
+				levels[level].deletedFiles = new TreeSet<Long>();
 			}
 		}
 		
@@ -192,7 +222,7 @@ public class VersionSet {
 		    for (int level = 0; level < DBFormat.kNumLevels; level++) {
 		    	// Merge the set of added files with the set of pre-existing files.
 		    	// Drop any deleted files.  Store the result in *v.
-		    	ArrayList<FileMetaData> baseFiles = base.files[level];
+		    	ArrayList<FileMetaData> baseFiles = base.levelFiles(level);
 		    	TreeSet<FileMetaData> added = levels[level].addedFiles;
 		    	
 		    	//v.files[level].reserve(base_files.size() + added->size());
@@ -219,14 +249,29 @@ public class VersionSet {
 		static <T> int count(TreeSet<T> set, T v) {
 			return set.contains(v) ? 1 : 0;
 		}
+		
 		public void maybeAddFile(Version v, int level, FileMetaData f) {
 			if (count(levels[level].deletedFiles, f.number) > 0) {
 		        // File is deleted: do nothing
 			} else {
-		        ArrayList<FileMetaData> files = v.files[level];
+		        ArrayList<FileMetaData> files = v.levelFiles(level);
+		        
+		        System.out.printf("[DEBUG] f, level=%d, number=%d, smallest=%s, largest=%s\n",
+		        		level, f.number, f.smallest.debugString(), f.largest.debugString());
+		        
+		        for (FileMetaData fmd : files) {
+		        	System.out.printf("[DEBUG] maybeAddFile, number=%d, smallest=%s, largest=%s\n",
+		        			fmd.number, fmd.smallest.debugString(), fmd.largest.debugString());
+		        }
 		        if (level > 0 && !files.isEmpty()) {
-		          // Must not overlap
-		        	assert(vset.icmp.compare(files.get(files.size()-1).largest, f.smallest) < 0);
+		        	// Must not overlap
+		        	int ret = vset.icmp.compare(files.get(files.size()-1).largest, f.smallest);
+		        	
+		        	System.out.printf("[DEBUG] maybeAddFile, ret=%d, files.last.largest=%s, f.smallest=%s\n",
+		        			ret, files.get(files.size()-1).largest.debugString(), 
+		        			f.smallest.debugString());
+		        	
+		        	assert(ret < 0);
 		        }
 		        f.refs++;
 		        files.add(f);
@@ -261,11 +306,15 @@ public class VersionSet {
 		edit.setNextFile(nextFileNumber);
 		edit.setLastSequence(lastSequence);
 
+		System.out.println("[DEBUG] VersionSet.logAndApply, edit="+edit.debugString());
+		
 		Version v = new Version(this);
 		{
 			Builder builder = new Builder(this, current);
 			builder.apply(edit);
 			builder.saveTo(v);
+			builder.delete();
+			builder = null;
 		}
 		finalize(v);
 
@@ -287,7 +336,7 @@ public class VersionSet {
 			    s = writeSnapshot(descriptorLog);
 			}
 		}
-
+		
 		// Unlock during expensive MANIFEST log write
 		{
 			mu.unlock();
@@ -301,7 +350,7 @@ public class VersionSet {
 			    	s = descriptorFile.sync();
 			    }
 			    if (!s.ok()) {
-			        //Log(options_->info_log, "MANIFEST write: %s\n", s.ToString().c_str());
+			        Logger0.log0(options.infoLog, "MANIFEST write: {}\n", s);
 			    }
 			}
 
@@ -363,10 +412,10 @@ public class VersionSet {
 		String dscname = dbname + "/" + currentFileName.encodeToString();
 		Object0<SequentialFile> file0 = new Object0<SequentialFile>();
 		s = env.newSequentialFile(dscname, file0);
-		SequentialFile file = file0.getValue();
 		if (!s.ok()) {
 		    return s;
 		}
+		SequentialFile file = file0.getValue();
 		
 		boolean have_log_number = false;
 		boolean have_prev_log_number = false;
@@ -378,87 +427,97 @@ public class VersionSet {
 		long prev_log_number = 0;
 		  
 		Builder builder = new Builder(this, current);
-		{
-			LogReporter reporter = new LogReporter();
-			reporter.status = s;
-			LogReader reader = new LogReader(file, reporter, true/*checksum*/, 0/*initial_offset*/);
-			Slice record = new Slice();
-			ByteBuf scratch = ByteBufFactory.defaultByteBuf();
-			while (reader.readRecord(record, scratch) && s.ok()) {
-				VersionEdit edit = new VersionEdit();
-			    s = edit.decodeFrom(record);
-			    if (s.ok()) {
-			        if (edit.hasComparator && !edit.comparator.equals(icmp.userComparator().name())) {
-			        	s = Status.invalidArgument(edit.comparator + " does not match existing comparator " + icmp.userComparator().name());
-			        }
+		try {
+			try {
+				LogReporter reporter = new LogReporter();
+				reporter.status = s;
+				LogReader reader = new LogReader(file, reporter, true, 0);
+				Slice record = new Slice();
+				ByteBuf scratch = ByteBufFactory.defaultByteBuf();
+				while (reader.readRecord(record, scratch) && s.ok()) {
+					VersionEdit edit = new VersionEdit();
+				    s = edit.decodeFrom(record);
+				    if (s.ok()) {
+				        if (edit.hasComparator && !edit.comparator.equals(icmp.userComparator().name())) {
+				        	s = Status.invalidArgument(edit.comparator + 
+				        			" does not match existing comparator " + 
+				        			icmp.userComparator().name());
+				        }
+				    }
+				    
+				    if (s.ok()) {
+				        builder.apply(edit);
+				    }
+				    
+				    if (edit.hasLogNumber) {
+				        log_number = edit.logNumber;
+				        have_log_number = true;
+				    }
+				    
+				    if (edit.hasPrevLogNumber) {
+				        prev_log_number = edit.prevLogNumber;
+				        have_prev_log_number = true;
+				    }
+	
+				    if (edit.hasNextFileNumber) {
+				        next_file = edit.nextFileNumber;
+				        have_next_file = true;
+				    }
+				    
+				    if (edit.hasLastSequence) {
+				        last_sequence = edit.lastSequence;
+				        have_last_sequence = true;
+				    }
+				}
+			} finally {
+				file.delete();
+				file = null;
+			}
+		
+		
+			if (s.ok()) {
+			    if (!have_next_file) {
+			    	s = Status.corruption("no meta-nextfile entry in descriptor");
+			    } else if (!have_log_number) {
+			    	s = Status.corruption("no meta-lognumber entry in descriptor");
+			    } else if (!have_last_sequence) {
+			    	s = Status.corruption("no last-sequence-number entry in descriptor");
 			    }
-			    
-			    if (s.ok()) {
-			        builder.apply(edit);
+	
+			    if (!have_prev_log_number) {
+			    	prev_log_number = 0;
 			    }
-			    
-			    if (edit.hasLogNumber) {
-			        log_number = edit.logNumber;
-			        have_log_number = true;
-			    }
-			    
-			    if (edit.hasPrevLogNumber) {
-			        prev_log_number = edit.prevLogNumber;
-			        have_prev_log_number = true;
-			    }
-
-			    if (edit.hasNextFileNumber) {
-			        next_file = edit.nextFileNumber;
-			        have_next_file = true;
-			    }
-			    
-			    if (edit.hasLastSequence) {
-			        last_sequence = edit.lastSequence;
-			        have_last_sequence = true;
+	
+			    markFileNumberUsed(prev_log_number);
+			    markFileNumberUsed(log_number);
+			}
+		
+			if (s.ok()) {
+			    Version v = new Version(this);
+			    builder.saveTo(v);
+			    // Install recovered version
+			    finalize(v);
+			    appendVersion(v);
+			    manifestFileNumber = next_file;
+			    nextFileNumber = next_file + 1;
+			    lastSequence = last_sequence;
+			    logNumber = log_number;
+			    prevLogNumber = prev_log_number;
+	
+			    // See if we can reuse the existing MANIFEST file.
+			    if (reuseManifest(dscname, currentFileName.encodeToString())) {
+			    	// No need to save new manifest
+			    } else {
+			    	saveManifest.setValue(true);
 			    }
 			}
+			return s;
+		} finally {
+			if (builder != null) {
+				builder.delete();
+				builder = null;
+			}
 		}
-		file.delete();
-		file = null;
-		
-		
-		if (s.ok()) {
-		    if (!have_next_file) {
-		    	s = Status.corruption("no meta-nextfile entry in descriptor");
-		    } else if (!have_log_number) {
-		    	s = Status.corruption("no meta-lognumber entry in descriptor");
-		    } else if (!have_last_sequence) {
-		    	s = Status.corruption("no last-sequence-number entry in descriptor");
-		    }
-
-		    if (!have_prev_log_number) {
-		    	prev_log_number = 0;
-		    }
-
-		    markFileNumberUsed(prev_log_number);
-		    markFileNumberUsed(log_number);
-		}
-		
-		if (s.ok()) {
-		    Version v = new Version(this);
-		    builder.saveTo(v);
-		    // Install recovered version
-		    finalize(v);
-		    appendVersion(v);
-		    manifestFileNumber = next_file;
-		    nextFileNumber = next_file + 1;
-		    lastSequence = last_sequence;
-		    logNumber = log_number;
-		    prevLogNumber = prev_log_number;
-
-		    // See if we can reuse the existing MANIFEST file.
-		    if (reuseManifest(dscname, currentFileName.encodeToString())) {
-		    	// No need to save new manifest
-		    } else {
-		    	saveManifest.setValue(true);
-		    }
-		}
-		return s;
 	}
 	
 	/**
@@ -500,7 +559,7 @@ public class VersionSet {
 	public int numLevelFiles(int level) {
 		assert(level >= 0);
 		assert(level < DBFormat.kNumLevels);
-		return current.files[level].size();
+		return current.levelFiles(level).size();
 	}
 	  
 	/**
@@ -511,7 +570,7 @@ public class VersionSet {
 	public long numLevelBytes(int level) {
 		assert(level >= 0);
 		assert(level < DBFormat.kNumLevels);
-		return VersionSetGlobal.totalFileSize(current.files[level]);
+		return VersionSetGlobal.totalFileSize(current.levelFiles(level));
 	}
 	
 	/**
@@ -579,8 +638,8 @@ public class VersionSet {
 		    c = new Compaction(options, level);
 
 		    // Pick the first file that comes after compact_pointer_[level]
-		    for (int i = 0; i < current.files[level].size(); i++) {
-		    	FileMetaData f = current.files[level].get(i);
+		    for (int i = 0; i < current.levelFiles(level).size(); i++) {
+		    	FileMetaData f = current.levelFiles(level).get(i);
 		    	if (compactPointer[level].empty() ||
 		    			icmp.compare(f.largest.encode(), compactPointer[level]) > 0) {
 		    		c.inputs[0].add(f);
@@ -589,7 +648,7 @@ public class VersionSet {
 		    }
 		    if (c.inputs[0].isEmpty()) {
 		    	// Wrap-around to the beginning of the key space
-		    	c.inputs[0].add(current.files[level].get(0));
+		    	c.inputs[0].add(current.levelFiles(level).get(0));
 		    }
 		} else if (seekCompaction) {
 		    level = current.fileToCompactLevel;
@@ -687,8 +746,8 @@ public class VersionSet {
 		long result = 0;
 		ArrayList<FileMetaData> overlaps = new ArrayList<FileMetaData>();
 		for (int level = 1; level < DBFormat.kNumLevels - 1; level++) {
-		    for (int i = 0; i < current.files[level].size(); i++) {
-		    	FileMetaData f = current.files[level].get(i);
+		    for (int i = 0; i < current.levelFiles(level).size(); i++) {
+		    	FileMetaData f = current.levelFiles(level).get(i);
 		    	current.getOverlappingInputs(level+1, f.smallest, f.largest, overlaps);
 		    	long sum = VersionSetGlobal.totalFileSize(overlaps);
 		    	if (sum > result) {
@@ -727,26 +786,26 @@ public class VersionSet {
 		// we will make a concatenating iterator per level.
 		// TODO(opt): use concatenating iterator for level-0 if there is no overlap
 		final int space = (c.level() == 0 ? c.inputs[0].size() + 1 : 2);
-		Iterator0[] list = new Iterator0[space];
-		int num = 0;
+		List<Iterator0> list = new ArrayList<>();
+		
 		for (int which = 0; which < 2; which++) {
 		    if (!c.inputs[which].isEmpty()) {
 		    	if (c.level() + which == 0) {
 		    		final ArrayList<FileMetaData> files = c.inputs[which];
 		    		for (int i = 0; i < files.size(); i++) {
-		    			list[num++] = tcache.newIterator(opt, files.get(i).number, files.get(i).fileSize);
+		    			list.add( tcache.newIterator(opt, files.get(i).number, files.get(i).fileSize) );
 		    		}
 		    	} else {
 		    		// Create concatenating iterator for the files from this level
-		    		list[num++] = TwoLevelIterator.newTwoLevelIterator(
+		    		list.add( TwoLevelIterator.newTwoLevelIterator(
 		    				new Version.LevelFileNumIterator(icmp, c.inputs[which]), 
-		    				VersionSetGlobal.getFileIterator, tcache, opt);
+		    				VersionSetGlobal.getFileIterator, tcache, opt) );
 		    	}
 		    }
 		}
 		
-		assert(num <= space);
-		Iterator0 result = Merger.newMergingIterator(icmp, list, num);
+		assert(list.size() <= space);
+		Iterator0 result = Merger.newMergingIterator(icmp, list);
 		list = null; //delete[] list;
 		return result;
 	}
@@ -767,7 +826,7 @@ public class VersionSet {
 	public void addLiveFiles(Set<Long> live) {
 		for (Version v = dummyVersions.next; v != dummyVersions; v = v.next) {
 			for (int level = 0; level < DBFormat.kNumLevels; level++) {
-				ArrayList<FileMetaData> files = v.files[level];
+				ArrayList<FileMetaData> files = v.levelFiles(level);
 			    for (int i = 0; i < files.size(); i++) {
 			    	live.add(files.get(i).number);
 			    }
@@ -783,7 +842,7 @@ public class VersionSet {
 	public long approximateOffsetOf(Version v, InternalKey ikey) {
 		long result = 0;
 		for (int level = 0; level < DBFormat.kNumLevels; level++) {
-			ArrayList<FileMetaData> files = v.files[level];
+			ArrayList<FileMetaData> files = v.levelFiles(level);
 		    for (int i = 0; i < files.size(); i++) {
 		    	if (icmp.compare(files.get(i).largest, ikey) <= 0) {
 		    		// Entire file is before "ikey", so just add the file size
@@ -817,13 +876,13 @@ public class VersionSet {
 		// Update code if kNumLevels changes
 		//assert(DBFormat.kNumLevels == 7);
 		return String.format("files[ %d %d %d %d %d %d %d ]", 
-		           current.files[0].size(),
-		           current.files[1].size(),
-		           current.files[2].size(),
-		           current.files[3].size(),
-		           current.files[4].size(),
-		           current.files[5].size(),
-		           current.files[6].size());
+		           current.levelFiles(0).size(),
+		           current.levelFiles(1).size(),
+		           current.levelFiles(2).size(),
+		           current.levelFiles(3).size(),
+		           current.levelFiles(4).size(),
+		           current.levelFiles(5).size(),
+		           current.levelFiles(6).size());
 	}
 	
 	
@@ -878,11 +937,11 @@ public class VersionSet {
 		      // file size is small (perhaps because of a small write-buffer
 		      // setting, or very high compression ratios, or lots of
 		      // overwrites/deletions).
-		      score = v.files[level].size() /
+		      score = v.levelFiles(level).size() /
 		          (double)(DBFormat.kL0_CompactionTrigger);
 		    } else {
 		    	// Compute the ratio of current size to size limit.
-		    	long level_bytes = VersionSetGlobal.totalFileSize(v.files[level]);
+		    	long level_bytes = VersionSetGlobal.totalFileSize(v.levelFiles(level));
 		    	score = (double)(level_bytes) / VersionSetGlobal.maxBytesForLevel(options, level);
 		    }
 
@@ -1014,7 +1073,7 @@ public class VersionSet {
 
 		  // Save files
 		  for (int level = 0; level < DBFormat.kNumLevels; level++) {
-			  ArrayList<FileMetaData> files = current.files[level];
+			  ArrayList<FileMetaData> files = current.levelFiles(level);
 		   	  for (int i = 0; i < files.size(); i++) {
 		   		  FileMetaData f = files.get(i);
 		   		  edit.addFile(level, f.number, f.fileSize, f.smallest, f.largest);
@@ -1022,6 +1081,7 @@ public class VersionSet {
 		  }
 
 		  ByteBuf record = ByteBufFactory.defaultByteBuf();
+		  record.require(1); //TODO
 		  edit.encodeTo(record);
 		  return log.addRecord(new Slice(record));
 	}

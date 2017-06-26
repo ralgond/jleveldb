@@ -50,9 +50,9 @@ public class LogWriter {
 		int ptrOffset = slice.offset;
 		int left = slice.size();
 
-		  // Fragment the record if necessary and emit it.  Note that if slice
-		  // is empty, we still want to iterate once to emit a single
-		  // zero-length record
+		// Fragment the record if necessary and emit it.  Note that if slice
+		// is empty, we still want to iterate once to emit a single
+		// zero-length record
 		Status s = Status.ok0();
 		boolean begin = true;
 		do {
@@ -105,9 +105,9 @@ public class LogWriter {
 		buf[6] = (byte)(t.getType() & 0xff);
 
 		// Compute the crc of the record type and the payload.
-		long crc = Crc32C.extend(typeCrc[t.getType()], ptr, 0, (int)n);
+		long crc = Crc32C.extend(typeCrc[t.getType()], ptr, offset, n);
 		crc = Crc32C.mask(crc);                 // Adjust for storage
-		Coding.encodeFixedNat32Long(buf, 0, 4, crc);
+		Coding.encodeFixedNat32Long(buf, 0, crc);
 
 		// Write the header and the payload
 		Status s = dest.append(new Slice(buf, 0, LogFormat.kHeaderSize));

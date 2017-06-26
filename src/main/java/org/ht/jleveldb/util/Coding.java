@@ -211,7 +211,7 @@ public class Coding {
 				   ((data[offset+2] & 0x0ffL) << 16) |
 				   ((data[offset+3] & 0x0ffL) << 24));
 		
-		return tmp & 0xFFFFFFFFL;
+		return tmp & 0xffffffffL;
 	}
 	
 	final public static long decodeFixedNat32Long(byte[] data, int offset) {
@@ -297,8 +297,8 @@ public class Coding {
 	}
 	
 	final public static boolean getLengthPrefixedSlice(Slice input, Slice result) {
-		int len;
-		if ((len = getVarNat32(input)) > 0 && input.size() >= len) {
+		int len = getVarNat32(input);
+		if (input.size() >= len) {
 			//System.out.printf("getLengthPrefixedSlice len=%d\n", len);
 		    result.init(input.data, input.offset, len);
 		    input.removePrefix(len);

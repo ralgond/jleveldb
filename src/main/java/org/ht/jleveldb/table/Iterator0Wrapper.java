@@ -54,22 +54,27 @@ public class Iterator0Wrapper {
 	
 	public void seekToFirst() {
 		iter.seekToFirst();
+		update();
 	}
 	
 	public void seekToLast() {
 		iter.seekToLast();
+		update();
 	}
 	
 	public void seek(Slice target) {
 		iter.seek(target);
+		update();
 	}
 	
 	public void next() {
 		iter.next();
+		update();
 	}
 	
 	public void prev() {
 		iter.prev();
+		update();
 	}
 	
 	public Slice key() {

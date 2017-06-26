@@ -4,9 +4,9 @@ import java.util.Comparator;
 
 import org.ht.jleveldb.Iterator0;
 import org.ht.jleveldb.Status;
+import org.ht.jleveldb.db.format.DBFormat;
 import org.ht.jleveldb.db.format.InternalKeyComparator;
 import org.ht.jleveldb.db.format.LookupKey;
-import org.ht.jleveldb.db.format.ParsedInternalKeySlice;
 import org.ht.jleveldb.db.format.ValueType;
 import org.ht.jleveldb.util.ByteBuf;
 import org.ht.jleveldb.util.ByteBufFactory;
@@ -40,14 +40,14 @@ public class MemTable {
 		}
 	}
 	
-	static class TableKeyComparator implements Comparator<ParsedInternalKeySlice>{
+	static class TableKeyComparator implements Comparator<Slice>{
 		InternalKeyComparator comparator;
 		
 		public TableKeyComparator(InternalKeyComparator comparator) {
 			this.comparator = comparator;
 		}
 		
-	    public int compare(ParsedInternalKeySlice a, ParsedInternalKeySlice b) {
+	    public int compare(Slice a, Slice b) {
 	    	// Internal keys are encoded as length-prefixed strings.
 	    	// Slice a = getLengthPrefixedSlice(adata, 0);
 	    	// Slice b = getLengthPrefixedSlice(bdata, 0);
@@ -57,9 +57,9 @@ public class MemTable {
 	
 	static class MemTableIterator extends Iterator0 {
 		
-		SkipListMap<ParsedInternalKeySlice, KeyValueSlice>.Iterator1 iter;
+		SkipListMap<Slice, KeyValueSlice>.Iterator1 iter;
 		
-		public MemTableIterator(SkipListMap<ParsedInternalKeySlice, KeyValueSlice> table) {
+		public MemTableIterator(SkipListMap<Slice, KeyValueSlice> table) {
 			iter = table.iterator1();
 		}
 		
@@ -80,8 +80,7 @@ public class MemTable {
 		}
 		
 		public void seek(Slice target0) {
-			ParsedInternalKeySlice target = (ParsedInternalKeySlice)target0;
-			iter.seek(target);
+			iter.seek(target0);
 		}
 		
 		public void next() {
@@ -107,17 +106,17 @@ public class MemTable {
 	
 	TableKeyComparator comparator;
 	int refs;
-	SkipListMap<ParsedInternalKeySlice,KeyValueSlice> table;
+	SkipListMap<Slice,KeyValueSlice> table;
 	long approximateMemory = 0;
 		
 	public MemTable(InternalKeyComparator c) {
 		comparator = new TableKeyComparator(c);
 		refs = 0;
-		table = new SkipListMap<ParsedInternalKeySlice,KeyValueSlice>(12, 4, comparator);
+		table = new SkipListMap<Slice,KeyValueSlice>(12, 4, comparator);
 	}
 	
 	public void delete() {
-		assert(refs == 0);
+		//TODO: //assert(refs == 0);
 		table = null;
 	}
 	
@@ -133,7 +132,7 @@ public class MemTable {
 	 */
 	public void unref() {
 		--refs;
-	    assert(refs >= 0);
+		//TODO: //assert(refs >= 0);
 	    if (refs <= 0) {
 	    	delete();
 	    }
@@ -179,10 +178,10 @@ public class MemTable {
 		//   internalKey : {data:byte[size], (seq&type):uint64}
 		
 		int keyOffset = -1;
-		int keySize = key.size();
+		int userKeySize = key.size();
 		int valueOffset = -1;
 		int valueSize = value.size();
-		int internalKeySize = keySize + 8;
+		int internalKeySize = userKeySize + 8;
 		int encodedLen = Coding.varNatLength(internalKeySize) + internalKeySize + Coding.varNatLength(valueSize) + valueSize;
 		
 		ByteBuf buf = ByteBufFactory.defaultByteBuf();
@@ -199,7 +198,8 @@ public class MemTable {
 		approximateMemory += buf.capacity();
 		
 		KeyValueSlice kvs = new KeyValueSlice(buf.data(), keyOffset, internalKeySize, valueOffset, valueSize);
-		ParsedInternalKeySlice keySlice = new ParsedInternalKeySlice(seq, type, buf.data(), keyOffset, keySize);
+		//ParsedInternalKeySlice keySlice = new ParsedInternalKeySlice(seq, type, buf.data(), keyOffset, keySize);
+		Slice keySlice = new Slice(buf.data(), keyOffset, internalKeySize);
 		table.put(keySlice, kvs);
 	}
 	
@@ -216,16 +216,19 @@ public class MemTable {
 	public boolean get(LookupKey key, ByteBuf value, Object0<Status> s) {
 		if (value != null)
 			value.clear();
-		ParsedInternalKeySlice memkey = key.memtableKey();
-		SkipListMap<ParsedInternalKeySlice,KeyValueSlice>.Iterator1 iter = table.iterator1();
+		Slice memkey = key.internalKey();
+		SkipListMap<Slice,KeyValueSlice>.Iterator1 iter = table.iterator1();
 		iter.seek(memkey);
 		if (iter.valid()) {
-			ParsedInternalKeySlice ikey = iter.key();
+			Slice ikey = iter.key();
 		    //System.out.println("seek result: "+ikey);
-		    if (comparator.comparator.userComparator().compare(ikey, key.userKey()) == 0) {
+		    if (comparator.comparator.userComparator().compare(
+		    		new Slice(ikey.data, ikey.offset, ikey.size()-8), 
+		    		key.userKey()) == 0) {
 		    	// Correct user key
-		    	if (ikey.valueType != null) {
-			    	switch (ikey.valueType) {
+		    	ValueType vtype = DBFormat.extractValueType(ikey);
+		    	if (vtype != null) {
+			    	switch (vtype) {
 			        case Value: {
 			        	Slice v = iter.value().value();
 			        	value.assign(v.data(), v.offset, v.size());

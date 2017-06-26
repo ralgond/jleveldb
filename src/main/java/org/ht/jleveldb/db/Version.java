@@ -33,17 +33,57 @@ public class Version {
 		public boolean run(Object arg, int level, FileMetaData meta);
 	}
 	
+	final VersionSet vset;
+	Version next;
+	Version prev;
+	int refs;
+	
+	/**
+	 * List of files per level
+	 */
+	//ArrayList<FileMetaData>[] files;
+	Object[] files;
+	
+	/**
+	 * Next file to compact based on seek stats.
+	 */
+	FileMetaData fileToCompact;
+	int fileToCompactLevel;
+	
+	/**
+	 * Level that should be compacted next and its compaction score.
+	 * Score < 1 means compaction is not strictly needed.  These fields
+	 * are initialized by Finalize().
+	 */
+	double compactionScore;
+	int compactionLevel;
+	
+	public Version(VersionSet vset) {
+		this.vset = vset;
+		next = this;
+		prev = this;
+		refs = 0;
+		fileToCompact = null;
+		fileToCompactLevel = -1;
+		compactionScore = -1.0;
+		compactionLevel = -1;
+		files = new Object[DBFormat.kNumLevels];
+		for (int i = 0; i < DBFormat.kNumLevels; i++)
+			files[i] = new ArrayList<FileMetaData>();
+	}
+	
 	public void delete() {
 		assert(refs == 0);
 
 		// Remove from linked list
 		prev.next = next;
 		next.prev = prev;
+		
 
 		// Drop references to files
 		for (int level = 0; level < DBFormat.kNumLevels; level++) {
-		    for (int i = 0; i < files[level].size(); i++) {
-		    	FileMetaData f = files[level].get(i);
+		    for (int i = 0; i < levelFiles(level).size(); i++) {
+		    	FileMetaData f = levelFiles(level).get(i);
 		    	assert(f.refs > 0);
 		    	f.refs--;
 		    	if (f.refs <= 0) {
@@ -54,23 +94,44 @@ public class Version {
 		}
 	}
 	
+    /**
+     *  Reference count management (so Versions do not disappear out from
+     *  under live iterators)
+     */
+	public void ref() {
+		//Thread.dumpStack();
+		vset.incrVersionRef();
+		++refs;
+	}
+	
+	public void unref() {
+		//Thread.dumpStack();
+		assert(this != vset.dummyVersions);
+		assert(refs >= 1);
+		vset.decrVersionRef();
+		--refs;
+		if (refs == 0) {
+		    delete();
+		}
+	}
+	
 	public void addIterators(ReadOptions options, List<Iterator0> iters) {
 		// Merge all level zero files together since they may overlap
-		for (int i = 0; i < files[0].size(); i++)
-		    iters.add(vset.tcache.newIterator(options, files[0].get(i).number, files[0].get(i).fileSize));
+		for (int i = 0; i < levelFiles(0).size(); i++)
+		    iters.add(vset.tcache.newIterator(options, levelFiles(0).get(i).number, levelFiles(0).get(i).fileSize));
 
 		// For levels > 0, we can use a concatenating iterator that sequentially
 		// walks through the non-overlapping files in the level, opening them
 		// lazily.
 		for (int level = 1; level < DBFormat.kNumLevels; level++) {
-		    if (!files[level].isEmpty())
+		    if (!levelFiles(level).isEmpty())
 		    	iters.add(newConcatenatingIterator(options, level));
 		}
 	}
 	
 	public Iterator0 newConcatenatingIterator(ReadOptions options, int level) {
 		return TwoLevelIterator.newTwoLevelIterator(
-			      new LevelFileNumIterator(vset.icmp, files[level]), 
+			      new LevelFileNumIterator(vset.icmp, levelFiles(level)), 
 			      VersionSetGlobal.getFileIterator, vset.tcache, options);
 	}
 	
@@ -106,7 +167,7 @@ public class Version {
 				if (s.ucmp.compare(parsedKey.userKey, s.userKey) == 0) {
 					s.state = (parsedKey.type == ValueType.Value) ? SaverState.kFound : SaverState.kDeleted;
 					if (s.state == SaverState.kFound)
-						s.value.assign(v.data(), v.size());
+						s.value.assign(v.data(), v.offset, v.size());
 			    }
 			}
 		}
@@ -146,12 +207,12 @@ public class Version {
 		ArrayList<FileMetaData> tmp = new ArrayList<FileMetaData>();
 		FileMetaData tmp2;
 		for (int level = 0; level < DBFormat.kNumLevels; level++) {
-			int numFiles = files[level].size();
+			int numFiles = levelFiles(level).size();
 		    if (numFiles == 0) 
 		    	continue;
 
 		    // Get the list of files to search in this level
-		    ArrayList<FileMetaData> levelFiles = files[level];
+		    ArrayList<FileMetaData> levelFiles = levelFiles(level);
 		    if (level == 0) {
 		    	// Level-0 files may overlap each other.  Find all files that
 		    	// overlap user_key and process them in order from newest to oldest.
@@ -174,7 +235,7 @@ public class Version {
 		    	numFiles = tmp.size();
 		    } else {
 		    	// Binary search to find earliest index whose largest key >= ikey.
-		    	int index = VersionSetGlobal.findFile(vset.icmp, files[level], ikey);
+		    	int index = VersionSetGlobal.findFile(vset.icmp, levelFiles(level), ikey);
 		    	if (index >= numFiles) {
 		    		levelFiles = null;
 		    		numFiles = 0;
@@ -302,23 +363,7 @@ public class Version {
 		}
 		return false;
 	}
-	
-    /**
-     *  Reference count management (so Versions do not disappear out from
-     *  under live iterators)
-     */
-	public void ref() {
-		++refs;
-	}
-	
-	public void unref() {
-		assert(this != vset.dummyVersions);
-		assert(refs >= 1);
-		  --refs;
-		if (refs == 0) {
-		    this.delete();
-		}
-	}
+
 	
 	/**
 	 * 
@@ -341,8 +386,8 @@ public class Version {
 			  userEnd = end.userKey();
 		  }
 		  Comparator0 userCmp = vset.icmp.userComparator();
-		  for (int i = 0; i < files[level].size(); ) {
-			  FileMetaData f = files[level].get(i++);
+		  for (int i = 0; i < levelFiles(level).size(); ) {
+			  FileMetaData f = levelFiles(level).get(i++);
 			  Slice fileStart = f.smallest.userKey();
 			  Slice fileLimit = f.largest.userKey();
 			  if (begin != null && userCmp.compare(fileLimit, userBegin) < 0) {
@@ -377,7 +422,7 @@ public class Version {
 	 * @return Returns true iff some file in the specified level overlaps
 	 */
 	public boolean overlapInLevel(int level, Slice smallestUserKey, Slice largestUserKey) {
-		return VersionSetGlobal.someFileOverlapsRange(vset.icmp, (level > 0), files[level],
+		return VersionSetGlobal.someFileOverlapsRange(vset.icmp, (level > 0), levelFiles(level),
 				smallestUserKey, largestUserKey);
 	}
 	
@@ -416,7 +461,7 @@ public class Version {
 	}
 	
 	public int numFiles(int level) { 
-		return files[level].size(); 
+		return levelFiles(level).size(); 
 	}
 
 	
@@ -427,8 +472,8 @@ public class Version {
 		  // Search level-0 in order from newest to oldest.
 		ArrayList<FileMetaData> tmp = new ArrayList<FileMetaData>();
 		//tmp.reserve(files[0].size());
-		for (int i = 0; i < files[0].size(); i++) {
-		    FileMetaData f = files[0].get(i);
+		for (int i = 0; i < levelFiles(0).size(); i++) {
+		    FileMetaData f = levelFiles(0).get(i);
 		    if (ucmp.compare(userKey, f.smallest.userKey()) >= 0 &&
 		        ucmp.compare(userKey, f.largest.userKey()) <= 0) {
 		      tmp.add(f);
@@ -445,13 +490,14 @@ public class Version {
 
 		// Search other levels.
 		for (int level = 1; level < DBFormat.kNumLevels; level++) {
-		    int numFiles = files[level].size();
-		    if (numFiles == 0) continue;
+		    int numFiles = levelFiles(level).size();
+		    if (numFiles == 0) 
+		    	continue;
 
 		    // Binary search to find earliest index whose largest key >= internal_key.
-		    int index = VersionSetGlobal.findFile(vset.icmp, files[level], internalKey);
+		    int index = VersionSetGlobal.findFile(vset.icmp, levelFiles(level), internalKey);
 		    if (index < numFiles) {
-		    	FileMetaData f = files[level].get(index);
+		    	FileMetaData f = levelFiles(level).get(index);
 		    	if (ucmp.compare(userKey, f.smallest.userKey()) < 0) {
 		    		// All of "f" is past any data for user_key
 		    	} else {
@@ -463,39 +509,13 @@ public class Version {
 		}
 	}
 	
-	final VersionSet vset;
-	Version next;
-	Version prev;
-	int refs;
+
 	
-	/**
-	 * List of files per level
-	 */
-	ArrayList<FileMetaData>[] files;
+
 	
-	/**
-	 * Next file to compact based on seek stats.
-	 */
-	FileMetaData fileToCompact;
-	int fileToCompactLevel;
-	
-	/**
-	 * Level that should be compacted next and its compaction score.
-	 * Score < 1 means compaction is not strictly needed.  These fields
-	 * are initialized by Finalize().
-	 */
-	double compactionScore;
-	int compactionLevel;
-	
-	public Version(VersionSet vset) {
-		this.vset = vset;
-		next = this;
-		prev = this;
-		refs = 0;
-		fileToCompact = null;
-		fileToCompactLevel = -1;
-		compactionScore = -1.0;
-		compactionLevel = -1;
+	@SuppressWarnings("unchecked")
+	final public ArrayList<FileMetaData> levelFiles(int level) {
+		return (ArrayList<FileMetaData>)files[level];
 	}
 	
 	

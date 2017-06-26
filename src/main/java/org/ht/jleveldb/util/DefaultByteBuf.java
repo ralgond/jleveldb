@@ -82,8 +82,9 @@ public class DefaultByteBuf implements ByteBuf {
 	
 	@Override
 	final public String encodeToString() {
-		if (data == null)
-			return new String();
+		if (data == null || size() == 0)
+			return "";
+		
 		return new String(data, 0, size());
 	}
 
@@ -228,6 +229,11 @@ public class DefaultByteBuf implements ByteBuf {
 	public void assign(String s) {
 		byte[] b = s.getBytes();
 		assign(b, 0, b.length);
+	}
+	
+	@Override
+	public void assign(ByteBuf buf) {
+		assign(buf.data(), 0, buf.size());
 	}
 
 	@Override

@@ -108,4 +108,19 @@ public class TestEnvImpl {
 		file2.getValue().delete();
 		file2.setValue(null);
 	}
+	
+	@Test
+	public void testSchedule() throws Exception {
+		EnvImpl env = new EnvImpl();
+		for (int i = 1; i < 10; i++) {
+			env.schedule(new Runnable() {
+				@Override
+				public void run() {
+					System.out.println("=================>run success");
+				}
+			});
+			Thread.sleep(1000);
+		}
+		
+	}
 }

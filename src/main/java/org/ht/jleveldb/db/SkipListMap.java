@@ -286,8 +286,8 @@ public class SkipListMap<K, V> {
 		Node<K,V> node;
 		
 		public Iterator1() {
-			prev = head;
-			node = prev.next(0);
+			prev = null;
+			node = head;
 		}
 		
 		/**

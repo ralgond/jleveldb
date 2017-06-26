@@ -49,6 +49,8 @@ public interface ByteBuf {
 	
 	void assign(String s);
 	
+	void assign(ByteBuf buf);
+	
 	void addByte(byte b);
 	
 	/**

@@ -19,11 +19,15 @@ public class Table {
 	
 	static class Rep {
 		public void delete() {
-			filter.delete(); //delete filter;
-			filter = null;
+			if (filter != null) {
+				filter.delete(); //delete filter;
+				filter = null;
+			}
 		    filterData = null; //delete [] filter_data;
-		    indexBlock.delete();
-		    indexBlock = null; //delete index_block;
+		    if (indexBlock != null) {
+			    indexBlock.delete();
+			    indexBlock = null; //delete index_block;
+		    }
 		}
 		
 		Options options;
@@ -205,6 +209,7 @@ public class Table {
 		    // right near the end of the file).
 		    result = rep.metaindexHandle.offset();
 		}
+		indexIter.delete();
 		indexIter = null;//delete indexIter;
 		return result;
 	}

@@ -41,12 +41,12 @@ public class DBFormat {
 	
 
 	// Returns the user key portion of an internal key.
-	public static Slice extractUserKey(Slice internalKey) {
+	final public static Slice extractUserKey(Slice internalKey) {
 		assert(internalKey.size() >= 8);
 		return new Slice(internalKey.data(), internalKey.offset, internalKey.size() - 8);
 	}
 	
-	public static ValueType extractValueType(Slice internalKey) {
+	final public static ValueType extractValueType(Slice internalKey) {
 		assert(internalKey.size() >= 8);
 		int n = internalKey.size();
 		long num = Coding.decodeFixedNat64(internalKey.data(), internalKey.offset + n - 8);
@@ -54,7 +54,7 @@ public class DBFormat {
 		return ValueType.create(c);
 	}
 	
-	public static long packSequenceAndType(long seq, ValueType t) {
+	final public static long packSequenceAndType(long seq, ValueType t) {
 		assert(seq <= kMaxSequenceNumber);
 		assert(t.type() <= kValueTypeForSeek.type());
 		return ((seq << 8) | (t.type() & 0x0ffL));

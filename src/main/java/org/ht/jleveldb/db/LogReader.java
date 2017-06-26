@@ -80,11 +80,16 @@ public class LogReader {
 		resyncing = initialOffset > 0;
 	}
 	
-	  // Read the next record into *record.  Returns true if read
-	  // successfully, false if we hit end of the input.  May use
-	  // "*scratch" as temporary storage.  The contents filled in *record
-	  // will only be valid until the next mutating operation on this
-	  // reader or the next mutation to *scratch.
+	/**
+	 * Read the next record into record.  Returns true if read
+	 * successfully, false if we hit end of the input.  May use
+	 * "scratch" as temporary storage.  The contents filled in record
+	 * will only be valid until the next mutating operation on this
+	 * reader or the next mutation to scratch.
+	 * @param record
+	 * @param scratch
+	 * @return
+	 */
 	public boolean readRecord(Slice record, ByteBuf scratch) {
 		if (lastRecordOffset < initialOffset) {
 		    if (!skipToInitialBlock()) {
@@ -95,10 +100,11 @@ public class LogReader {
 		scratch.clear();
 		record.clear();
 		
-		boolean in_fragmented_record = false;
-		  // Record offset of the logical record that we're reading
-		  // 0 is a dummy value to make compilers happy
-		long prospective_record_offset = 0;
+		boolean inFragmentedRecord = false;
+		
+		// Record offset of the logical record that we're reading
+		// 0 is a dummy value to make compilers happy
+		long prospectiveRecordOffset = 0;
 
 		Slice fragment = new Slice();
 		while (true) {
@@ -106,8 +112,8 @@ public class LogReader {
 			// ReadPhysicalRecord may have only had an empty trailer remaining in its
 		    // internal buffer. Calculate the offset of the next physical record now
 		    // that it has returned, properly accounting for its header size.
-		    long physical_record_offset =
-		        this.endOfBufferOffset - buffer.size() - LogFormat.kHeaderSize - fragment.size();
+		    long physicalRecordOffset =
+		        endOfBufferOffset - buffer.size() - LogFormat.kHeaderSize - fragment.size();
 		    
 		    if (resyncing) {
 		        if (record_type == LogFormat.RecordType.MiddleType.getType()) {
@@ -121,40 +127,40 @@ public class LogReader {
 		    }
 		    
 		    if (record_type == LogFormat.RecordType.FullType.getType()) {
-		    	if (in_fragmented_record) {
+		    	if (inFragmentedRecord) {
 		            // Handle bug in earlier versions of log::Writer where
 		            // it could emit an empty kFirstType record at the tail end
 		            // of a block followed by a kFullType or kFirstType record
 		            // at the beginning of the next block.
 		            if (scratch.empty()) {
-		            	in_fragmented_record = false;
+		            	inFragmentedRecord = false;
 		            } else {
 		            	reportCorruption(scratch.size(), "partial record without end(1)");
 		            }
 		        }
-		        prospective_record_offset = physical_record_offset;
+		        prospectiveRecordOffset = physicalRecordOffset;
 		        scratch.clear();
 		        record.init(fragment);
-		        lastRecordOffset = prospective_record_offset;
+		        lastRecordOffset = prospectiveRecordOffset;
 		        return true;
 		    } else if (record_type == LogFormat.RecordType.FirstType.getType()) {
-		    	if (in_fragmented_record) {
+		    	if (inFragmentedRecord) {
 		            // Handle bug in earlier versions of log::Writer where
 		            // it could emit an empty kFirstType record at the tail end
 		            // of a block followed by a kFullType or kFirstType record
 		            // at the beginning of the next block.
 		    		if (scratch.empty()) {
-		            	in_fragmented_record = false;
+		            	inFragmentedRecord = false;
 		            } else {
 		            	reportCorruption(scratch.size(), "partial record without end(2)");
 		            }
 		        }
-		        prospective_record_offset = physical_record_offset;
-		        scratch.assign(fragment.data(), fragment.size());
-		        in_fragmented_record = true;
+		        prospectiveRecordOffset = physicalRecordOffset;
+		        scratch.assign(fragment.data(), fragment.offset, fragment.size());
+		        inFragmentedRecord = true;
 		        break;	
 		    } else if (record_type == LogFormat.RecordType.MiddleType.getType()) {
-		    	if (!in_fragmented_record) {
+		    	if (!inFragmentedRecord) {
 		            reportCorruption(fragment.size(),
 		                             "missing start of fragmented record(1)");
 		        } else {
@@ -162,17 +168,17 @@ public class LogReader {
 		        }
 		        break;
 		    } else if (record_type == LogFormat.RecordType.LastType.getType()) {
-		    	if (!in_fragmented_record) {
+		    	if (!inFragmentedRecord) {
 		            reportCorruption(fragment.size(),
 		                             "missing start of fragmented record(2)");
 		        } else {
 		            scratch.append(fragment.data(), fragment.size());
 		            record.init(scratch);
-		            lastRecordOffset = prospective_record_offset;
+		            lastRecordOffset = prospectiveRecordOffset;
 		            return true;
 		        }
 		    } else if (record_type == ExtendRecordType.Eof.getType()) {
-		    	if (in_fragmented_record) {
+		    	if (inFragmentedRecord) {
 		            // This can be caused by the writer dying immediately after
 		            // writing a physical record but before completing the next; don't
 		            // treat it as a corruption, just ignore the entire logical record.
@@ -180,19 +186,20 @@ public class LogReader {
 		        }
 		        return false;
 		    } else if (record_type == ExtendRecordType.BadRecord.getType()) {
-		    	 if (in_fragmented_record) {
+		    	 if (inFragmentedRecord) {
 		             reportCorruption(scratch.size(), "error in middle of record");
-		             in_fragmented_record = false;
+		             inFragmentedRecord = false;
 		             scratch.clear();
 		         }
 		    } else {
 		        reportCorruption(
-		            (fragment.size() + (in_fragmented_record ? scratch.size() : 0)),
+		            (fragment.size() + (inFragmentedRecord ? scratch.size() : 0)),
 		            "unknown record type "+record_type);
-		        in_fragmented_record = false;
+		        inFragmentedRecord = false;
 		        scratch.clear();
 		    }
 		}
+		
 		return false;
 	}
 	
@@ -230,7 +237,7 @@ public class LogReader {
 		return true;
 	}
 	
-	  // Return type, or one of the preceding special values
+	// Return type, or one of the preceding special values
 	int readPhysicalRecord(Slice result) {
 		while (true) {
 			if (buffer.size() < LogFormat.kHeaderSize) {
@@ -238,7 +245,7 @@ public class LogReader {
 					// Last read was a full read, so this is a trailer to skip
 					buffer.clear();
 					Status status = file.read(LogFormat.kBlockSize, buffer, backingStore);
-					this.endOfBufferOffset += buffer.size();
+					endOfBufferOffset += buffer.size();
 		        
 					if (!status.ok()) {
 						buffer.clear();
@@ -258,16 +265,13 @@ public class LogReader {
 					return ExtendRecordType.Eof.getType();
 				}
 			}
+			
+			
 
 		    // Parse the header
 			byte[] header = buffer.data;
 			int headerOffset = buffer.offset;
-			
-//		    const char* header = buffer_.data();
-//		    const uint32_t a = static_cast<uint32_t>(header[4]) & 0xff;
-//		    const uint32_t b = static_cast<uint32_t>(header[5]) & 0xff;
-//		    const unsigned int type = header[6];
-//		    const uint32_t length = a | (b << 8);
+
 			int a = (int)(buffer.getByte(4) & 0xff);
 			int b = (int)(buffer.getByte(5) & 0xff);
 			int type = (int)(buffer.getByte(6) & 0xff);
@@ -285,6 +289,7 @@ public class LogReader {
 		    	// Don't report a corruption.
 		    	return ExtendRecordType.Eof.getType();
 		    }
+		    
 
 		    if (type == LogFormat.RecordType.ZeroType.getType() && length == 0) {
 		    	// Skip zero length record without reporting any drops since
@@ -296,8 +301,8 @@ public class LogReader {
 
 		    // Check crc
 		    if (checksum) {
-		    	long expected_crc = Crc32C.unmask(Coding.decodeFixedNat32(header, headerOffset));
-		    	long actual_crc = Crc32C.value(header, 6, 1 + length);
+		    	long expected_crc = Crc32C.unmask(Coding.decodeFixedNat32Long(header, headerOffset));
+		    	long actual_crc = Crc32C.value(header, headerOffset + 6, 1 + length);
 		    	if (actual_crc != expected_crc) {
 		    		// Drop the rest of the buffer since "length" itself may have
 		    		// been corrupted and if we trust it, we could find some

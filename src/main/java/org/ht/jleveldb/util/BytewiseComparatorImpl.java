@@ -8,13 +8,20 @@ public class BytewiseComparatorImpl extends Comparator0 {
 	}
 	
 	@Override
-	public int compare(Slice a, Slice b) {
-		return compare(a.data, a.offset, a.size(), b.data, b.offset, b.size());
-	}
-
-	@Override
 	public int compare(byte[] a, int aoff, int asize, byte[] b, int boff, int bsize) {
-		return ByteUtils.bytewiseCompare(a, aoff, asize, b, boff, bsize);
+		
+		//return ByteUtils.bytewiseCompare(a, aoff, asize, b, boff, bsize);
+
+		for (int i = 0; i < asize && i < bsize; i++) {
+			if (a[aoff+i] == b[boff+i])
+				continue;
+			return((a[aoff+i]&0xff) < (b[boff+i]&0xff)) ? -1 : +1;
+		}
+		
+		if (asize == bsize)
+			return 0;
+		
+		return asize < bsize ? -1 : +1;
 	}
 
 	@Override

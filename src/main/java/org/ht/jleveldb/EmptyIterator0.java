@@ -9,11 +9,6 @@ public class EmptyIterator0 extends Iterator0 {
 	public EmptyIterator0(Status s) {
 		status = s;
 	}
-	
-	@Override
-	public void delete() {
-
-	}
 
 	@Override
 	public boolean valid() {

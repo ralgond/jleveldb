@@ -4,6 +4,7 @@ import org.ht.jleveldb.CompressionType;
 import org.ht.jleveldb.Options;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.WritableFile;
+import org.ht.jleveldb.db.format.InternalKeyComparator;
 import org.ht.jleveldb.table.Format.BlockHandle;
 import org.ht.jleveldb.table.Format.Footer;
 import org.ht.jleveldb.util.ByteBuf;
@@ -12,6 +13,7 @@ import org.ht.jleveldb.util.Coding;
 import org.ht.jleveldb.util.Crc32C;
 import org.ht.jleveldb.util.Slice;
 import org.ht.jleveldb.util.Snappy;
+import org.ht.jleveldb.util.Strings;
 
 public class TableBuilder {
 	
@@ -49,6 +51,7 @@ public class TableBuilder {
 			offset = 0;
 			dataBlock = new BlockBuilder(options);
 			indexBlock = new BlockBuilder(indexBlockOptions);
+			lastKey = ByteBufFactory.defaultByteBuf();
 			numEntries = 0;
 			closed = false;
 			filterBlock = opt.filterPolicy == null ? null : new FilterBlockBuilder(opt.filterPolicy);
@@ -100,10 +103,23 @@ public class TableBuilder {
 		assert(!r.closed);
 		if (!ok()) 
 			return;
+		
+		//System.out.println("[DEBUG] TableBuilder.add 1 r="+r);
+		
 		if (r.numEntries > 0) {
-			assert(r.options.comparator.compare(key, r.lastKey) > 0);
+			//System.out.println("[DEBUG] TableBuilder.add 1.1, r.options="+r.options+", r.lastKey="+r.lastKey);
+			//System.out.println("[DEBUG] TableBuilder.add 1.2, r.options.comparator="+r.options.comparator);
+			if (r.options.comparator instanceof InternalKeyComparator) {
+				//InternalKeyComparator cmp = (InternalKeyComparator)r.options.comparator;
+				//System.out.println("[DEBUG] TableBuilder.add 1.2, r.options.comparator.userComparator="+cmp.userComparator());
+			}
+			int ret = r.options.comparator.compare(key, r.lastKey);
+			//System.out.println("[DEBUG] TableBuilder.add 1.3, ret="+ret+",  key="+
+			//		Strings.escapeString(key)+", r.lastKey="+Strings.escapeString(r.lastKey));
+			assert(ret > 0);
 		}
 
+		//System.out.println("[DEBUG] TableBuilder.add 2");
 		if (r.pendingIndexEntry) {
 		    assert(r.dataBlock.empty());
 		    r.options.comparator.findShortestSeparator(r.lastKey, key);
@@ -112,19 +128,26 @@ public class TableBuilder {
 		    r.indexBlock.add(new Slice(r.lastKey), new Slice(handle_encoding));
 		    r.pendingIndexEntry = false;
 		}
+		//System.out.println("[DEBUG] TableBuilder.add 3");
 
 		if (r.filterBlock != null) {
 		    r.filterBlock.addKey(key);
 		}
-
-		r.lastKey.assign(key.data(), key.size());
+		
+		
+		r.lastKey.assign(key.data(), key.offset, key.size());
+		//System.out.println("[DEBUG] TableBuilder.add 4, key="+Strings.escapeString(key)+", r="+Strings.escapeString(r.lastKey));
 		r.numEntries++;
 		r.dataBlock.add(key, value);
+		
+		//System.out.println("[DEBUG] TableBuilder.add 5");
 
 		int estimated_block_size = r.dataBlock.currentSizeEstimate();
 		if (estimated_block_size >= r.options.blockSize) {
 		    flush();
 		}
+		
+		//System.out.println("[DEBUG] TableBuilder.add 6");
 	}
 	
 	public void flush() {

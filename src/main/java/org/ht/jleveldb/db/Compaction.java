@@ -111,7 +111,7 @@ public class Compaction {
 		// Maybe use binary search to find right entry instead of linear search?
 		final Comparator0 userCmp = inputVersion.vset.icmp.userComparator();
 		for (int lvl = level + 2; lvl < DBFormat.kNumLevels; lvl++) {
-		    ArrayList<FileMetaData> files = inputVersion.files[lvl];
+		    ArrayList<FileMetaData> files = inputVersion.levelFiles(lvl);
 		    for (; levelPtrs[lvl] < files.size(); ) {
 		    	FileMetaData f = files.get(levelPtrs[lvl]);
 		    	if (userCmp.compare(userKey, f.largest.userKey()) <= 0) {

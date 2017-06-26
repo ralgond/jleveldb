@@ -30,23 +30,19 @@ public class LookupKey {
 		
 		start = 0;
 		int usize = userKey.size();
+		
 		buf.writeVarNat32(usize + 8);
+		
 		kstart = buf.position();
+		
 		buf.append(userKey.data(), usize);
 		buf.writeFixedNat64(DBFormat.packSequenceAndType(sequence, DBFormat.kValueTypeForSeek));
+		
 		end = buf.position();
 		
 		data = buf.data();
 		
 		this.sequence = sequence;
-	}
-	
-	/** 
-	 * Return a key suitable for lookup in a MemTable.
-	 * @return
-	 */
-	public ParsedInternalKeySlice memtableKey() { 
-		return new ParsedInternalKeySlice(sequence, DBFormat.kValueTypeForSeek, data, kstart, end - kstart - 8); 
 	}
 	
 	/**

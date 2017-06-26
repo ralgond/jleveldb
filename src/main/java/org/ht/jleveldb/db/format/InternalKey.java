@@ -13,22 +13,23 @@ import org.ht.jleveldb.util.Strings;
  * @author Teng Huang ht201509@163.com
  */
 public class InternalKey {
-	ByteBuf rep = ByteBufFactory.defaultByteBuf();
+	ByteBuf rep;
 	
 	public InternalKey() {
-		
+		rep = ByteBufFactory.defaultByteBuf();
 	}
 	
 	public ByteBuf rep() {
 		return rep;
 	}
 	
-	static void appendInternalKey(ByteBuf result, ParsedInternalKey key) {
+	protected static void appendInternalKey(ByteBuf result, ParsedInternalKey key) {
 		result.append(key.userKey.data(), key.userKey.size());
 		result.writeFixedNat64(DBFormat.packSequenceAndType(key.sequence, key.type));
 	}
 	
 	public InternalKey(Slice userKey, long s, ValueType t) {
+		this();
 		appendInternalKey(rep, new ParsedInternalKey(userKey, s, t));
 	}
 	
@@ -63,7 +64,7 @@ public class InternalKey {
 	}
 	
 	public void assgin(InternalKey ik) {
-		rep = ik.rep;
+		rep.assign(ik.rep);
 	}
 	
 	public String debugString() {
@@ -81,7 +82,7 @@ public class InternalKey {
 	@Override
 	public InternalKey clone() {
 		InternalKey ik = new InternalKey();
-		ik.rep.assign(rep.data(), rep.size());
+		ik.rep.assign(rep);
 		return ik;
 	}
 }

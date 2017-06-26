@@ -1,7 +1,6 @@
 package org.ht.jleveldb.db;
 
 import java.util.Random;
-import java.util.concurrent.ThreadLocalRandom;
 
 import org.ht.jleveldb.Iterator0;
 import org.ht.jleveldb.Status;
@@ -47,10 +46,22 @@ public class DBIter extends Iterator0 {
 		
 		direction = Direction.kForward;
 		valid = false;
-		rnd = ThreadLocalRandom.current();
+		//rnd = ThreadLocalRandom.current();
+		rnd = new Random();
 		rnd.setSeed(seed);
 		
 		bytesCounter = randomPeriod();
+	}
+	
+	@Override
+	public void delete() {
+		db = null;
+		savedKey = null;     // == current key when direction_==kReverse
+		savedValue = null;   // == current raw value when direction_==kReverse
+		if (iter != null) {
+			iter.delete();
+			iter = null;
+		}
 	}
 	
 	// Pick next gap with average value of config::kReadBytesPeriod.
@@ -74,8 +85,8 @@ public class DBIter extends Iterator0 {
 		        	skipping = true;
 		        	break;
 		        case Value:
-		          if (skipping &&
-		              userComparator.compare(ikey.userKey, skip) <= 0) {
+		          if (skipping && 
+		        		  userComparator.compare(ikey.userKey, skip) <= 0) {
 		            // Entry hidden
 		          } else {
 		        	  valid = true;
@@ -162,16 +173,7 @@ public class DBIter extends Iterator0 {
 	    }
 	}
 	
-	@Override
-	public void delete() {
-		db = null;
-		savedKey = null;     // == current key when direction_==kReverse
-		savedValue = null;   // == current raw value when direction_==kReverse
-		if (iter != null) {
-			iter.delete();
-			iter = null;
-		}
-	}
+
 	  
 	@Override
 	final public boolean valid() {
@@ -218,7 +220,7 @@ public class DBIter extends Iterator0 {
 
 		if (direction == Direction.kReverse) {  // Switch directions?
 		    direction = Direction.kForward;
-		    // iter_ is pointing just before the entries for this->key(),
+		    // iter is pointing just before the entries for this->key(),
 		    // so advance into the range of entries for this->key() and then
 		    // use the normal skipping code below.
 		    if (!iter.valid()) {
@@ -231,9 +233,9 @@ public class DBIter extends Iterator0 {
 		    	savedKey.clear();
 		    	return;
 		    }
-		    // saved_key_ already contains the key to skip past.
+		    // savedKey already contains the key to skip past.
 		} else {
-		    // Store in saved_key_ the current key so we skip it below.
+		    // Store in savedKey the current key so we skip it below.
 		    saveKey(DBFormat.extractUserKey(iter.key()), savedKey);
 		}
 

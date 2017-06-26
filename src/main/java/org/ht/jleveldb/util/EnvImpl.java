@@ -14,6 +14,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeSet;
@@ -88,15 +89,17 @@ public class EnvImpl implements Env {
 	static class SequentialFileImpl implements SequentialFile {
 		String filename;
 		DataInputStream dis;
+		FileInputStream fis;
 		public SequentialFileImpl(String fname) {
 			filename = fname;
 		}
 		
 		public Status open() {
 			try {
-				dis = new DataInputStream(new FileInputStream(new File(filename)));
+				fis = new FileInputStream(new File(filename));
+				dis = new DataInputStream(fis);
 				return Status.ok0();
-			} catch (FileNotFoundException e) {
+			} catch (IOException e) {
 				e.printStackTrace();
 				return Status.ioError(filename+" SequentialFileImpl.open failed: "+e);
 			}
@@ -107,6 +110,9 @@ public class EnvImpl implements Env {
 				if (dis != null) {
 					dis.close();
 					dis = null;
+					fis.close();
+					fis = null;
+					//System.out.println("[DEBUG] SequentialFileImpl.close"+filename);
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -114,11 +120,7 @@ public class EnvImpl implements Env {
 		}
 		
 		public void delete() {
-			try {
-				dis.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			close();
 		}
 		
 		public Status read(int n, Slice result, byte[] scratch) {
@@ -130,8 +132,12 @@ public class EnvImpl implements Env {
 					// We leave status as ok if we hit the end of the file
 					result.init(scratch, 0, 0);
 				} else if (r < n) {
-					// A partial read with an error: return a non-ok status
-				    s = Status.ioError(filename+" partial read");
+					if (dis.read(scratch, r, 1) < 0) {
+						
+					} else {
+						// A partial read with an error: return a non-ok status
+					    s = Status.ioError(filename+" partial read");
+					}
 				}
 				result.init(scratch, 0, r);
 				return s;
@@ -279,10 +285,9 @@ public class EnvImpl implements Env {
 				if (fos != null) {
 					fos.close();
 					fos = null;
-				}
-				if (dos != null) {
 					dos.close();
 					dos = null;
+					//System.out.println("[DEBUG] WritableFileImpl.close: "+filename);
 				}
 				return Status.ok0();
 			} catch (IOException e) {
@@ -341,7 +346,7 @@ public class EnvImpl implements Env {
 	
 	ReentrantLock mu;
 	Condition bgsignal;
-	Thread bgthread_;
+	Thread bgthread;
 	boolean startedBgthread;
 	
 //	Limiter mmapLimit = new Limiter();
@@ -361,12 +366,20 @@ public class EnvImpl implements Env {
 //		return k_mmap_limit;
 //	}
 	
+	public EnvImpl() {
+		mu = new ReentrantLock();
+		bgsignal = mu.newCondition();
+		startedBgthread = false;
+	}
+	
 	@Override
 	public Status newSequentialFile(String fname, Object0<SequentialFile> result) {
 		SequentialFileImpl file = new SequentialFileImpl(fname);
 		Status s = file.open();
 		if (s.ok())
 			result.setValue(file);
+		else
+			result.setValue(null);
 		return s;
 	}
 
@@ -382,7 +395,8 @@ public class EnvImpl implements Env {
 			if (s.ok()) {
 				result.setValue(f2);
 				return s;
-			}
+			} else
+				result.setValue(null);
 		}
 		return s;
 	}
@@ -393,6 +407,8 @@ public class EnvImpl implements Env {
 		Status s = f.open();
 		if (s.ok())
 			result.setValue(f);
+		else
+			result.setValue(null);
 		return s;
 	}
 
@@ -402,6 +418,8 @@ public class EnvImpl implements Env {
 		Status s = f.open();
 		if (s.ok())
 			result.setValue(f);
+		else
+			result.setValue(null);
 		return s;
 	}
 
@@ -427,6 +445,7 @@ public class EnvImpl implements Env {
 			Files.delete(FileSystems.getDefault().getPath(fname));
 			return Status.ok0();
 		} catch (IOException e) {
+			e.printStackTrace();
 			return Status.ioError(fname+" deleteFile failed: "+e);
 		}
 	}
@@ -464,11 +483,16 @@ public class EnvImpl implements Env {
 
 	@Override
 	public Status renameFile(String src, String target) {
-		boolean ret = (new File(src)).renameTo(new File(target));
-		if (ret) 
+		try {
+			Files.move(FileSystems.getDefault().getPath(src), 
+					FileSystems.getDefault().getPath(target), 
+					StandardCopyOption.ATOMIC_MOVE,
+					StandardCopyOption.REPLACE_EXISTING);
 			return Status.ok0();
-		else 
+		} catch (IOException e) {
+			e.printStackTrace();
 			return Status.ioError(src+" renameFile to "+target+" failed");
+		}
 	}
 
 	static class FileLock0Impl extends FileLock0 {
@@ -554,7 +578,8 @@ public class EnvImpl implements Env {
 		// Start background thread if necessary
 		if (!startedBgthread) {
 			startedBgthread = true;
-		    (new Thread(new BGThreadRunnable())).start();
+			bgthread = new Thread(new BGThreadRunnable());
+			bgthread.start();
 		}
 		
 		// If the queue is currently empty, the background thread may currently be
@@ -600,6 +625,9 @@ public class EnvImpl implements Env {
 	}
 	
 	Status doWriteStringToFile(Slice data, String fname, boolean shouldSync) {
+		if (fname.contains("MANIFEST"))
+			Thread.dumpStack();
+		
 		Object0<WritableFile> file0 = new Object0<WritableFile>();
 		Status s = newWritableFile(fname, file0);
 		if (!s.ok()) {

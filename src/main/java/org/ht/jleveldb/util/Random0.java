@@ -44,7 +44,7 @@ public class Random0 {
 	// Returns a uniformly distributed value in the range [0..n-1]
 	// REQUIRES: n > 0
 	public long uniform(int size) {
-		return ((long)(next() * size) & kUint32Mask);
+		return ((next() % size) & kUint32Mask);
 	}
 	
 	// Randomly returns true ~"1/n" of the time, and false otherwise.

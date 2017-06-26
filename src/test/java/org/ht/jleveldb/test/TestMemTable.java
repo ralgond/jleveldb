@@ -10,6 +10,7 @@ import static org.junit.Assert.assertTrue;
 import org.ht.jleveldb.Iterator0;
 import org.ht.jleveldb.Status;
 import org.ht.jleveldb.db.MemTable;
+import org.ht.jleveldb.db.format.DBFormat;
 import org.ht.jleveldb.db.format.InternalKeyComparator;
 import org.ht.jleveldb.db.format.LookupKey;
 import org.ht.jleveldb.db.format.ValueType;
@@ -34,12 +35,15 @@ public class TestMemTable {
 		String[] ary = new String[]{"1","2","3","4","5"};
 		int idx = 0;
 		Iterator0 it = memtable.newIterator();
+		it.seekToFirst();
 		while (it.valid()) {
-			Slice k = it.key();
+			Slice ikey = it.key();
 			//System.out.println(k.encodeToString());
-			assertEquals(k.encodeToString(), ary[idx++]);
+			assertEquals(DBFormat.extractUserKey(ikey).encodeToString(), ary[idx++]);
 			it.next();
 		}
+		it.delete();
+		it = null;
 		
 		//System.out.println("ApproximateMemoryUsage: "+memtable.approximateMemoryUsage()+" bytes");
 		//System.out.println("entry count: "+memtable.entrySize());

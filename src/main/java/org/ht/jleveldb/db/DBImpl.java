@@ -216,7 +216,8 @@ public class DBImpl implements DB {
 		if (result.infoLog == null) {
 		    // Open a log file in the same directory as the db
 		    src.env.createDir(dbname);  // In case it does not exist
-		    src.env.renameFile(FileName.getInfoLogFileName(dbname), FileName.getOldInfoLogFileName(dbname));
+		    if (src.env.fileExists(FileName.getInfoLogFileName(dbname)))
+		    	src.env.renameFile(FileName.getInfoLogFileName(dbname), FileName.getOldInfoLogFileName(dbname));
 		    Status s = src.env.newLogger(FileName.getInfoLogFileName(dbname), log0);
 		    if (!s.ok()) {
 		       // No place suitable for logging
@@ -252,7 +253,7 @@ public class DBImpl implements DB {
 		seed = 0;
 		bgCompactionScheduled = false;
 		manualCompaction = null;
-		
+		shuttingDown = new AtomicReference<Object>();
 		
 		hasImm.set(null);
 		
@@ -262,6 +263,9 @@ public class DBImpl implements DB {
 		tcache = new TableCache(dbname, options, tableCacheSize);
 
 		versions = new VersionSet(dbname, options, tcache, internalComparator);
+		
+		for (int i = 0; i < DBFormat.kNumLevels; i++)
+			stats[i] = new CompactionStats();
 	}
 	
 	@Override
@@ -273,12 +277,13 @@ public class DBImpl implements DB {
 		Boolean0 saveManifest = new Boolean0();
 		saveManifest.setValue(false);
 		Status s = recover(edit, saveManifest);
+		
 		if (s.ok() && memtable == null) {
 			// Create new log and a corresponding memtable.
 			long newLogNumber = versions.newFileNumber();
 			
 			Object0<WritableFile> result = new Object0<WritableFile>();
-			s = env.newWritableFile(dbname, result);
+			s = env.newWritableFile(FileName.getLogFileName(dbname, newLogNumber), result);
 			if (s.ok()) {
 				edit.setLogNumber(newLogNumber);
 				logFile = result.getValue();
@@ -288,11 +293,13 @@ public class DBImpl implements DB {
 			}
 		}
 		
+		
 		if (s.ok() && saveManifest.getValue()) {
 			edit.setPrevLogNumber(0); //No older logs needed after recovery.
 			edit.setLogNumber(logFileNumber);
 			s = versions.logAndApply(edit, mutex);
 		}
+		
 		
 		if (s.ok()) {
 			deleteObsoleteFiles();
@@ -302,6 +309,21 @@ public class DBImpl implements DB {
 		mutex.unlock();
 		
 		return s;
+	}
+	
+	@Override
+	public void close() {
+		if (logFile != null) {
+			logFile.close();
+			logFile = null;
+		}
+		
+		if (dbLock != null) {
+			env.unlockFile(dbLock);
+			dbLock = null;
+		}
+		
+		versions.delete();
 	}
 	
 	@Override
@@ -333,6 +355,8 @@ public class DBImpl implements DB {
 				return w.status;
 			
 			Status status = makeRoomForWrite(batch == null);
+			//System.out.println("DBImpl.write, 1, status="+status);
+			
 			long lastSequence = versions.lastSequence();
 			Object0<Writer> lastWriter = new Object0<Writer>();
 			lastWriter.setValue(w);
@@ -349,13 +373,19 @@ public class DBImpl implements DB {
 				{
 					mutex.unlock();
 					status = logWriter.addRecord(WriteBatchInternal.contents(updates));
+
+					//System.out.println("DBImpl.write, 2, status="+status);
+					
 					boolean syncError = false;
 					if (status.ok() && options.sync) {
 						status = logFile.sync();
 						if (!status.ok())
 							syncError = true;
 					}
-				      
+				    
+
+					//System.out.println("DBImpl.write, 3, status="+status);
+					
 				    if (status.ok())
 				    	status = WriteBatchInternal.insertInto(updates, memtable);
 				      
@@ -390,6 +420,7 @@ public class DBImpl implements DB {
 				writers.peekFirst().cv.signal();
 			}
 			
+			//System.out.println("DBImpl.write, 10");
 			return status;
 		} finally {
 			mutex.unlock();
@@ -414,7 +445,7 @@ public class DBImpl implements DB {
 			Version current = versions.current();
 			//mem->Ref();
 			//if (imm != NULL) imm->Ref();
-			//current->Ref();
+			current.ref();
 			
 			boolean haveStatUpdate = false;
 			Version.GetStats stats = new Version.GetStats();
@@ -440,7 +471,7 @@ public class DBImpl implements DB {
 			
 			// mem->Unref();
 			// if (imm != NULL) imm->Unref();
-			// current->Unref();
+			current.unref();
 			return s.getValue();
 		} finally {
 			mutex.unlock();
@@ -470,46 +501,14 @@ public class DBImpl implements DB {
 			try {
 				state.mem = null; // state->mem->Unref();
 				state.imm = null; // if (state->imm != NULL) state->imm->Unref();
+				state.version.unref();
 				state.version = null;
 			} finally {
 				state.mutex.unlock();
 			}
 		}
 	}
-	
-	Iterator0 newInternalCursor(ReadOptions options, Long0 latestSnapshot, Integer0 outSeed) {
-		IterState cleanup = new IterState();
-		mutex.lock();
-		try {
-			latestSnapshot.setValue(versions.lastSequence());
-			
-			ArrayList<Iterator0> cursorList = new ArrayList<>();
-			cursorList.add(memtable.newIterator());
-			MemTable mem0 = memtable; //mem_->Ref();
-			MemTable imm0 = null;
-			if (immtable != null) {
-				cursorList.add(immtable.newIterator());
-				imm0 = immtable; //imm_->Ref();
-			}
-			
-			versions.current().addIterators(options, cursorList);
-			Iterator0[] cursorArray = (Iterator0[])cursorList.toArray();
-			Iterator0 internalCursor = Merger.newMergingIterator(internalComparator, cursorArray, cursorArray.length);
-			Version version0 = versions.current(); //versions_->current()->Ref();
-			
-			cleanup.mutex = mutex;
-			cleanup.mem = mem0;
-			cleanup.imm = imm0;
-			cleanup.version = version0;
-			internalCursor.registerCleanup(new CleanupIteratorState(cleanup));
-			
-			outSeed.setValue(++seed);
-			
-			return internalCursor;
-		} finally {
-			mutex.unlock();
-		}
-	}
+
 	
 	Status newDB() {
 		VersionEdit ndb = new VersionEdit();
@@ -651,7 +650,7 @@ public class DBImpl implements DB {
 			    // No change needed
 			  return s;
 		  } else {
-			  Logger0.log0(options.infoLog, "Ignoring error %s", s);
+			  Logger0.log0(options.infoLog, "Ignoring error {}", s);
 			  return Status.ok0();
 		  }
 	}
@@ -708,8 +707,8 @@ public class DBImpl implements DB {
 		    		  tcache.evict(number.getValue());
 		    	  }
 		    	  
-		          Logger0.log0(options.infoLog, "Delete type=%d #%d\n",
-		        		  type.getValue().ordinal(), number);
+		          Logger0.log0(options.infoLog, "Delete type={} #{}\n",
+		        		  type.getValue().name(), number.getValue());
 		          
 		    	  env.deleteFile(dbname + "/" + filenames.get(i));
 		      }
@@ -727,15 +726,18 @@ public class DBImpl implements DB {
 	void compactMemTable() {
 		mutex.assertHeld();
 		assert(immtable != null);
+		System.out.println("[DEBUG] DBImpl.compactMemTable 1");
 		
 		// Save the contents of the memtable as a new Table
 		VersionEdit edit = new VersionEdit();
 		Version base = versions.current(); 
-		base.ref();
 		
+		base.ref();
 		Status s = writeLevel0Table(immtable, edit, base);
 		base.unref();
 		base = null;
+		
+		System.out.println("[DEBUG] DBImpl.compactMemTable 2, s="+s);
 		
 		if (s.ok() && shuttingDown.get() != null) { //shutting_down_.Acquire_Load()
 		    s = new Status(Status.Code.IOError, "Deleting DB during memtable compaction");
@@ -748,9 +750,11 @@ public class DBImpl implements DB {
 			s = versions.logAndApply(edit, mutex);
 		}
 		
+		System.out.println("[DEBUG] DBImpl.compactMemTable 3, s="+s);
+		
 		if (s.ok()) {
 		    // Commit to the new state
-		    immtable = null; //imm_->Unref();
+		    immtable.unref(); immtable = null; //imm_->Unref();
 		    hasImm.set(null); //has_imm_.Release_Store(NULL);
 		    deleteObsoleteFiles();
 		} else {
@@ -765,7 +769,7 @@ public class DBImpl implements DB {
 	    Status status = Status.ok0();
 	    
 		public void corruption(int bytes, Status s) {
-		    Logger0.log0(infoLog, "%s%s: dropping %d bytes; %s",
+		    Logger0.log0(infoLog, "{}{}: dropping {} bytes; {}",
 		              (status == null ? "(ignoring error) " : ""),
 		              fname, bytes, s);
 		    
@@ -810,7 +814,7 @@ public class DBImpl implements DB {
 		// large sequence numbers).
 		LogReader reader = new LogReader(file, reporter, true, 0);
 		
-		Logger0.log0(options.infoLog, "Recovering log #%d", logNumber);
+		Logger0.log0(options.infoLog, "Recovering log #{}", logNumber);
 		
 		// Read all the records and add to a memtable
 		ByteBuf scratch = null; //std::string scratch
@@ -872,7 +876,7 @@ public class DBImpl implements DB {
 		    
 		    if (env.getFileSize(fname, lfileSize).ok() && env.newAppendableFile(fname, logFile0).ok()) {
 		    	logFile = logFile0.getValue();
-		    	Logger0.log0(options.infoLog, "Reusing old log %s \n", fname);
+		    	Logger0.log0(options.infoLog, "Reusing old log {} \n", fname);
 		    	logWriter = new LogWriter(logFile, lfileSize.getValue());
 		    	logFileNumber = logNumber;
 		    	if (mem != null) {
@@ -909,22 +913,34 @@ public class DBImpl implements DB {
 	 */
 	Status writeLevel0Table(MemTable mem, VersionEdit edit, Version base) {
 		mutex.assertHeld();
+		
+		System.out.println("[DEBUG] DBImpl.writeLevel0Table 1");
+		
 		long startMillis = env.nowMillis();
 		FileMetaData meta = new FileMetaData();
 		meta.number = versions.newFileNumber();
 		pendingOutputs.add(meta.number);
 		Iterator0 iter = mem.newIterator();
-		Logger0.log0(options.infoLog, "Level-0 table #%d: started", meta.number);
+		Logger0.log0(options.infoLog, "Level-0 table #{}: started", meta.number);
 		
 		Status s = Status.ok0();
 		{
 		    mutex.unlock();
-			s = Builder.buildTable(dbname, env, options, tcache, iter, meta);
+		    try {
+		    	s = Builder.buildTable(dbname, env, options, tcache, iter, meta);
+		    } catch (Exception e) {
+		    	e.printStackTrace();
+		    	throw e;
+		    }
+			
+			System.out.println("[DEBUG] DBImpl.writeLevel0Table 2, s="+s);
+			
 		    mutex.lock();
 		}
 		
-		Logger0.log0(options.infoLog, "Level-0 table #%d: %d bytes %s", meta.number, meta.fileSize, s);
+		Logger0.log0(options.infoLog, "Level-0 table #{}: {} bytes {}", meta.number, meta.fileSize, s);
 		
+		iter.delete();
 		iter = null;
 		
 		pendingOutputs.remove(meta.number);
@@ -977,8 +993,7 @@ public class DBImpl implements DB {
 				      env.sleepForMilliseconds(1);
 				      allowDelay = false;  // Do not delay a single write more than once
 				      mutex.lock();
-				 } else if (!force &&
-				               (memtable.approximateMemoryUsage() <= options.writeBufferSize)) {
+				 } else if (!force && (memtable.approximateMemoryUsage() <= options.writeBufferSize)) {
 				      // There is room in current memtable
 				      break;
 				 } else if (immtable != null) {
@@ -1019,6 +1034,7 @@ public class DBImpl implements DB {
 			}
 			return s;
 		} catch (Exception e) {
+			e.printStackTrace();
 			return Status.otherError(""+e);
 		}
 	}
@@ -1084,15 +1100,20 @@ public class DBImpl implements DB {
 		mutex.assertHeld();
 		if (bgCompactionScheduled) {
 		    // Already scheduled
+			System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: Already scheduled");
 		} else if (shuttingDown.get() != null) { //shutting_down_.Acquire_Load()
 		    // DB is being deleted; no more background compactions
+			System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: DB is being deleted; no more background compactions");
 		} else if (!bgError.ok()) {
 		    // Already got an error; no more changes
+			System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: Already got an error; no more changes");
 		} else if (immtable == null &&
 		             manualCompaction == null &&
 		             !versions.needsCompaction()) {
 		    // No work to be done
+			System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: No work to be done");
 		} else {
+			System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: env.schedule(new BgWorkRunnable())");
 			bgCompactionScheduled = true;
 		    env.schedule(new BgWorkRunnable());
 		}
@@ -1107,13 +1128,19 @@ public class DBImpl implements DB {
 	void backgroundCall() {
 		mutex.lock();
 		try {
+			System.out.println("[DEBUG] DBImpl.backgroundCall: start");
+			
 			assert(bgCompactionScheduled);
 			if (shuttingDown.get() != null) { //shutting_down_.Acquire_Load()
 			    // No more background work when shutting down.
+				System.out.println("[DEBUG] DBImpl.backgroundCall: No more background work when shutting down.");
 			} else if (!bgError.ok()) {
 			    // No more background work after a background error.
+				System.out.println("[DEBUG] DBImpl.backgroundCall: No more background work after a background error.");
 			} else {
+				System.out.println("[DEBUG] DBImpl.backgroundCall: backgroundCompaction start");
 			    backgroundCompaction();
+			    System.out.println("[DEBUG] DBImpl.backgroundCall: backgroundCompaction end");
 			}
 			
 			bgCompactionScheduled = false;
@@ -1121,9 +1148,14 @@ public class DBImpl implements DB {
 			// Previous compaction may have produced too many files in a level,
 			// so reschedule another compaction if needed.
 			maybeScheduleCompaction();
+			System.out.println("[DEBUG] DBImpl.backgroundCall: bgCv.signalAll() start");
 			bgCv.signalAll();
+			System.out.println("[DEBUG] DBImpl.backgroundCall: bgCv.signalAll() end");
+		} catch (Exception e) {
+			e.printStackTrace();
 		} finally {
 			mutex.unlock();
+			System.out.println("[DEBUG] DBImpl.backgroundCall: end");
 		}
 	}
 	
@@ -1149,7 +1181,7 @@ public class DBImpl implements DB {
 			}
 			
 		    Logger0.log0(options.infoLog,
-		        "Manual compaction at level-%d from %s .. %s; will stop at %s\n",
+		        "Manual compaction at level-{} from {} .. {}; will stop at {}\n",
 		        m.level,
 		        (m.begin != null ? m.begin.debugString() : "(begin)"),
 		        (m.end != null ? m.end.debugString() : "(end)"),
@@ -1173,7 +1205,7 @@ public class DBImpl implements DB {
 	    		recordBackgroundError(status);
 	    	}
 	    	
-	        Logger0.log0(options.infoLog, "Moved #%d to level-%d %d bytes %s: %s\n",
+	        Logger0.log0(options.infoLog, "Moved #{} to level-{} {} bytes {}: {}\n",
 	                f.number,
 	                c.level() + 1,
 	                f.fileSize,
@@ -1198,7 +1230,7 @@ public class DBImpl implements DB {
 	    } else if (shuttingDown.get() != null) { //shutting_down_.Acquire_Load()
 	        // Ignore compaction errors found during shutting down
 	    } else {
-	        Logger0.log0(options.infoLog, "Compaction error: %s", status);
+	        Logger0.log0(options.infoLog, "Compaction error: {}", status);
 	    }
 	    
 	    if (isManual) {
@@ -1305,10 +1337,11 @@ public class DBImpl implements DB {
                     currentBytes);
 			
 			s = iter.status();
+			iter.delete();
 			iter = null;
 			if (s.ok()) {
 				Logger0.log0(options.infoLog,
-				          "Generated table #%d@%d: %d keys, %d bytes",
+				          "Generated table #{}@{}: {} keys, {} bytes",
 				          outputNumber,
 				          compact.compaction.level(),
 				          currentEntries,
@@ -1326,7 +1359,7 @@ public class DBImpl implements DB {
 	 */
 	Status installCompactionResults(CompactionState compact) {
 		mutex.assertHeld();
-		Logger0.log0(options.infoLog,  "Compacted %d@%d + %d@%d files => %d bytes",
+		Logger0.log0(options.infoLog,  "Compacted {}@{} + {}@{} files => {} bytes",
 			      compact.compaction.numInputFiles(0),
 			      compact.compaction.level(),
 			      compact.compaction.numInputFiles(1),
@@ -1351,7 +1384,7 @@ public class DBImpl implements DB {
 		long startMillis = env.nowMillis();
 		long immMillis = 0;  // millis spent doing imm compactions
 		
-		Logger0.log0(options.infoLog,  "Compacting %d@%d + %d@%d files",
+		Logger0.log0(options.infoLog,  "Compacting {}@{} + {}@{} files",
 			      compact.compaction.numInputFiles(0),
 			      compact.compaction.level(),
 			      compact.compaction.numInputFiles(1),
@@ -1466,6 +1499,8 @@ public class DBImpl implements DB {
 			status = input.status();
 		}
 		
+		input.delete();
+		input = null;
 		
 		CompactionStats stat = new CompactionStats();
 		stat.millis = env.nowMillis() - startMillis - immMillis;
@@ -1489,7 +1524,7 @@ public class DBImpl implements DB {
 			recordBackgroundError(status);
 		}
 		
-		Logger0.log0(options.infoLog, "compacted to: %s", versions.levelSummary());
+		Logger0.log0(options.infoLog, "compacted to: {}", versions.levelSummary());
 		return status;
 	}
 	
@@ -1532,8 +1567,7 @@ public class DBImpl implements DB {
 				memtable.ref();
 		}
 		versions.current().addIterators(options, list);
-		Iterator0 internalIter =
-				Merger.newMergingIterator(internalComparator, (Iterator0[])list.toArray(), list.size());
+		Iterator0 internalIter = Merger.newMergingIterator(internalComparator, list);
 		versions.current().ref();
 
 		cleanup.mutex = mutex;
@@ -1673,10 +1707,7 @@ public class DBImpl implements DB {
 		return s;
 	}
 	
-	@Override
-	public void close() {
-		//TODO
-	}
+
 	
 	@Override
 	public void getApproximateSizes(List<Range> range, Long0 sizes) {

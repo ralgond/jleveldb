@@ -145,6 +145,9 @@ public class TableCache {
 	Cache cache;
 	
 	Status findTable(long fileNumber, long fileSize, Object0<Cache.Handle> handle) {
+		System.out.printf("[DEBUG] TableCache.findTable, fileNumber=%d, fileSize=%d\n",
+				fileNumber, fileSize);
+		
 		Status s = Status.ok0();
 		byte buf[] = new byte[kUint64Size];
 		Coding.encodeFixedNat64(buf, 0, kUint64Size);

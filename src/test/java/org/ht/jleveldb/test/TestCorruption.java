@@ -136,6 +136,7 @@ public class TestCorruption {
 		    	}
 		    }
 		    iter.delete();
+		    iter = null;
 
 		    System.err.printf("expected=%d..%d; got=%d; bad_keys=%d; bad_values=%d; missed=%d\n",
 		            min_expected, max_expected, correct, bad_keys, bad_values, missed);

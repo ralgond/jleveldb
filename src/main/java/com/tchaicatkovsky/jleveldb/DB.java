@@ -3,7 +3,6 @@ package com.tchaicatkovsky.jleveldb;
 import java.util.List;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
-import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 

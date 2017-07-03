@@ -13,30 +13,44 @@ import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class VersionSetGlobal {
 	public static int targetFileSize(Options options) {
 		return options.maxFileSize;
 	}
 	
-	// Maximum bytes of overlaps in grandparent (i.e., level+2) before we
-	// stop building a single file in a level->level+1 compaction.
+	/**
+	 * Maximum bytes of overlaps in grandparent (i.e., level+2) before we
+	 * stop building a single file in a level->level+1 compaction.
+	 * 
+	 * @param options
+	 * @return
+	 */
 	public static long maxGrandParentOverlapBytes(Options options) {
 		return 10 * targetFileSize(options);
 	}
 
-	// Maximum number of bytes in all compacted files.  We avoid expanding
-	// the lower level file set of a compaction if it would make the
-	// total compaction cover more than this many bytes.
+	/**
+	 * Maximum number of bytes in all compacted files.  We avoid expanding
+	 * the lower level file set of a compaction if it would make the
+	 * total compaction cover more than this many bytes.
+	 * 
+	 * @param options
+	 * @return
+	 */
 	public static long expandedCompactionByteSizeLimit(Options options) {
 		return 25 * targetFileSize(options);
 	}
 	
+	/**
+	 * Note: the result for level zero is not really used since we set
+	 * the level-0 compaction threshold based on number of files.
+	 * 
+	 * @param options
+	 * @param level
+	 * @return
+	 */
 	public static double maxBytesForLevel(Options options, int level) {
-		// Note: the result for level zero is not really used since we set
-		// the level-0 compaction threshold based on number of files.
-
 		// Result for both level-0 and level-1
 		double result = 10. * 1048576.0;
 		while (level > 1) {
@@ -59,7 +73,6 @@ public class VersionSetGlobal {
 		return sum;
 	}
 	
-	//TODO: may has bugs
 	public static int findFile(InternalKeyComparator icmp,
 			ArrayList<FileMetaData> files,
 			Slice key) {
@@ -83,12 +96,12 @@ public class VersionSetGlobal {
 	}
 	
 	static boolean afterFile(Comparator0 ucmp, Slice userKey, FileMetaData f) {
-		// NULL user_key occurs before all keys and is therefore never after *f
+		// null userKey occurs before all keys and is therefore never after f
 		return (userKey != null && ucmp.compare(userKey, f.largest.userKey()) > 0);
 	}
 	
 	static boolean beforeFile(Comparator0 ucmp, Slice userKey, FileMetaData f) {
-		// NULL user_key occurs after all keys and is therefore never before *f
+		// null userKey occurs after all keys and is therefore never before f
 		return (userKey != null && ucmp.compare(userKey, f.smallest.userKey()) < 0);
 	}
 	
@@ -121,9 +134,6 @@ public class VersionSetGlobal {
 			  index = findFile(icmp, files, small.encode());
 		  }
 
-//		  System.out.printf("[DEBUG] someFileOverlapsRange, index=%d, files.size=%d, smallest=%s, largest=%s\n",
-//				  index, files.size(), Strings.escapeString(smallestUserKey), Strings.escapeString(largestUserKey));
-		  
 		  if (index >= files.size()) {
 			  // beginning of range is after all files, so no overlap.
 			  return false;

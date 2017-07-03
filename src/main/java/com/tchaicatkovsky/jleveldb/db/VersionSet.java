@@ -33,7 +33,6 @@ import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 /**
  * The representation of a DBImpl consists of a set of Versions.  The
@@ -202,10 +201,6 @@ public class VersionSet {
 		 * @param edit
 		 */
 		public void apply(VersionEdit edit) {
-			//TODO(may bug): check once more time.
-			
-			//System.out.printf("[DEBUG] Builder.apply, edit=%s", edit.debugString());
-			
 		    // Update compaction pointers
 		    for (int i = 0; i < edit.compactPointers.size(); i++) {
 		    	int level = edit.compactPointers.get(i).i;
@@ -249,7 +244,6 @@ public class VersionSet {
 		    }
 		}
 		
-		//TODO:
 		public void dumpFileMetaDataList(int level, ArrayList<FileMetaData> flist) {
 			String s = "level="+level+", flist=";
 			for (int i = 0; i < flist.size(); i++) {
@@ -262,8 +256,6 @@ public class VersionSet {
 		}
 		
 		public void saveTo(Version v) {
-			
-			//TODO(check): bugs may happens, be careful.
 		    BySmallestKey cmp = new BySmallestKey(vset.icmp);
 		    for (int level = 0; level < DBFormat.kNumLevels; level++) {
 		    	// Merge the set of added files with the set of pre-existing files.

@@ -83,7 +83,7 @@ public class DBImpl implements DB {
 
 	// Queue of writers.
 	Deque<Writer> writers = new LinkedList<>();
-	WriteBatch tmpBatch;
+	WriteBatch tmpBatch = new WriteBatch();
 
 	SnapshotList snapshots = new SnapshotList();
 
@@ -471,6 +471,7 @@ public class DBImpl implements DB {
 
 	@Override
 	public Status get(ReadOptions options, Slice key, ByteBuf value) {
+		value.clear();
 		Object0<Status> s = new Object0<Status>();
 		s.setValue(Status.ok0());
 		mutex.lock();
@@ -1126,7 +1127,7 @@ public class DBImpl implements DB {
 					break;
 				}
 
-				// Append to *result
+				// Append to result
 				if (result == first.batch) {
 					// Switch to temporary batch instead of disturbing caller's batch
 					result = tmpBatch;

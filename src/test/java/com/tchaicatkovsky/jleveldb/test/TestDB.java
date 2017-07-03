@@ -1,10 +1,11 @@
 package com.tchaicatkovsky.jleveldb.test;
 
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.Test;
 
@@ -545,7 +546,7 @@ public class TestDB {
 			ArrayList<String> files = new ArrayList<>();
 			env.getChildren(dbname, files);
 			for (String fileName : files)
-				System.out.println("DB FILENAME: "+fileName);
+				System.out.println("DB FILENAME: " + fileName);
 			return files.size();
 		}
 
@@ -1507,7 +1508,7 @@ public class TestDB {
 			assertEquals(big.encodeToString(), r.get("foo", snapshot));
 			System.out.printf("[DEBUG] testHiddenValuesAreRemoved 2, size=%d\n", r.size(slice(""), slice("pastfoo")));
 			assertTrue(between(r.size(slice(""), slice("pastfoo")), 50000, 60000));
-			
+
 			r.db.releaseSnapshot(snapshot);
 			assertEquals(r.allEntriesFor(slice("foo")), "[ tiny, " + big + " ]");
 			Slice x = slice("x");
@@ -1524,18 +1525,17 @@ public class TestDB {
 		r.delete();
 	}
 
-	
 	@Test
 	public void testDeletionMarkers1() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
 
 		r.put("foo", "v1");
-		
+
 		assertTrue(r.dbfull().TEST_CompactMemTable().ok());
-		
+
 		final int last = DBFormat.kMaxMemCompactLevel;
-		
+
 		assertEquals(r.numTableFilesAtLevel(last), 1); // foo => v1 is now in last level
 
 		// Place a table at level last-1 to prevent merging with preceding mutation
@@ -1549,7 +1549,7 @@ public class TestDB {
 		r.put("foo", "v2");
 		assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
 		assertTrue(r.dbfull().TEST_CompactMemTable().ok()); // Moves to level last-2
-		
+
 		assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
 		Slice z = slice("z");
 		r.dbfull().TEST_CompactRange(last - 2, null, z);
@@ -1565,7 +1565,6 @@ public class TestDB {
 
 		r.delete();
 	}
-
 
 	@Test
 	public void testDeletionMarkers2() throws Exception {
@@ -2079,7 +2078,6 @@ public class TestDB {
 		r.delete();
 	}
 
-
 	@Test
 	public void testFilesDeletedAfterCompaction() throws Exception {
 		DBTestRunner r = new DBTestRunner();
@@ -2087,19 +2085,19 @@ public class TestDB {
 		assertTrue(r.put("foo", "v2").ok());
 		r.compact("a", "z");
 		final int num_files = r.countFiles();
-		
+
 		PrintStream defaultOut = System.out;
 		System.setOut(new PrintStream(new DummyOutputStream()));
-		
+
 		for (int i = 0; i < 10; i++) {
 			assertTrue(r.put("foo", "v2").ok());
 			r.compact("a", "z");
 		}
-		
+
 		System.setOut(defaultOut);
-		
+
 		System.out.printf("DB.dataRange: %s", r.db.debugDataRange());
-		
+
 		assertEquals(r.countFiles(), num_files);
 
 		r.delete();
@@ -2118,7 +2116,34 @@ public class TestDB {
 		}
 	}
 
-	// TODO
+	@Test
+	public void testBloomFilter01() throws Exception {
+		DBTestRunner r = new DBTestRunner();
+
+		r.destroyAndReopen();
+
+		r.env.countRandomReads = true;
+		Options options = r.currentOptions().cloneOptions();
+		options.env = r.env;
+		options.blockCache = Cache.newLRUCache(0); // Prevent cache hits
+		options.filterPolicy = BloomFilterPolicy.newBloomFilterPolicy(10);
+
+		r.reopen(options);
+
+		final int N = 1000;
+		for (int i = 0; i < N; i++)
+			assertTrue(r.put(Key(i), Key(i)).ok());
+
+		System.out.println("\n[DEBUG] TestDB.testBloomFilter compact start");
+
+		r.compact("a", "z");
+
+		for (int i = 0; i < N; i++)
+			assertEquals(r.get(Key(i)), Key(i));
+
+		r.delete();
+	}
+
 	@Test
 	public void testBloomFilter() throws Exception {
 		DBTestRunner r = new DBTestRunner();
@@ -2143,11 +2168,11 @@ public class TestDB {
 
 		r.compact("a", "z");
 
+		System.out.printf("[DEBUG] TestDB.testBloomFilter, dataRange=%s\n", r.db.debugDataRange());
+
 		for (int i = 0; i < N; i += 100) {
 			assertTrue(r.put(Key(i), Key(i)).ok());
 		}
-
-		System.out.printf("[DEBUG] TestDB.testBloomFilter compact end dataRange=%s\n\n", r.db.debugDataRange());
 
 		System.out.println("\n[DEBUG] TestDB.testBloomFilter TEST_CompactMemTable start");
 
@@ -2160,24 +2185,24 @@ public class TestDB {
 
 		// Lookup present keys. Should rarely read from small sstable.
 		r.env.randomReadCounter.set(0);
-		// ReadOptions readOpt = new ReadOptions();
-		// readOpt.verifyChecksums = true;
+
 		for (int i = 0; i < N; i++) {
 			assertEquals(Key(i), r.get(Key(i)));
 		}
-		// int reads = (int) r.env.randomReadCounter.get();
-		// System.err.printf("%d present => %d reads\n", N, reads);
-		// assertTrue(reads >= N);
-		// assertTrue(reads <= N + 2 * N / 100);
-		//
-		// // Lookup present keys. Should rarely read from either sstable.
-		// r.env.randomReadCounter.set(0);
-		// for (int i = 0; i < N; i++) {
-		// assertEquals("NOT_FOUND", r.get(Key(i) + ".missing"));
-		// }
-		// reads = (int) r.env.randomReadCounter.get();
-		// System.err.printf("%d missing => %d reads\n", N, reads);
-		// assertTrue(reads <= 3 * N / 100);
+
+		int reads = (int) r.env.randomReadCounter.get();
+		System.err.printf("%d present => %d reads\n", N, reads);
+		assertTrue(reads >= N);
+		assertTrue(reads <= N + 2 * N / 100);
+
+		// Lookup present keys. Should rarely read from either sstable.
+		r.env.randomReadCounter.set(0);
+		for (int i = 0; i < N; i++) {
+			assertEquals("NOT_FOUND", r.get(Key(i) + ".missing"));
+		}
+		reads = (int) r.env.randomReadCounter.get();
+		System.err.printf("%d missing => %d reads\n", N, reads);
+		assertTrue(reads <= 3 * N / 100);
 
 		r.env.delayDataSync.set(null);
 		r.close();
@@ -2189,6 +2214,135 @@ public class TestDB {
 	static final int kNumThreads = 4;
 	static final int kTestSeconds = 10;
 	static final int kNumKeys = 1000;
+
+	static class MTState {
+		public DBTestRunner test;
+		public AtomicReference<Object> stop = new AtomicReference<>();
+		public AtomicLong[] counter;
+		public Object[] thread_done;
+
+		public MTState() {
+			counter = new AtomicLong[kNumThreads];
+			for (int i = 0; i < counter.length; i++)
+				counter[i] = new AtomicLong();
+			thread_done = new Object[kNumThreads];
+			for (int i = 0; i < thread_done.length; i++)
+				thread_done[i] = new AtomicReference<Object>();
+		}
+
+		@SuppressWarnings("unchecked")
+		public AtomicReference<Object> threadDone(int id) {
+			return (AtomicReference<Object>) thread_done[id];
+		}
+	}
+
+	static class MTThread {
+		public MTState state;
+		int id;
+	}
+
+	static class MTThreadBody implements Runnable {
+		MTThread t;
+
+		public MTThreadBody(MTThread t) {
+			this.t = t;
+		}
+
+		@Override
+		public void run() {
+			try {
+				int id = t.id;
+				DB db = t.state.test.db;
+				long counter = 0;
+				System.err.printf("... starting thread %d\n", id);
+				Random0 rnd = new Random0(1000 + id);
+				ByteBuf value = ByteBufFactory.defaultByteBuf();
+
+				Pattern pattern = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+).*");
+
+				while (t.state.stop.get() == null) {
+					t.state.counter[id].set(counter);
+
+					long key = rnd.uniform(kNumKeys);
+					String key1 = String.format("%016d", key);
+
+					if (rnd.oneIn(2)) {
+						// Write values of the form <key, my id, counter>.
+						// We add some padding for force compactions.
+						String value1 = String.format("%d.%d.%-1000d", key, id, counter);
+						assertTrue(db.put(new WriteOptions(), new DefaultSlice(key1), new DefaultSlice(value1)).ok());
+					} else {
+						// Read a value and verify that it matches the pattern written above.
+						Status s = db.get(new ReadOptions(), new DefaultSlice(key1), value);
+						if (s.isNotFound()) {
+							// Key has not yet been written
+						} else {
+							// Check that the writer thread counter is >= the counter in the value
+							assertTrue(s.ok());
+							int k = 0;
+							int w = 0;
+							int c = 0;
+							// ASSERT_EQ(3, sscanf(value.c_str(), "%d.%d.%d", &k, &w, &c)) << value;
+
+							Matcher m = pattern.matcher(value.encodeToString());
+							assertTrue(m.find());
+							// if (m.find()) {
+							k = Integer.parseInt(m.group(1));
+							w = Integer.parseInt(m.group(2));
+							c = Integer.parseInt(m.group(3));
+							// }
+
+							assertEquals(k, key);
+							assertTrue(w >= 0);
+							assertTrue(w < kNumThreads);
+							assertTrue(c <= t.state.counter[w].get());
+						}
+					}
+					counter++;
+				}
+				t.state.threadDone(id).set(t);
+				System.err.printf("... stopping thread %d after %d ops\n", id, counter);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	@Test
+	public void testMultiThreaded() throws Exception {
+		DBTestRunner r = new DBTestRunner();
+		do {
+			// Initialize state
+			MTState mt = new MTState();
+			mt.test = r;
+			mt.stop.set(null);
+			for (int id = 0; id < kNumThreads; id++) {
+				mt.counter[id].set(0);
+				mt.threadDone(id).set(null);
+			}
+
+			// Start threads
+			MTThread[] thread = new MTThread[kNumThreads];
+			for (int id = 0; id < kNumThreads; id++) {
+				thread[id] = new MTThread();
+				thread[id].state = mt;
+				thread[id].id = id;
+				r.env.startThread(new MTThreadBody(thread[id]));
+			}
+
+			// Let them run for a while
+			delayMilliseconds(kTestSeconds * 1000);
+
+			// Stop the threads and wait for them to finish
+			mt.stop.set(mt);
+			for (int id = 0; id < kNumThreads; id++) {
+				while (mt.threadDone(id).get() == null) {
+					delayMilliseconds(100);
+				}
+			}
+		} while (r.changeOptions());
+		r.delete();
+	}
 
 	static ByteBuf RandomKey(Random0 rnd) {
 		int len = (int) (rnd.oneIn(3) ? 1 // Short sometimes to encourage

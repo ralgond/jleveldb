@@ -15,23 +15,19 @@ import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class Table {
 
 	static class Rep {
 		public void delete() {
 			if (filter != null) {
-				filter.delete(); // delete filter;
+				filter.delete();
 				filter = null;
 			}
-			filterData = null; // delete [] filter_data;
+			filterData = null;
 			if (indexBlock != null) {
 				indexBlock.delete();
-				indexBlock = null; // delete index_block;
-			}
-			if (file != null) {
-
+				indexBlock = null;
 			}
 		}
 
@@ -42,10 +38,11 @@ public class Table {
 		FilterBlockReader filter;
 		byte[] filterData;
 
-		BlockHandle metaindexHandle = new BlockHandle(); // Handle to
-															// metaindex_block:
-															// saved from footer
-		Block indexBlock; // Block* index_block;
+		/**
+		 * Handle to Meta Index Block: saved from Footer
+		 */
+		BlockHandle metaindexHandle = new BlockHandle();
+		Block indexBlock;
 	};
 
 	Rep rep;
@@ -59,8 +56,7 @@ public class Table {
 	}
 
 	/**
-	 * Convert an index iterator value (i.e., an encoded BlockHandle) into an
-	 * iterator over the contents of the corresponding block.
+	 * Convert an index iterator value (i.e., an encoded BlockHandle) into an iterator over the contents of the corresponding block.
 	 * 
 	 * @param arg
 	 * @param options
@@ -89,20 +85,9 @@ public class Table {
 				Slice key = new DefaultSlice(cacheKeyBuffer, 0, 16);
 				cacheHandle = blockCache.lookup(key);
 				if (cacheHandle != null) {
-					// is in cache
 					block = (Block) (blockCache.value(cacheHandle));
 				} else {
-					// is not in cache
 					s = Format.readBlock(table.rep.file, options, handle, contents);
-
-					// System.out.printf("[DEBUG] [%d] call readBlock, handle=%s, codename=%s,
-					// lineno=%d, s=%s\n",
-					// Thread.currentThread().getId(),
-					// handle,
-					// Thread.currentThread().getStackTrace()[1].getFileName(),
-					// Thread.currentThread().getStackTrace()[1].getLineNumber(),
-					// s);
-
 					if (s.ok()) {
 						block = new Block(contents);
 						if (contents.cachable && options.fillCache) {
@@ -113,14 +98,6 @@ public class Table {
 				}
 			} else {
 				s = Format.readBlock(table.rep.file, options, handle, contents);
-
-				// System.out.printf("[DEBUG] call readBlock, handle=%s, codename=%s, lineno=%d,
-				// s=%s\n",
-				// handle,
-				// Thread.currentThread().getStackTrace()[1].getFileName(),
-				// Thread.currentThread().getStackTrace()[1].getLineNumber(),
-				// s);
-
 				if (s.ok()) {
 					block = new Block(contents);
 				}
@@ -195,8 +172,7 @@ public class Table {
 
 	/**
 	 * Returns a new iterator over the table contents.</br>
-	 * The result of newIterator() is initially invalid (caller must call one of the
-	 * seek methods on the iterator before using it).
+	 * The result of newIterator() is initially invalid (caller must call one of the seek methods on the iterator before using it).
 	 * 
 	 * @param options
 	 * @return
@@ -206,12 +182,9 @@ public class Table {
 	}
 
 	/**
-	 * Given a key, return an approximate byte offset in the file where the data for
-	 * that key begins (or would begin if the key were present in the file). The
-	 * returned value is in terms of file bytes, and so includes effects like
-	 * compression of the underlying data.</br>
-	 * E.g., the approximate offset of the last key in the table will be close to
-	 * the file length.
+	 * Given a key, return an approximate byte offset in the file where the data for that key begins (or would begin if the key were present in the file). The returned value is in terms of file bytes,
+	 * and so includes effects like compression of the underlying data.</br>
+	 * E.g., the approximate offset of the last key in the table will be close to the file length.
 	 * 
 	 * @param key
 	 * @return
@@ -262,7 +235,7 @@ public class Table {
 			BlockHandle handle = new BlockHandle();
 			if (filter != null && handle.decodeFrom(handleValue).ok() && !filter.keyMayMatch(handle.offset(), ikey)) {
 				// Not found
-				//System.out.printf("[DEBUG] Table.internalGet filter not match, ikey=%s\n", Strings.escapeString(ikey));
+				// System.out.printf("[DEBUG] Table.internalGet filter not match, ikey=%s\n", Strings.escapeString(ikey));
 			} else {
 				Iterator0 blockIter = blockReader(this, options, iiter.value());
 				blockIter.seek(ikey);
@@ -287,8 +260,7 @@ public class Table {
 			return; // Do not need any metadata
 		}
 
-		// TODO(sanjay): Skip this if footer.metaindex_handle() size indicates
-		// it is an empty block.
+		// TODO(sanjay): Skip this if footer.metaindexHandle() size indicates it is an empty block.
 		ReadOptions opt = new ReadOptions();
 		if (rep.options.paranoidChecks) {
 			opt.verifyChecksums = true;
@@ -298,8 +270,7 @@ public class Table {
 		System.out.printf("[DEBUG] readMeta, footer.metaindexHandle=%s\n", footer.metaindexHandle());
 
 		if (!Format.readBlock(rep.file, opt, footer.metaindexHandle(), contents).ok()) {
-			// Do not propagate errors since meta info is not needed for
-			// operation
+			// Do not propagate errors since meta info is not needed for operation
 			return;
 		}
 		Block meta = new Block(contents);
@@ -322,8 +293,8 @@ public class Table {
 			return;
 		}
 
-		// We might want to unify with ReadBlock() if we start
-		// requiring checksum verification in Table::Open.
+		// We might want to unify with readBlock() if we start
+		// requiring checksum verification in Table.open.
 		ReadOptions opt = new ReadOptions();
 		if (rep.options.paranoidChecks) {
 			opt.verifyChecksums = true;
@@ -372,8 +343,7 @@ public class Table {
 		}
 
 		if (s.ok()) {
-			// We've successfully read the footer and the index block: we're
-			// ready to serve requests.
+			// We've successfully read the footer and the index block: we're ready to serve requests.
 			Rep rep = new Rep();
 			rep.options = options.cloneOptions();
 			rep.file = file;

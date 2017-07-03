@@ -36,7 +36,6 @@ public class InternalKeyComparator extends Comparator0 {
 			long anum = Coding.decodeFixedNat64(a, aoff + asize - 8);
 			long bnum = Coding.decodeFixedNat64(b, boff + bsize - 8);
 			r = anum > bnum ? -1 : +1;
-			// System.out.println("anum="+anum+", bnum="+bnum+", r="+r);
 		}
 		return r;
 	}

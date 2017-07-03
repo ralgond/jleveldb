@@ -151,7 +151,7 @@ public interface DB {
 	 * @param n
 	 * @param sizes
 	 */
-	void getApproximateSizes(List<Range> range, Long0 sizes);
+	void getApproximateSizes(List<Range> range, List<Long> sizes);
 	
 	/**
 	 * Compact the underlying storage for the key range [begin,end].

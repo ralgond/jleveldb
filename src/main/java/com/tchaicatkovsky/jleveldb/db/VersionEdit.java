@@ -117,8 +117,9 @@ public class VersionEdit {
 	public void addFile(int level, long file,
             long fileSize,
             InternalKey smallest,
-            InternalKey largest) {
-		FileMetaData f = new FileMetaData(file, fileSize, smallest, largest);
+            InternalKey largest,
+            int numEntries) {
+		FileMetaData f = new FileMetaData(file, fileSize, smallest, largest, numEntries);
 		newFiles.add(new IntObjectPair<FileMetaData>(level, f));
 	}
 	

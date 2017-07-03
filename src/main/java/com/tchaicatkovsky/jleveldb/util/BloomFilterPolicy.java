@@ -82,11 +82,12 @@ public class BloomFilterPolicy extends FilterPolicy {
 	    	return true;
 	    }
 		
+	    int offset = bloomFilter.offset();
 		long h = bloomHash(key);
 	    final long delta = (((h >> 17) | (h << 15)) & kUint32Mask);  // Rotate right 17 bits
 	    for (int j = 0; j < k; j++) {
 	    	final long bitpos = h % bits;
-	    	if ((array[(int)(bitpos/8)] & (1 << (bitpos % 8))) == 0) 
+	    	if ((array[(int)(offset + bitpos/8)] & (1 << (bitpos % 8))) == 0) 
 	    		return false;
 	    	h += delta; h &= kUint32Mask;
 	    }

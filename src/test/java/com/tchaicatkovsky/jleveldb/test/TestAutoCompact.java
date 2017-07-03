@@ -13,7 +13,6 @@ import com.tchaicatkovsky.jleveldb.WriteOptions;
 import com.tchaicatkovsky.jleveldb.db.DBImpl;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
-import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
@@ -30,7 +29,7 @@ public class TestAutoCompact {
 	static class AutoCompactRunner {
 		String dbname;
 		Cache tinyCache;
-		Options options;
+		Options options = new Options();
 		DB db;
 		
 		public AutoCompactRunner() throws Exception {
@@ -58,11 +57,11 @@ public class TestAutoCompact {
 		
 		public long size(Slice start, Slice limit) {
 		    Range r = new Range(start, limit);
-		    Long0 size = new Long0();
+		    ArrayList<Long> sizes = new ArrayList<>();
 		    ArrayList<Range> l = new ArrayList<>();
 		    l.add(r);
-		    db.getApproximateSizes(l, size);
-		    return size.getValue();
+		    db.getApproximateSizes(l, sizes);
+		    return sizes.get(0);
 		}
 		
 		public long size(String start, String limit) {
@@ -126,11 +125,13 @@ public class TestAutoCompact {
 	public void testReadAll() throws Exception {
 		AutoCompactRunner r = new AutoCompactRunner();
 		r.DoReads(kCount);
+		r.delete();
 	}
 	
 	@Test
 	public void testReadHalf() throws Exception {
 		AutoCompactRunner r = new AutoCompactRunner();
 		r.DoReads(kCount / 2);
+		r.delete();
 	}
 }

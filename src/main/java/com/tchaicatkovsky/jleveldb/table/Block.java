@@ -24,12 +24,15 @@ public class Block {
 		size = data.size();
 		owned = contents.heapAllocated;
 		if (data.size() < 4) { //size_ < sizeof(uint32_t)
-			System.out.printf("[DEBUG] Block.<init> size=%d\n", size);
+			System.out.printf("[DEBUG] Block.<init> 1 size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
 			size = 0; //Error marker
+			Thread.dumpStack();
 		} else {
 			int maxRestartsAllowed = (size - 4) / 4; //size_t max_restarts_allowed = (size_-sizeof(uint32_t)) / sizeof(uint32_t);
 			if (numRestarts() > maxRestartsAllowed) {
 				// The size is too small for NumRestarts()
+				System.out.printf("[DEBUG] [DEBUG] Block.<init> 2 numRestarts=%d, maxRestartsAllowed=%d\n",
+						numRestarts(), maxRestartsAllowed);
 				size = 0;
 			} else {
 			    restartOffset = data.offset() + size - (1 + numRestarts()) * 4; //restart_offset_ = size_ - (1 + NumRestarts()) * sizeof(uint32_t);
@@ -46,8 +49,8 @@ public class Block {
 	}
 	
 	public Iterator0 newIterator(Comparator0 comparator) {
-		if (size < 4) { //if (size_ < sizeof(uint32_t)) {
-			System.out.printf("[DEBUG] Block.<init> size=%d\n", size);
+		if (size < 4) { //if (size_ < sizeof(uint32_t))
+			System.out.printf("[DEBUG] Block.newIterator size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
 		    return Iterator0.newErrorIterator(Status.corruption("bad block contents"));
 		}
 		
@@ -302,7 +305,7 @@ public class Block {
 		    	key.resize(shared.getValue());
 		    	key.append(slice.data(), slice.offset(), nonShared.getValue());
 		    	value = new DefaultSlice(slice.data(), slice.offset()+nonShared.getValue(), valueLength.getValue());
-		    	
+
 		    	while (restartIndex + 1 < numRestarts &&
 		                getRestartPoint(restartIndex + 1) < current) {
 		           ++restartIndex;

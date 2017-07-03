@@ -34,7 +34,7 @@ import sun.nio.ch.DirectBuffer;
 
 @SuppressWarnings("restriction")
 public class EnvImpl implements Env {
-	
+
 	// Helper class to limit resource usage to avoid exhaustion.
 	// Currently used to limit read-only file descriptors and mmap file usage
 	// so that we do not end up running out of file descriptors, virtual memory,
@@ -76,27 +76,28 @@ public class EnvImpl implements Env {
 			}
 		}
 
-	  	Mutex mu = new Mutex();
-	  	AtomicLong allowed = new AtomicLong();
+		Mutex mu = new Mutex();
+		AtomicLong allowed = new AtomicLong();
 
-	  	long getAllowed() {
-	  		return allowed.get();
-	  	}
+		long getAllowed() {
+			return allowed.get();
+		}
 
-	  	// REQUIRES: mu_ must be held
-	  	void setAllowed(long v) {
-	  		allowed.set(v);
-	  	}
+		// REQUIRES: mu_ must be held
+		void setAllowed(long v) {
+			allowed.set(v);
+		}
 	};
-	
+
 	static class SequentialFileImpl implements SequentialFile {
 		String filename;
 		DataInputStream dis;
 		FileInputStream fis;
+
 		public SequentialFileImpl(String fname) {
 			filename = fname;
 		}
-		
+
 		public Status open() {
 			try {
 				fis = new FileInputStream(new File(filename));
@@ -104,10 +105,10 @@ public class EnvImpl implements Env {
 				return Status.ok0();
 			} catch (IOException e) {
 				e.printStackTrace();
-				return Status.ioError(filename+" SequentialFileImpl.open failed: "+e);
+				return Status.ioError(filename + " SequentialFileImpl.open failed: " + e);
 			}
 		}
-		
+
 		public void close() {
 			try {
 				if (dis != null) {
@@ -120,11 +121,11 @@ public class EnvImpl implements Env {
 				e.printStackTrace();
 			}
 		}
-		
+
 		public void delete() {
 			close();
 		}
-		
+
 		public Status read(int n, Slice result, byte[] scratch) {
 			Status s = Status.ok0();
 			try {
@@ -135,46 +136,46 @@ public class EnvImpl implements Env {
 					result.init(scratch, 0, 0);
 				} else if (r < n) {
 					if (dis.read(scratch, r, 1) < 0) {
-						
+
 					} else {
 						// A partial read with an error: return a non-ok status
-					    s = Status.ioError(filename+" partial read");
+						s = Status.ioError(filename + " partial read");
 					}
 				}
 				result.init(scratch, 0, r);
 				return s;
 			} catch (IOException e) {
-				return Status.ioError(filename+" SequentialFileImpl.read failed: "+e);
+				return Status.ioError(filename + " SequentialFileImpl.read failed: " + e);
 			}
 		}
-		
+
 		public Status skip(long n) {
 			try {
 				dis.skip(n);
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" SequentialFileImpl.skip failed: "+e.getMessage());
+				return Status.ioError(filename + " SequentialFileImpl.skip failed: " + e.getMessage());
 			}
 		}
 	}
-	
+
 	static class RandomAccessFileImpl implements RandomAccessFile0 {
 		String filename;
 		DataInputStream dis;
-		
+
 		public RandomAccessFileImpl(String fname) {
 			filename = fname;
 		}
-		
+
 		public Status open() {
 			try {
 				dis = new DataInputStream(new FileInputStream(new File(filename)));
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
-				return Status.ioError(filename+" RandomAccessFileImpl.open failed: "+e);
+				return Status.ioError(filename + " RandomAccessFileImpl.open failed: " + e);
 			}
 		}
-		
+
 		public void close() {
 			try {
 				if (dis != null) {
@@ -185,39 +186,40 @@ public class EnvImpl implements Env {
 				e.printStackTrace();
 			}
 		}
-		
+
 		public void delete() {
 			close();
 		}
-		
+
 		public String name() {
 			return filename;
 		}
-		
+
 		public Status read(long offset, int n, Slice result, byte[] scratch) {
 			try {
 				dis.reset();
 				dis.skip(offset);
 				int r = dis.read(scratch, 0, n);
 				if (r < n)
-					return Status.ioError(filename+" RandomAccessFileImpl.read failed: partial read");
+					return Status.ioError(filename + " RandomAccessFileImpl.read failed: partial read");
 				result.init(scratch, 0, r);
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" RandomAccessFileImpl.read failed: "+e);
+				return Status.ioError(filename + " RandomAccessFileImpl.read failed: " + e);
 			}
 		}
 	}
-	
+
 	static class MmapReadableFile implements RandomAccessFile0 {
 		String filename;
 		MappedByteBuffer buffer = null;
 		RandomAccessFile file = null;
 		long fileSize = 0;
+
 		public MmapReadableFile(String fname) {
 			filename = fname;
 		}
-		
+
 		public Status open() {
 			try {
 				fileSize = (new File(filename)).length();
@@ -225,18 +227,18 @@ public class EnvImpl implements Env {
 				buffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" MmapReadableFile.open failed: "+e);
+				return Status.ioError(filename + " MmapReadableFile.open failed: " + e);
 			}
 		}
-		
+
 		public void delete() {
 			close();
 		}
-		
+
 		public void close() {
 			try {
 				if (file != null) {
-					((DirectBuffer)buffer).cleaner().clean();
+					((DirectBuffer) buffer).cleaner().clean();
 					file.close();
 					file = null;
 				}
@@ -244,52 +246,66 @@ public class EnvImpl implements Env {
 				e.printStackTrace();
 			}
 		}
-		
+
 		public String name() {
 			return filename;
 		}
-		
+
 		public Status read(long offset, int n, Slice result, byte[] scratch) {
 			if (offset + n > fileSize)
-				return Status.ioError(filename+" RandomAccessFileImpl.read failed: exceed file size");
-			
-			buffer.position((int)offset);
-			buffer.get(scratch, 0, n);
-			result.init(scratch, 0, n);
-			return Status.ok0();
+				return Status.ioError(filename + " MmapReadableFile.read failed: exceed file size");
+
+			// TODO: should create a new buffer in each operation
+			MappedByteBuffer tmpBuf = null;
+			try {
+				tmpBuf = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
+				tmpBuf.position((int) offset);
+				if (buffer.remaining() < n)
+					System.out.printf("[DEBUG] MmapReadableFile.read, remaining=%d, n=%d\n", buffer.remaining(), n);
+
+				tmpBuf.get(scratch, 0, n);
+				result.init(scratch, 0, n);
+				return Status.ok0();
+			} catch (Exception e) {
+				return Status.otherError("" + e);
+			} finally {
+				if (tmpBuf != null) {
+					((DirectBuffer) tmpBuf).cleaner().clean();
+				}
+			}
 		}
 	}
-	
+
 	static class WritableFileImpl implements WritableFile {
 		String filename;
 		boolean append;
 		FileOutputStream fos;
 		DataOutputStream dos;
-		
+
 		public WritableFileImpl(String fname, boolean append) {
 			filename = fname;
 			this.append = append;
 		}
-		
+
 		public Status open() {
 			try {
 				fos = new FileOutputStream(new File(filename), append);
 				dos = new DataOutputStream(fos);
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
-				return Status.ioError(filename+" WritableFileImpl.open failed: "+e);
+				return Status.ioError(filename + " WritableFileImpl.open failed: " + e);
 			}
 		}
-		
+
 		public Status append(Slice data) {
 			try {
 				dos.write(data.data(), data.offset(), data.size());
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" WritableFileImpl.append failed: "+e.getMessage());
+				return Status.ioError(filename + " WritableFileImpl.append failed: " + e.getMessage());
 			}
 		}
-		
+
 		public Status close() {
 			try {
 				if (fos != null) {
@@ -299,91 +315,89 @@ public class EnvImpl implements Env {
 					fos = null;
 					dos.close();
 					dos = null;
-					//System.out.println("[DEBUG] WritableFileImpl.close: "+filename);
+					// System.out.println("[DEBUG] WritableFileImpl.close: "+filename);
 				}
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" WritableFileImpl.closed failed: "+e.getMessage());
+				return Status.ioError(filename + " WritableFileImpl.closed failed: " + e.getMessage());
 			}
 		}
-		
+
 		public Status flush() {
 			try {
 				dos.flush();
 				return Status.ok0();
 			} catch (IOException e) {
-				return Status.ioError(filename+" WritableFileImpl.flush failed: "+e.getMessage());
+				return Status.ioError(filename + " WritableFileImpl.flush failed: " + e.getMessage());
 			}
 		}
-		
+
 		public Status sync() {
 			try {
 				fos.getFD().sync();
 				return Status.ok0();
 			} catch (SyncFailedException e) {
-				return Status.ioError(filename+" WritableFileImpl.sync failed: "+e.getMessage());
+				return Status.ioError(filename + " WritableFileImpl.sync failed: " + e.getMessage());
 			} catch (IOException e) {
-				return Status.ioError(filename+" WritableFileImpl.sync failed: "+e.getMessage());
+				return Status.ioError(filename + " WritableFileImpl.sync failed: " + e.getMessage());
 			}
 		}
-		
+
 		public void delete() {
 			close();
 		}
 	}
-	
+
 	static class LockTable {
 		Mutex mu = new Mutex();
 		TreeSet<String> lockedFiles = new TreeSet<String>();
-		
+
 		public boolean insert(String fname) {
-		    mu.lock();
-		    try {
-		    	return lockedFiles.add(fname);
-		    } finally {
-		    	mu.unlock();
-		    }
+			mu.lock();
+			try {
+				return lockedFiles.add(fname);
+			} finally {
+				mu.unlock();
+			}
 		}
-		
+
 		public void remove(String fname) {
-		    mu.lock();
-		    try {
-		    	lockedFiles.remove(fname);
-		    } finally {
-		    	mu.unlock();
-		    }  
+			mu.lock();
+			try {
+				lockedFiles.remove(fname);
+			} finally {
+				mu.unlock();
+			}
 		}
 	};
-	
-	
+
 	ReentrantLock mu;
 	Condition bgsignal;
 	Thread bgthread;
 	boolean startedBgthread;
-	
-//	Limiter mmapLimit = new Limiter();
-//	Limiter fdLimit = new Limiter();
-	  
+
+	// Limiter mmapLimit = new Limiter();
+	// Limiter fdLimit = new Limiter();
+
 	static int k_open_read_only_file_limit = -1;
 	static int k_mmap_limit = -1;
 
-	
 	// Return the maximum number of concurrent mmaps.
-//	static int MaxMmaps() {
-//		if (k_mmap_limit >= 0) {
-//			return k_mmap_limit;
-//		}
-//		// Up to 1000 mmaps for 64-bit binaries; none for smaller pointer sizes.
-//		k_mmap_limit = 8 >= 8 ? 1000 : 0;
-//		return k_mmap_limit;
-//	}
-	
+	// static int MaxMmaps() {
+	// if (k_mmap_limit >= 0) {
+	// return k_mmap_limit;
+	// }
+	// // Up to 1000 mmaps for 64-bit binaries; none for smaller pointer sizes.
+	// k_mmap_limit = 8 >= 8 ? 1000 : 0;
+	// return k_mmap_limit;
+	// }
+
 	public EnvImpl() {
 		mu = new ReentrantLock();
 		bgsignal = mu.newCondition();
 		startedBgthread = false;
 	}
-	
+
 	@Override
 	public Status newSequentialFile(String fname, Object0<SequentialFile> result) {
 		SequentialFileImpl file = new SequentialFileImpl(fname);
@@ -415,7 +429,7 @@ public class EnvImpl implements Env {
 
 	@Override
 	public Status newWritableFile(String fname, Object0<WritableFile> result) {
-		WritableFileImpl f = new WritableFileImpl(fname, false); //FILE* f = fopen(fname.c_str(), "w");
+		WritableFileImpl f = new WritableFileImpl(fname, false); // FILE* f = fopen(fname.c_str(), "w");
 		Status s = f.open();
 		if (s.ok())
 			result.setValue(f);
@@ -426,7 +440,7 @@ public class EnvImpl implements Env {
 
 	@Override
 	public Status newAppendableFile(String fname, Object0<WritableFile> result) {
-		WritableFileImpl f = new WritableFileImpl(fname, true); //FILE* f = fopen(fname.c_str(), "a");
+		WritableFileImpl f = new WritableFileImpl(fname, true); // FILE* f = fopen(fname.c_str(), "a");
 		Status s = f.open();
 		if (s.ok())
 			result.setValue(f);
@@ -443,7 +457,7 @@ public class EnvImpl implements Env {
 	@Override
 	public Status getChildren(String dir, List<String> result) {
 		File f = new File(dir);
-		String[]  fileList = f.list();
+		String[] fileList = f.list();
 		if (fileList != null) {
 			for (String name : fileList)
 				result.add(name);
@@ -453,14 +467,14 @@ public class EnvImpl implements Env {
 
 	@Override
 	public Status deleteFile(String fname) {
-//		try {
-//			Files.delete(FileSystems.getDefault().getPath(fname));
-//			return Status.ok0();
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//			return Status.ioError(fname+" deleteFile failed: "+e);
-//		}
-		
+		// try {
+		// Files.delete(FileSystems.getDefault().getPath(fname));
+		// return Status.ok0();
+		// } catch (IOException e) {
+		// e.printStackTrace();
+		// return Status.ioError(fname+" deleteFile failed: "+e);
+		// }
+
 		(new File(fname)).delete();
 		return Status.ok0();
 	}
@@ -471,7 +485,7 @@ public class EnvImpl implements Env {
 			Files.createDirectory(FileSystems.getDefault().getPath(dirname));
 			return Status.ok0();
 		} catch (IOException e) {
-			return Status.ioError(dirname+" createDir failed: "+e);
+			return Status.ioError(dirname + " createDir failed: " + e);
 		}
 	}
 
@@ -481,7 +495,7 @@ public class EnvImpl implements Env {
 			Files.delete(FileSystems.getDefault().getPath(dirname));
 			return Status.ok0();
 		} catch (IOException e) {
-			return Status.ioError(dirname+" deleteDir failed: "+e);
+			return Status.ioError(dirname + " deleteDir failed: " + e);
 		}
 	}
 
@@ -492,94 +506,97 @@ public class EnvImpl implements Env {
 			fileSize.setValue(size);
 			return Status.ok0();
 		} catch (IOException e) {
-			return Status.ioError(fname+" getFileSize failed: "+e);
+			return Status.ioError(fname + " getFileSize failed: " + e);
 		}
 	}
 
 	@Override
 	public Status renameFile(String src, String target) {
 		try {
-			Files.move(FileSystems.getDefault().getPath(src), 
-					FileSystems.getDefault().getPath(target), 
-					StandardCopyOption.ATOMIC_MOVE,
-					StandardCopyOption.REPLACE_EXISTING);
+			Files.move(FileSystems.getDefault().getPath(src), FileSystems.getDefault().getPath(target), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 			return Status.ok0();
 		} catch (IOException e) {
 			e.printStackTrace();
-			return Status.ioError(src+" renameFile to "+target+" failed");
+			return Status.ioError(src + " renameFile to " + target + " failed");
 		}
 	}
 
 	static class FileLock0Impl extends FileLock0 {
 		public FileLock lock;
 		public String fname;
-		public FileLock0Impl(String fname, FileLock lock) {
+		public FileOutputStream fos;
+
+		public FileLock0Impl(String fname, FileLock lock, FileOutputStream fos) {
 			this.fname = fname;
 			this.lock = lock;
+			this.fos = fos;
 		}
 	}
-	
+
 	@Override
 	public Status lockFile(String fname, Object0<FileLock0> lock0) {
 		FileOutputStream os = null;
 		try {
 			os = new FileOutputStream(new File(fname));
-        	FileChannel channel = os.getChannel();
-        	lock0.setValue(new FileLock0Impl(fname, channel.tryLock()));
-        	
-        	return lock0.getValue() != null ? Status.ok0() : Status.otherError(fname+" lockFile failed");
-		} catch (IOException e) {
-			 lock0.setValue(null);
-			 return Status.ioError(fname+" lockFile failed: "+e);
-		} finally {
+			FileChannel channel = os.getChannel();
+			FileLock lock = channel.tryLock();
+			if (lock == null)
+				lock0.setValue(null);
+			else
+				lock0.setValue(new FileLock0Impl(fname, lock, os));
+
+			return lock0.getValue() != null ? Status.ok0() : Status.otherError(fname + " lockFile failed");
+		} catch (Exception e) {
 			if (os != null) {
 				try {
 					os.close();
-				} catch (IOException e) {
-					e.printStackTrace();
+				} catch (Exception e1) {
+					e1.printStackTrace();
 				}
 			}
+			lock0.setValue(null);
+			return Status.ioError(fname + " [error] lockFile failed: " + e);
 		}
 	}
 
 	@Override
 	public Status unlockFile(FileLock0 lock) {
-		FileLock0Impl l = (FileLock0Impl)lock;
-		if (l.lock != null) {
+		FileLock0Impl l = (FileLock0Impl) lock;
+		if (l != null) {
 			try {
 				l.lock.release();
+				l.fos.close();
 			} catch (IOException e) {
-				return Status.ioError(l.fname+" unlockFile failed: "+e);
+				return Status.ioError(l.fname + " unlockFile failed: " + e);
 			}
 		}
 		return Status.ok0();
 	}
-	
+
 	void BGThread() {
 		while (true) {
 			// Wait until there is an item that is ready to run
-		    mu.lock();
-		    
-		    while (queue.isEmpty()) {
-		    	try {
+			mu.lock();
+
+			while (queue.isEmpty()) {
+				try {
 					bgsignal.await();
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-		    }
+			}
 
-		    Runnable item = queue.pollFirst();
+			Runnable item = queue.pollFirst();
 
-		    mu.unlock();
-		   
-		    if (item != null)
-		    	item.run();
+			mu.unlock();
+
+			if (item != null)
+				item.run();
 		}
 	}
-	
-	
+
 	LinkedList<Runnable> queue = new LinkedList<Runnable>();
-	
+
 	public class BGThreadRunnable implements Runnable {
 		public void run() {
 			BGThread();
@@ -589,26 +606,26 @@ public class EnvImpl implements Env {
 	@Override
 	public void schedule(Runnable r) {
 		mu.lock();
-		
+
 		// Start background thread if necessary
 		if (!startedBgthread) {
 			startedBgthread = true;
 			bgthread = new Thread(new BGThreadRunnable());
 			bgthread.start();
 		}
-		
+
 		// If the queue is currently empty, the background thread may currently be
 		// waiting.
 		if (queue.isEmpty()) {
-		    bgsignal.signal();
+			bgsignal.signal();
 		}
-		
+
 		// Add to priority queue
 		queue.add(r);
-		
+
 		mu.unlock();
 	}
-	
+
 	@Override
 	public void startThread(Runnable runnable) {
 		Thread t = new Thread(runnable);
@@ -618,7 +635,7 @@ public class EnvImpl implements Env {
 	static long gettid() {
 		return Thread.currentThread().getId();
 	}
-	
+
 	@Override
 	public Status newLogger(String fname, Object0<Logger0> logger) {
 		logger.setValue(new Logger0Impl());
@@ -638,11 +655,11 @@ public class EnvImpl implements Env {
 			e.printStackTrace();
 		}
 	}
-	
+
 	Status doWriteStringToFile(Slice data, String fname, boolean shouldSync) {
 		if (fname.contains("MANIFEST"))
 			Thread.dumpStack();
-		
+
 		Object0<WritableFile> file0 = new Object0<WritableFile>();
 		Status s = newWritableFile(fname, file0);
 		if (!s.ok()) {
@@ -656,18 +673,18 @@ public class EnvImpl implements Env {
 		if (s.ok()) {
 			s = file.close();
 		}
-		file.delete();  // Will auto-close if we did not close above
+		file.delete(); // Will auto-close if we did not close above
 		if (!s.ok()) {
 			deleteFile(fname);
 		}
 		return s;
-	}	
+	}
 
 	@Override
 	public Status writeStringToFile(Slice data, String fname) {
 		return doWriteStringToFile(data, fname, false);
 	}
-	
+
 	@Override
 	public Status writeStringToFileSync(Slice data, String fname) {
 		return doWriteStringToFile(data, fname, true);
@@ -688,7 +705,7 @@ public class EnvImpl implements Env {
 			}
 			return Status.ok0();
 		} catch (Exception e) {
-			return Status.ioError(fname+" readFileToString failed: "+e.getMessage());
+			return Status.ioError(fname + " readFileToString failed: " + e.getMessage());
 		} finally {
 			try {
 				if (is != null)

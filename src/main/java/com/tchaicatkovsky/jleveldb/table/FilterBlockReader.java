@@ -4,7 +4,6 @@ import com.tchaicatkovsky.jleveldb.FilterPolicy;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class FilterBlockReader {
 
@@ -50,8 +49,19 @@ public class FilterBlockReader {
 				baseLg, begin, end, num);
 	}
 	
+	String strOffset() {
+		String s = "";
+		for (int i = 0; i < num; i++) {
+			int start = Coding.decodeFixedNat32(data, (int)(end + i * 4));
+			int limit = Coding.decodeFixedNat32(data, (int)(end + i * 4 + 4));
+			
+			s += ("["+start+","+limit+"],");
+		}
+		return s;
+	}
+	
 	public boolean keyMayMatch(long blockOffset, Slice key) {
-		System.out.println("[DEBUG] keyMayMatch, key="+Strings.escapeString(key));
+		
 		long index = blockOffset >> baseLg;
 		
 		if (index < num) {
@@ -60,7 +70,11 @@ public class FilterBlockReader {
 		    		    
 		    if (start <= limit && limit <= (end - begin)) {
 		    	Slice filter = new DefaultSlice(data, begin + start, limit - start);
-		    	return policy.keyMayMatch(key, filter);
+		    	
+		    	boolean ret = policy.keyMayMatch(key, filter);
+//		    	System.out.printf("[DEBUG] keyMayMatch, ret=%s, start=%d, limit=%d, begin=%d, end=%d, offsets=%s, key=%s\n", 
+//		    			ret, start, limit, begin, end, strOffset(), Strings.escapeString(key));
+		    	return ret;
 		    } else if (start == limit) {
 		    	// Empty filters do not match any keys
 		    	return false;

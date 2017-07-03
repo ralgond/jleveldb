@@ -12,16 +12,22 @@ public class BytewiseComparatorImpl extends Comparator0 {
 		
 		//return ByteUtils.bytewiseCompare(a, aoff, asize, b, boff, bsize);
 
+		int r = 0;
 		for (int i = 0; i < asize && i < bsize; i++) {
 			if (a[aoff+i] == b[boff+i])
 				continue;
-			return((a[aoff+i]&0xff) < (b[boff+i]&0xff)) ? -1 : +1;
+			r = ((a[aoff+i]&0xff) < (b[boff+i]&0xff)) ? -1 : +1;
+			break;
 		}
 		
-		if (asize == bsize)
-			return 0;
+		if (r == 0) {
+			 if (asize < bsize) 
+				 r = -1;
+			 else if (asize > bsize) 
+				 r = +1;
+		}
 		
-		return asize < bsize ? -1 : +1;
+		return r;
 	}
 
 	@Override

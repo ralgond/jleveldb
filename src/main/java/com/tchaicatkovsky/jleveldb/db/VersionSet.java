@@ -33,6 +33,7 @@ import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.Strings;
 
 /**
  * The representation of a DBImpl consists of a set of Versions.  The
@@ -96,7 +97,6 @@ public class VersionSet {
 	}
 	
 	public void delete() {
-		System.out.printf("[DEBUG] VersionSet.delete, ref=%d - unref=%d\n", versionRef1, versionRef2);
 		current.unref();
 		assert(dummyVersions.next == dummyVersions);  // List must be empty
 		if (descriptorLog != null) {
@@ -307,6 +307,16 @@ public class VersionSet {
 		        if (level > 0 && !files.isEmpty()) {
 		        	// Must not overlap
 		        	int ret = vset.icmp.compare(files.get(files.size()-1).largest, f.smallest);
+		        	if (!(ret < 0)) {
+		        		System.out.printf("[DEBUG] maybeAddFile 1, ret=%d, files.get(files.size()-1).largest=%s, f.smallest=%s\n",
+		        				ret, files.get(files.size()-1).largest.debugString(), f.smallest.debugString());
+		        		System.out.printf("[DEBUG] maybeAddFile f=%s\n", f.debugString());
+		        		System.out.printf("[DEBUG] maybeAddFile 2:\n");
+		        		System.out.printf("[DEBUG] maybeAddFile 3 level=%d\n", level);
+		        		for (int i = 0; i < files.size(); i++) {
+		        			System.out.printf("[DEBUG] maybeAddFile 3 [%d] file=%s\n", i, files.get(i).debugString());
+		        		}
+		        	}
 		        	assert(ret < 0);
 		        }
 		        f.refs++;
@@ -653,11 +663,11 @@ public class VersionSet {
 		return prevLogNumber;
 	}
 	
+
 	/**
 	 * Pick level and inputs for a new compaction.
-	 * Returns NULL if there is no compaction to be done.
-	 * Otherwise returns a pointer to a heap-allocated object that
-	 * describes the compaction.  Caller should delete the result.
+	 * 
+	 * @return Returns null if there is no compaction to be done.
 	 */
 	public Compaction pickCompaction() {
 		Compaction c;
@@ -668,6 +678,7 @@ public class VersionSet {
 		final boolean sizeCompaction = (current.compactionScore >= 1.0);
 		final boolean seekCompaction = (current.fileToCompact != null);
 		if (sizeCompaction) {
+			System.out.println("[DEBUG] VersionSet.pickCompaction Size-Compaction");
 		    level = current.compactionLevel;
 		    assert(level >= 0);
 		    assert(level+1 < DBFormat.kNumLevels);
@@ -690,6 +701,8 @@ public class VersionSet {
 		    level = current.fileToCompactLevel;
 		    c = new Compaction(options, level);
 		    c.input(0).add(current.fileToCompact);
+		    
+		    System.out.printf("[DEBUG] VersionSet.pickCompaction Seek-Compaction level=%d\n", level);
 		} else {
 		    return null;
 		}
@@ -705,8 +718,21 @@ public class VersionSet {
 		    // Note that the next call will discard the file we placed in
 		    // c->inputs_[0] earlier and replace it with an overlapping set
 		    // which will include the picked file.
+		    
+//		    System.out.printf("[DEBUG] VersionSet.pickCompaction before call getOverlappingInputs, smallest=%s, largest=%s\n", 
+//		    		Strings.escapeString(smallest.encode()), Strings.escapeString(largest.encode()));
+//		    for (int i = 0; i < c.input(0).size(); i++) {
+//		    	System.out.printf("[DEBUG] VersionSet.pickCompaction call getOverlappingInputs, f=%s\n", c.input(0, i).debugString());
+//		    }
+		    
 		    current.getOverlappingInputs(0, smallest, largest, c.input(0));
-		    assert(!c.input(0).isEmpty());
+		    
+//		    System.out.printf("[DEBUG] VersionSet.pickCompaction after call getOverlappingInputs, smallest=%s, largest=%s\n", 
+//		    		Strings.escapeString(smallest.encode()), Strings.escapeString(largest.encode()));
+//		    for (int i = 0; i < c.input(0).size(); i++) {
+//		    	System.out.printf("[DEBUG] VersionSet.pickCompaction call getOverlappingInputs, f=%s\n", c.input(0, i).debugString());
+//		    }
+//		    assert(!c.input(0).isEmpty());
 		}
 
 		setupOtherInputs(c);
@@ -834,7 +860,7 @@ public class VersionSet {
 		    	} else {
 		    		// Create concatenating iterator for the files from this level
 		    		list.add( TwoLevelIterator.newTwoLevelIterator(
-		    				new Version.LevelFileNumIterator(icmp, which, c.input(which)), 
+		    				new Version.LevelFileNumIterator(icmp, c.level() + which, c.input(which)), 
 		    				VersionSetGlobal.getFileIterator, tableCache, opt) );
 		    	}
 		    }
@@ -1017,9 +1043,20 @@ public class VersionSet {
             List<FileMetaData> inputs2,
             InternalKey smallest,
             InternalKey largest) {
-		ArrayList<FileMetaData> all = inputs1;
+		ArrayList<FileMetaData> all = new ArrayList<>();
+		all.addAll(inputs1);
 		all.addAll(inputs2);
 		getRange(all, smallest, largest);
+	}
+	
+	String dumpFileNumberList(ArrayList<FileMetaData> l) {
+		String s = "";
+		for (int i = 0; i < l.size(); i++) {
+			if (s.length() > 0)
+				s += ",";
+			s += l.get(i).number;
+		}
+		return s;
 	}
 	
 	void setupOtherInputs(Compaction c) {
@@ -1030,6 +1067,9 @@ public class VersionSet {
 		
 		current.getOverlappingInputs(level+1, smallest, largest, c.input(1));
 
+		System.out.printf("[DEBUG] setupOtherInputs, level-%d=%s, level-%d=%s\n",
+				c.level, dumpFileNumberList(c.input(0)), c.level+1, dumpFileNumberList(c.input(1)));
+		
 		// Get entire range covered by compaction
 		InternalKey allStart = new InternalKey();
 		InternalKey allLimit = new InternalKey();
@@ -1040,12 +1080,12 @@ public class VersionSet {
 		if (!c.input(1).isEmpty()) {
 			ArrayList<FileMetaData> expanded0 = new ArrayList<FileMetaData>();
 		    current.getOverlappingInputs(level, allStart, allLimit, expanded0);
+		    
 		    final long inputs0Size = VersionSetGlobal.totalFileSize(c.input(0));
 		    final long inputs1Size = VersionSetGlobal.totalFileSize(c.input(1));
 		    final long expanded0Size = VersionSetGlobal.totalFileSize(expanded0);
 		    if (expanded0.size() > c.input(0).size() &&
-		        inputs1Size + expanded0Size <
-		            VersionSetGlobal.expandedCompactionByteSizeLimit(options)) {
+		        inputs1Size + expanded0Size < VersionSetGlobal.expandedCompactionByteSizeLimit(options)) {
 		    	InternalKey newStart = new InternalKey();
 		    	InternalKey newLimit = new InternalKey();
 		    	getRange(expanded0, newStart, newLimit);
@@ -1090,6 +1130,10 @@ public class VersionSet {
 		// key range next time.
 		compactPointer[level] = ByteBufFactory.defaultByteBuf(largest.rep().data(), largest.rep().size());
 		c.edit.setCompactPointer(level, largest);
+		
+
+		System.out.printf("[DEBUG] setupOtherInputs 2, level-%d=%s, level-%d=%s\n",
+				c.level, dumpFileNumberList(c.input(0)), c.level+1, dumpFileNumberList(c.input(1)));
 	}
 	
 	Status writeSnapshot(LogWriter log) {
@@ -1113,7 +1157,7 @@ public class VersionSet {
 			  ArrayList<FileMetaData> files = current.levelFiles(level);
 		   	  for (int i = 0; i < files.size(); i++) {
 		   		  FileMetaData f = files.get(i);
-		   		  edit.addFile(level, f.number, f.fileSize, f.smallest, f.largest);
+		   		  edit.addFile(level, f.number, f.fileSize, f.smallest, f.largest, f.numEntries);
 		   	  }
 		  }
 

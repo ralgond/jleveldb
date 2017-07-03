@@ -102,7 +102,7 @@ public class Compaction {
 	 * Return the ith input file at "level()+which" ("which" must be 0 or 1).
 	 */
 	@SuppressWarnings("unchecked")
-	FileMetaData input(int which, int i) { 
+	public FileMetaData input(int which, int i) { 
 		return ((ArrayList<FileMetaData>)inputs[which]).get(i); 
 	}
 	

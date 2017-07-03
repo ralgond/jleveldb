@@ -11,17 +11,26 @@ import com.tchaicatkovsky.jleveldb.table.TableBuilder;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
-//Build a Table file from the contents of *iter.  The generated file
-//will be named according to meta->number.  On success, the rest of
-//*meta will be filled with metadata about the generated table.
-//If no data is present in *iter, meta->file_size will be set to
-//zero, and no Table file will be produced.
 public class Builder {
 	
+	/**
+	 * Build a Table file from the contents of iter.  The generated file 
+	 * will be named according to meta.number.  On success, the rest of 
+	 * meta will be filled with metadata about the generated table.
+	 * If no data is present in iter, meta.fileSize will be set to
+	 * zero, and no Table file will be produced.
+	 * 
+	 * @param dbname
+	 * @param env
+	 * @param options
+	 * @param tcache
+	 * @param iter
+	 * @param meta
+	 * @return
+	 */
 	public static Status buildTable(String dbname, Env env, Options options, 
 			TableCache tcache, Iterator0 iter, FileMetaData meta) {
 		
-		System.out.println("[DEBUG] Builder.buildTable 1");
 		
 		Status s = Status.ok0();
 		meta.fileSize = 0;
@@ -34,8 +43,7 @@ public class Builder {
 			if (!s.ok())
 				return s;
 			
-			System.out.println("[DEBUG] Builder.buildTable 2");
-			
+		
 			WritableFile file = fileFuncOut.getValue();
 			TableBuilder builder = new TableBuilder(options, file);
 			meta.smallest.decodeFrom(iter.key());
@@ -43,9 +51,8 @@ public class Builder {
 				Slice key = iter.key();
 				meta.largest.decodeFrom(key);
 				builder.add(key, iter.value());
+				meta.numEntries++;
 			}
-			
-			System.out.println("[DEBUG] Builder.buildTable 3");
 			
 			// Finish and check for builder errors
 			if (s.ok()) {
@@ -57,8 +64,6 @@ public class Builder {
 			} else {
 				builder.abandon();
 			}
-			
-			System.out.println("[DEBUG] Builder.buildTable 4");
 			
 			
 			// Finish and check for file errors
@@ -74,8 +79,6 @@ public class Builder {
 			builder.delete();
 			builder = null;
 			
-			System.out.println("[DEBUG] Builder.buildTable 4.1");
-			
 			if (s.ok()) {
 				// Verify that the table is usable
 				Iterator0 it = tcache.newIterator(new ReadOptions(), meta.number, meta.fileSize);
@@ -84,7 +87,6 @@ public class Builder {
 				it = null;
 			}
 			
-			System.out.println("[DEBUG] Builder.buildTable 5");
 		}
 		
 		// Check for input iterator errors
@@ -92,7 +94,7 @@ public class Builder {
 			s = iter.status();
 		}
 		
-		System.out.println("[DEBUG] Builder.buildTable 6 s="+s+", meta="+meta+", iter="+iter);
+		System.out.println("[DEBUG] Builder.buildTable end s="+s+", meta="+meta.debugString());
 		
 		if (s.ok() && meta.fileSize > 0) {
 			//Keep it

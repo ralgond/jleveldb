@@ -35,6 +35,23 @@ public class BlockBuilder {
 		finished = false;
 		lastKey.clear();
 	}
+	
+	public int currentSizeEstimate() {
+		return (buffer.size() + 		// Raw data buffer
+				restarts.size() * 4 + 	// Restart array
+				4); 					// Restart array length
+	}
+	
+	public Slice finish() {
+		// Append restart array
+		for (int i = 0; i < restarts.size(); i++) {
+			buffer.writeFixedNat32(restarts.get(i));
+		}
+		buffer.writeFixedNat32(restarts.size());
+
+		finished = true;
+		return new DefaultSlice(buffer);
+	}
 
 	public void add(Slice key, Slice value) {
 		Slice lastKeyPiece = new DefaultSlice(lastKey);
@@ -72,22 +89,7 @@ public class BlockBuilder {
 		counter++;
 	}
 
-	public Slice finish() {
-		// Append restart array
-		for (int i = 0; i < restarts.size(); i++) {
-			buffer.writeFixedNat32(restarts.get(i));
-		}
-		buffer.writeFixedNat32(restarts.size());
 
-		finished = true;
-		return new DefaultSlice(buffer);
-	}
-
-	public int currentSizeEstimate() {
-		return (buffer.size() + // Raw data buffer
-				restarts.size() * 4 + // Restart array
-				4); // Restart array length
-	}
 
 	public boolean empty() {
 		return buffer.size() == 0;

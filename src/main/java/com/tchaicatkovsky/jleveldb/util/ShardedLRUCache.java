@@ -270,7 +270,7 @@ public class ShardedLRUCache extends Cache {
 			}
 		}
 		
-		public void erase(Slice key, int hash) {
+		public void erase(Slice key, long hash) {
 			mutex.lock();
 			try {
 				finishErase(table.remove(key, hash));
@@ -413,7 +413,9 @@ public class ShardedLRUCache extends Cache {
 
 	@Override
 	public void erase(Slice key) {
-	    int hash = key.hashCode();
+	    long hash = key.hashCode0();
+	    if (hash < 0)
+			hash *= -1;
 	    
 	    shard[calcShard(hash)].erase(key, hash);
 	}

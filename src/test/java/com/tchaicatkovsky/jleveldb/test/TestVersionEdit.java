@@ -33,7 +33,8 @@ public class TestVersionEdit {
 		    testEncodeDecode(edit);
 		    edit.addFile(3, kBig + 300 + i, kBig + 400 + i,
 		                 new InternalKey(new DefaultSlice("foo"), kBig + 500 + i, ValueType.Value),
-		                 new InternalKey(new DefaultSlice("zoo"), kBig + 600 + i, ValueType.Deletion));
+		                 new InternalKey(new DefaultSlice("zoo"), kBig + 600 + i, ValueType.Deletion),
+		                 10);
 		    edit.deleteFile(4, kBig + 700 + i);
 		    edit.setCompactPointer(i, new InternalKey(new DefaultSlice("x"), kBig + 900 + i, ValueType.Value));
 		}

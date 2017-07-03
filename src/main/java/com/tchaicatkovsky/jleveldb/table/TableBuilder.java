@@ -13,6 +13,7 @@ import com.tchaicatkovsky.jleveldb.util.Crc32C;
 import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
+import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class TableBuilder {
 
@@ -30,16 +31,15 @@ public class TableBuilder {
 		boolean closed; // Either finish() or abandon() has been called.
 
 		/**
-		 * We do not emit the index entry for a block until we have seen the
-		 * first key for the next data block. This allows us to use shorter
-		 * keys in the index block. For example, consider a block boundary
-		 * between the keys "the quick brown fox" and "the who". We can use
-		 * "the r" as the key for the index block entry since it is >= all
-		 * entries in the first block and < all entries in subsequent
-		 * blocks.</br></br>
+		 * We do not emit the index entry for a block until we have seen the first key
+		 * for the next data block. This allows us to use shorter keys in the index
+		 * block. For example, consider a block boundary between the keys "the quick
+		 * brown fox" and "the who". We can use "the r" as the key for the index block
+		 * entry since it is >= all entries in the first block and < all entries in
+		 * subsequent blocks.</br>
+		 * </br>
 		 * 
-		 * Invariant: pendingIndexEntry is true only if dataBlockBuilder is 
-		 * empty.
+		 * Invariant: pendingIndexEntry is true only if dataBlockBuilder is empty.
 		 */
 		boolean pendingIndexEntry;
 		BlockHandle pendingHandle = new BlockHandle(); // Handle to add to index block
@@ -118,23 +118,32 @@ public class TableBuilder {
 
 		if (r.numEntries > 0) {
 			int ret = r.options.comparator.compare(key, r.lastKey);
+			
+			if (!(ret > 0))
+				System.out.printf("[DEBUG] TableBuilder.add assert failed, ret=%d, key=%s, r.lastKey=%s\n", 
+						ret, Strings.escapeString(key), Strings.escapeString(r.lastKey));
+			
 			assert (ret > 0);
 		}
 
+		//System.out.println("[DEBUG] TableBuilder.add 1");
+		
 		if (r.pendingIndexEntry) {
 			assert (r.dataBlockBuilder.empty());
 			r.options.comparator.findShortestSeparator(r.lastKey, key);
 			ByteBuf handleEncoding = ByteBufFactory.defaultByteBuf();
 			r.pendingHandle.encodeTo(handleEncoding);
-			r.indexBlockBuilder.add(new DefaultSlice(r.lastKey), new DefaultSlice(handleEncoding)); // TODO:
-																									// new
-																									// DefaultSlice(r.lastKey)->r.lastKey
+			r.indexBlockBuilder.add(new DefaultSlice(r.lastKey), new DefaultSlice(handleEncoding)); // TODO: new DefaultSlice(r.lastKey)->r.lastKey
 			r.pendingIndexEntry = false;
 		}
+		
+		//System.out.println("[DEBUG] TableBuilder.add 2");
 
 		if (r.filterBlockBuilder != null) {
 			r.filterBlockBuilder.addKey(key);
 		}
+		
+		//System.out.println("[DEBUG] TableBuilder.add 3");
 
 		r.lastKey.assign(key.data(), key.offset(), key.size());
 		r.numEntries++;
@@ -144,9 +153,16 @@ public class TableBuilder {
 		if (estimatedBlockSize >= r.options.blockSize) {
 			flush();
 		}
+		
+		//System.out.println("[DEBUG] TableBuilder.add 4");
 	}
 
-	public void flush() {
+	/**
+	 * write current block to file and start accepting key value data 
+	 * for next block.
+	 */
+	void flush() {
+		
 		Rep r = rep;
 		assert (!r.closed);
 		if (!ok())
@@ -154,7 +170,7 @@ public class TableBuilder {
 
 		if (r.dataBlockBuilder.empty())
 			return;
-		
+
 		assert (!r.pendingIndexEntry);
 		writeBlock(r.dataBlockBuilder, r.pendingHandle);
 		if (ok()) {
@@ -200,10 +216,11 @@ public class TableBuilder {
 		// Write index block
 		if (ok()) {
 			if (r.pendingIndexEntry) {
+				assert (r.dataBlockBuilder.empty());
 				r.options.comparator.findShortSuccessor(r.lastKey);
 				ByteBuf handleEncoding = ByteBufFactory.defaultByteBuf();
 				r.pendingHandle.encodeTo(handleEncoding);
-				r.indexBlockBuilder.add(new DefaultSlice(r.lastKey), new DefaultSlice(handleEncoding)); //TODO
+				r.indexBlockBuilder.add(new DefaultSlice(r.lastKey), new DefaultSlice(handleEncoding)); // TODO
 				r.pendingIndexEntry = false;
 			}
 			writeBlock(r.indexBlockBuilder, indexBlockHandle);
@@ -216,7 +233,7 @@ public class TableBuilder {
 			footer.setIndexHandle(indexBlockHandle);
 			ByteBuf footerEncoding = ByteBufFactory.defaultByteBuf();
 			footer.encodeTo(footerEncoding);
-			r.status = r.file.append(new DefaultSlice(footerEncoding)); //TODO
+			r.status = r.file.append(new DefaultSlice(footerEncoding)); // TODO
 			if (r.status.ok()) {
 				r.offset += footerEncoding.size();
 			}
@@ -257,29 +274,28 @@ public class TableBuilder {
 
 		Slice blockContents = new DefaultSlice();
 		CompressionType type = r.options.compression;
-		
+
 		// TODO(postrelease): Support more compression options: zlib?
 		switch (type) {
-			case kNoCompression:
+		case kNoCompression:
+			blockContents = raw.clone();
+			break;
+
+		case kSnappyCompression: {
+			if (Snappy.compress(raw.data(), 0, raw.size(), r.compressedOutput) && r.compressedOutput.size() < raw.size() - (raw.size() / 8)) {
+				blockContents.init(r.compressedOutput);
+			} else {
+				// Snappy not supported, or compressed less than 12.5%, so just
+				// store uncompressed form
 				blockContents = raw.clone();
-				break;
-	
-			case kSnappyCompression: {
-				if (Snappy.compress(raw.data(), 0, raw.size(), r.compressedOutput)
-						&& r.compressedOutput.size() < raw.size() - (raw.size() / 8)) {
-					blockContents.init(r.compressedOutput);
-				} else {
-					// Snappy not supported, or compressed less than 12.5%, so just
-					// store uncompressed form
-					blockContents = raw.clone();
-					type = CompressionType.kNoCompression;
-				}
-				break;
+				type = CompressionType.kNoCompression;
 			}
-			default:
-				System.out.println("[DEBUG] writeBlock, unknown compression type="+type);
-				System.exit(-1);
-				break;
+			break;
+		}
+		default:
+			System.out.println("[DEBUG] writeBlock, unknown compression type=" + type);
+			System.exit(-1);
+			break;
 		}
 
 		writeRawBlock(blockContents, type, handle);

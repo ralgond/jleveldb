@@ -15,6 +15,7 @@ import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class Table {
 
@@ -75,7 +76,7 @@ public class Table {
 		BlockHandle handle = new BlockHandle();
 		Slice input = indexValue.clone();
 		Status s = handle.decodeFrom(input);
-		
+
 		// TODO(design) We intentionally allow extra stuff in indexValue so that
 		// we can add more features in the future.
 
@@ -94,30 +95,32 @@ public class Table {
 					// is not in cache
 					s = Format.readBlock(table.rep.file, options, handle, contents);
 
-					System.out.printf("[DEBUG] [%d] call readBlock, handle=%s, codename=%s, lineno=%d, s=%s\n",
-							Thread.currentThread().getId(),
-							handle, 
-							Thread.currentThread().getStackTrace()[1].getFileName(),
-							Thread.currentThread().getStackTrace()[1].getLineNumber(),
-							s);
-					
+					// System.out.printf("[DEBUG] [%d] call readBlock, handle=%s, codename=%s,
+					// lineno=%d, s=%s\n",
+					// Thread.currentThread().getId(),
+					// handle,
+					// Thread.currentThread().getStackTrace()[1].getFileName(),
+					// Thread.currentThread().getStackTrace()[1].getLineNumber(),
+					// s);
+
 					if (s.ok()) {
 						block = new Block(contents);
 						if (contents.cachable && options.fillCache) {
-							// add into cache
+							// Add into block cache
 							cacheHandle = blockCache.insert(key, block, (int) block.size(), deleteCachedBlock);
 						}
 					}
 				}
 			} else {
 				s = Format.readBlock(table.rep.file, options, handle, contents);
-				
-				System.out.printf("[DEBUG] call readBlock, handle=%s, codename=%s, lineno=%d, s=%s\n",
-						handle, 
-						Thread.currentThread().getStackTrace()[1].getFileName(),
-						Thread.currentThread().getStackTrace()[1].getLineNumber(),
-						s);
-				
+
+				// System.out.printf("[DEBUG] call readBlock, handle=%s, codename=%s, lineno=%d,
+				// s=%s\n",
+				// handle,
+				// Thread.currentThread().getStackTrace()[1].getFileName(),
+				// Thread.currentThread().getStackTrace()[1].getLineNumber(),
+				// s);
+
 				if (s.ok()) {
 					block = new Block(contents);
 				}
@@ -192,24 +195,23 @@ public class Table {
 
 	/**
 	 * Returns a new iterator over the table contents.</br>
-	 * The result of newIterator() is initially invalid (caller must call one of
-	 * the seek methods on the iterator before using it).
+	 * The result of newIterator() is initially invalid (caller must call one of the
+	 * seek methods on the iterator before using it).
 	 * 
 	 * @param options
 	 * @return
 	 */
 	public Iterator0 newIterator(ReadOptions options) {
-		return TwoLevelIterator.newTwoLevelIterator(rep.indexBlock.newIterator(rep.options.comparator),
-				blockReaderCallback, this, options);
+		return TwoLevelIterator.newTwoLevelIterator(rep.indexBlock.newIterator(rep.options.comparator), blockReaderCallback, this, options);
 	}
 
 	/**
-	 * Given a key, return an approximate byte offset in the file where the data
-	 * for that key begins (or would begin if the key were present in the file).
-	 * The returned value is in terms of file bytes, and so includes effects
-	 * like compression of the underlying data.</br>
-	 * E.g., the approximate offset of the last key in the table will be close
-	 * to the file length.
+	 * Given a key, return an approximate byte offset in the file where the data for
+	 * that key begins (or would begin if the key were present in the file). The
+	 * returned value is in terms of file bytes, and so includes effects like
+	 * compression of the underlying data.</br>
+	 * E.g., the approximate offset of the last key in the table will be close to
+	 * the file length.
 	 * 
 	 * @param key
 	 * @return
@@ -248,19 +250,19 @@ public class Table {
 	Slice internalKey2UserKey(Slice ikey) {
 		return new DefaultSlice(ikey.data(), ikey.offset(), ikey.size() - 8);
 	}
-	
+
 	public Status internalGet(ReadOptions options, Slice ikey, Object arg, HandleResult handleResult) {
 		Status s = Status.ok0();
 		Iterator0 iiter = rep.indexBlock.newIterator(rep.options.comparator);
+
 		iiter.seek(ikey);
 		if (iiter.valid()) {
 			Slice handleValue = iiter.value().clone();
 			FilterBlockReader filter = rep.filter;
 			BlockHandle handle = new BlockHandle();
-			if (filter != null && 
-					handle.decodeFrom(handleValue).ok() && 
-					!filter.keyMayMatch(handle.offset(), ikey)) {
+			if (filter != null && handle.decodeFrom(handleValue).ok() && !filter.keyMayMatch(handle.offset(), ikey)) {
 				// Not found
+				//System.out.printf("[DEBUG] Table.internalGet filter not match, ikey=%s\n", Strings.escapeString(ikey));
 			} else {
 				Iterator0 blockIter = blockReader(this, options, iiter.value());
 				blockIter.seek(ikey);
@@ -292,9 +294,9 @@ public class Table {
 			opt.verifyChecksums = true;
 		}
 		BlockContents contents = new BlockContents();
-		
-		System.out.printf("[DEBUG] readMeta, file=%s, footer.metaindexHandle()=%s\n", rep.file, footer.metaindexHandle());
-		
+
+		System.out.printf("[DEBUG] readMeta, footer.metaindexHandle=%s\n", footer.metaindexHandle());
+
 		if (!Format.readBlock(rep.file, opt, footer.metaindexHandle(), contents).ok()) {
 			// Do not propagate errors since meta info is not needed for
 			// operation
@@ -327,9 +329,9 @@ public class Table {
 			opt.verifyChecksums = true;
 		}
 		BlockContents block = new BlockContents();
-		
-		System.out.printf("[DEBUG] readFilter, file=%s, filterHandle=%s\n", rep.file, filterHandle);
-		
+
+		System.out.printf("[DEBUG] readFilter, filterHandle=%s\n", filterHandle);
+
 		if (!Format.readBlock(rep.file, opt, filterHandle, block).ok()) {
 			return;
 		}
@@ -351,14 +353,10 @@ public class Table {
 		if (!s.ok())
 			return s;
 
-		System.out.println("[DEBUG] Table.open 1");
-
 		Footer footer = new Footer();
 		s = footer.decodeFrom(footerInput);
 		if (!s.ok())
 			return s;
-		
-		System.out.println("[DEBUG] Table.open 2");
 
 		// Read the index block
 		BlockContents contents = new BlockContents();
@@ -372,8 +370,6 @@ public class Table {
 			if (s.ok())
 				indexBlock = new Block(contents);
 		}
-		
-		System.out.println("[DEBUG] Table.open 3");
 
 		if (s.ok()) {
 			// We've successfully read the footer and the index block: we're
@@ -393,8 +389,6 @@ public class Table {
 			indexBlock = null;
 		}
 
-		System.out.println("[DEBUG] Table.open 4");
-		
 		return s;
 	}
 }

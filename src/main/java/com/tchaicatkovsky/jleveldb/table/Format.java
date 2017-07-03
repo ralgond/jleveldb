@@ -41,8 +41,8 @@ public class Format {
 
 		public void encodeTo(ByteBuf dst) {
 			// Sanity check that all fields have been set
-			//assert(offset != ~static_cast<uint64_t>(0));
-			//assert(size != ~static_cast<uint64_t>(0));
+			assert(offset != Long.MAX_VALUE);
+			assert(size != Long.MAX_VALUE);
 			dst.writeVarNat64(offset);
 			dst.writeVarNat64(size);
 		}
@@ -53,7 +53,9 @@ public class Format {
 			return Status.ok0();
 		}
 
-		// Maximum encoding length of a BlockHandle
+		/**
+		 *  Maximum encoding length of a BlockHandle
+		 */
 		public static final int MaxEncodedLength = 10 + 10;
 
 		long offset = Long.MAX_VALUE;
@@ -178,13 +180,13 @@ public class Format {
 		    return Status.corruption("truncated block read");
 		}
 		
-		System.out.println("[DEBUG] Format.readBlock 1");
+//		System.out.printf("[DEBUG] Format.readBlock 1, n=%d, handle=%s\n", n, handle);
 		
 		// Check the crc of the type and the block contents
 		byte[] data = contents.data();    // Pointer to where Read put the data
 		int offset = contents.offset();
 		if (options.verifyChecksums) {
-			long crc = Crc32C.unmask(Coding.decodeFixedNat32(data, offset + n + 1));
+			long crc = Crc32C.unmask(Coding.decodeFixedNat32Long(data, offset + n + 1));
 		    long actual = Crc32C.value(data, offset, n + 1);
 		    if (actual != crc) {
 		    	buf = null;
@@ -193,8 +195,8 @@ public class Format {
 		    }
 		}
 		
-		System.out.printf("[DEBUG] readBlock, file=%s, n=%d, data[n]=%d, options.verifyChecksums=%s\n",
-				file.name(), n, data[n], options.verifyChecksums);
+//		System.out.printf("[DEBUG] readBlock, file=%s, n=%d, data[n]=%d, options.verifyChecksums=%s\n",
+//				file.name(), n, data[n], options.verifyChecksums);
 		
 	    if (data[n] == CompressionType.kNoCompression.getType()) {
 	    	if (data != buf) {
@@ -207,7 +209,7 @@ public class Format {
     			result.cachable = false;  // Do not double-cache
     		} else {
     			result.data = new DefaultSlice(buf, 0, n);
-    			result.heapAllocated = true;  //TODO: the logic behind this variable?
+    			result.heapAllocated = true;
     			result.cachable = true;
     		}
     	} else if (data[n] == CompressionType.kSnappyCompression.getType()) {
@@ -229,7 +231,7 @@ public class Format {
 	    	result.cachable = true;
 		} else {
     		buf = null;
-    		return Status.corruption("bad block type "+data[n]);
+    		return Status.corruption("bad compress type "+data[n]);
 	    }
 
 		return Status.ok0();

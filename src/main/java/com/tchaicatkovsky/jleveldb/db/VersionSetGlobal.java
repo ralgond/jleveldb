@@ -13,6 +13,7 @@ import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class VersionSetGlobal {
 	public static int targetFileSize(Options options) {
@@ -120,6 +121,9 @@ public class VersionSetGlobal {
 			  index = findFile(icmp, files, small.encode());
 		  }
 
+//		  System.out.printf("[DEBUG] someFileOverlapsRange, index=%d, files.size=%d, smallest=%s, largest=%s\n",
+//				  index, files.size(), Strings.escapeString(smallestUserKey), Strings.escapeString(largestUserKey));
+		  
 		  if (index >= files.size()) {
 			  // beginning of range is after all files, so no overlap.
 			  return false;

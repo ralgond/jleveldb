@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.util;
 
 import java.nio.BufferUnderflowException;
@@ -8,7 +24,11 @@ public class Coding {
 	public final static long MAX_SIGNED_INT_VALUE = Integer.MAX_VALUE;
 	public final static long MIN_SIGNED_INT_VALUE = Integer.MIN_VALUE;
 
-	// Returns the length of the varint32 or varint64 encoding of "v"
+	/**
+	 *  Returns the length of the varint32 or varint64 encoding of "v"
+	 * @param v
+	 * @return
+	 */
 	final public static int varNatLength(long v) {
 		if (v < 0)
 			throw new CodingException("overflow: "+v);
@@ -23,7 +43,13 @@ public class Coding {
 	
 
 	
-	// 64-bit fixed length nature number
+	/**
+	 *  64-bit fixed length nature number
+	 * @param buf
+	 * @param offset
+	 * @param limit
+	 * @param value
+	 */
 	final public static void encodeFixedNat64(byte[] buf, int offset, int limit, long value) {
 		//Big Endian
 		if (value < 0)
@@ -77,7 +103,14 @@ public class Coding {
 		s.incrOffset(+8);
 	}
 	
-	// 64-bit variant length nature number
+	/**
+	 *  64-bit variant length nature number
+	 * @param buf
+	 * @param offset
+	 * @param limit
+	 * @param v
+	 * @return
+	 */
 	final public static int encodeVarNat64(byte[] buf, int offset, int limit, long v) {		
 		if (v < 0)
 			throw new EncodeException("[varint64] uint64 overflow: "+v);
@@ -120,7 +153,13 @@ public class Coding {
 	
 	
 	
-	// 32-bit fixed length nature number
+	/**
+	 *  32-bit fixed length nature number
+	 * @param buf
+	 * @param offset
+	 * @param limit
+	 * @param value
+	 */
 	final public static void encodeFixedNat32Long(byte[] buf, int offset, int limit, long value) {
 		//Big Endian
 		if (value < 0 || value > MAX_UNSIGNED_INT_VALUE)

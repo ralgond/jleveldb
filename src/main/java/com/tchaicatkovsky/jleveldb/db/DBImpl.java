@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.db;
 
 import java.util.ArrayList;
@@ -110,7 +126,9 @@ public class DBImpl implements DB {
 
 	VersionSet versions;
 
-	// Have we encountered a background error in paranoid mode?
+	/**
+	 *  Have we encountered a background error in paranoid mode?
+	 */
 	Status bgError = Status.ok0();
 
 	class CompactionStats {
@@ -667,7 +685,8 @@ public class DBImpl implements DB {
 		for (int i = 0; i < filenames.size(); i++) {
 			if (FileName.parseFileName(filenames.get(i), number, type)) {
 				expected.remove(number.getValue());
-				if (type.getValue() == FileType.LogFile && ((number.getValue() >= minLog) || (number.getValue() == prevLog)))
+				if (type.getValue() == FileType.LogFile && 
+						((number.getValue() >= minLog) || (number.getValue() == prevLog)))
 					logs.add(number.getValue());
 			}
 		}
@@ -780,9 +799,6 @@ public class DBImpl implements DB {
 		mutex.assertHeld();
 		assert (immtable != null);
 
-		long compactIsn = memtableCompactIsn.incrementAndGet();
-		System.out.printf("[DEBUG] DBImpl.compactMemTable start, isn=%d\n", compactIsn);
-
 		// Save the contents of the memtable as a new Table
 		VersionEdit edit = new VersionEdit();
 		Version base = versions.current();
@@ -792,9 +808,7 @@ public class DBImpl implements DB {
 		base.unref();
 		base = null;
 
-		// System.out.println("[DEBUG] DBImpl.compactMemTable 2, s="+s);
-
-		if (s.ok() && shuttingDown.get() != null) { // shutting_down_.Acquire_Load()
+		if (s.ok() && shuttingDown.get() != null) {
 			s = new Status(Status.Code.IOError, "Deleting DB during memtable compaction");
 		}
 
@@ -805,8 +819,6 @@ public class DBImpl implements DB {
 			s = versions.logAndApply(edit, mutex);
 		}
 
-		// System.out.println("[DEBUG] DBImpl.compactMemTable 3, s="+s);
-
 		if (s.ok()) {
 			// Commit to the new state
 			immtable.unref();
@@ -816,8 +828,6 @@ public class DBImpl implements DB {
 		} else {
 			recordBackgroundError(s);
 		}
-
-		System.out.printf("[DEBUG] DBImpl.compactMemTable end, isn=%d\n", compactIsn);
 	}
 
 	static class LogReporter implements LogReader.Reporter {
@@ -1187,7 +1197,6 @@ public class DBImpl implements DB {
 
 	void backgroundCall() {
 		mutex.lock();
-		System.out.println("\n[DEBUG] backgroundCall start");
 		try {
 			assert (bgCompactionScheduled);
 			if (shuttingDown.get() != null) { // shutting_down_.Acquire_Load()
@@ -1206,7 +1215,6 @@ public class DBImpl implements DB {
 			// so reschedule another compaction if needed.
 			maybeScheduleCompaction();
 
-			System.out.println("[DEBUG] backgroundCall end\n");
 
 			bgCv.signalAll();
 		} catch (Exception e) {
@@ -1222,14 +1230,10 @@ public class DBImpl implements DB {
 	void backgroundCompaction() {
 		mutex.assertHeld();
 
-		System.out.printf("[DEBUG] backgroundCompaction 1\n");
-
 		if (immtable != null) {
 			compactMemTable();
 			return;
 		}
-
-		System.out.printf("[DEBUG] backgroundCompaction 2\n");
 
 		Compaction c;
 		boolean isManual = (manualCompaction != null);
@@ -1241,13 +1245,12 @@ public class DBImpl implements DB {
 			if (c != null)
 				manualEnd = c.input(0, c.numInputFiles(0) - 1).largest;
 
-			Logger0.log0(options.infoLog, "Manual compaction at level-{} from {} .. {}; will stop at {}\n", m.level, (m.begin != null ? m.begin.debugString() : "(begin)"),
+			Logger0.log0(options.infoLog, "Manual compaction at level-{} from {} .. {}; will stop at {}\n", 
+					m.level, (m.begin != null ? m.begin.debugString() : "(begin)"),
 					(m.end != null ? m.end.debugString() : "(end)"), (m.done ? "(end)" : manualEnd.debugString()));
 		} else {
 			c = versions.pickCompaction();
 		}
-
-		System.out.printf("[DEBUG] backgroundCompaction 3\n");
 
 		Status status = Status.ok0();
 		if (c == null) {
@@ -1264,12 +1267,10 @@ public class DBImpl implements DB {
 
 			Logger0.log0(options.infoLog, "Moved #{} to level-{} {} bytes {}: {}\n", f.number, c.level() + 1, f.fileSize, status, versions.levelSummary());
 		} else {
-			System.out.printf("[DEBUG] backgroundCompaction 3.2\n");
 
 			CompactionState compact = new CompactionState(c);
 			status = doCompactionWork(compact);
 
-			System.out.printf("[DEBUG] backgroundCompaction 3.3\n");
 
 			if (!status.ok()) {
 				recordBackgroundError(status);
@@ -1279,7 +1280,6 @@ public class DBImpl implements DB {
 			deleteObsoleteFiles();
 		}
 
-		System.out.printf("[DEBUG] backgroundCompaction 4\n");
 
 		if (c != null)
 			c.delete();
@@ -1306,8 +1306,6 @@ public class DBImpl implements DB {
 			}
 			manualCompaction = null;
 		}
-
-		System.out.printf("[DEBUG] backgroundCompaction 5\n");
 	}
 
 	/**
@@ -1441,17 +1439,8 @@ public class DBImpl implements DB {
 		long startMillis = env.nowMillis();
 		long immMillis = 0; // millis spent doing imm compactions
 
-		System.out.println("[DEBUG] doCompactionWork 1");
-
 		Logger0.log0(options.infoLog, "Compacting {}@{} + {}@{} files", compact.compaction.numInputFiles(0), compact.compaction.level(), compact.compaction.numInputFiles(1),
 				compact.compaction.level() + 1);
-
-		for (int i = 0; i < compact.compaction.input(0).size(); i++) {
-			System.out.printf("[DEBUG] Compacting, level=%d, file=%s\n", compact.compaction.level(), compact.compaction.input(0, i).debugString());
-		}
-		for (int i = 0; i < compact.compaction.input(1).size(); i++) {
-			System.out.printf("[DEBUG] Compacting, level=%d, file=%s\n", compact.compaction.level() + 1, compact.compaction.input(1, i).debugString());
-		}
 
 		assert (versions.numLevelFiles(compact.compaction.level()) > 0);
 		assert (compact.builder == null);
@@ -1739,19 +1728,14 @@ public class DBImpl implements DB {
 		mutex.lock();
 		try {
 			Version base = versions.current();
-			System.out.printf("[DEBUG] DBImpl.compactRange, currentVersion.dataRange=%s\n", base.debugDataRange());
 			for (int level = 1; level < DBFormat.kNumLevels; level++) {
 				if (base.overlapInLevel(level, begin, end)) {
 					maxLevelWithFiles = level;
 				}
 			}
 
-			System.out.println("[DEBUG] DBImpl.compactRange start TEST_CompactMemTable");
-
 			TEST_CompactMemTable(); // TODO(sanjay): Skip if memtable does not overlap
 			for (int level = 0; level < maxLevelWithFiles; level++) {
-				System.out.printf("[DEBUG] DBImpl.compactRange start maxLevelWithFiles=%d, TEST_CompactRange(%d, %s, %s)\n", maxLevelWithFiles, level,
-						begin == null ? "<null>" : Strings.escapeString(begin), end == null ? "<null>" : Strings.escapeString(end));
 				TEST_CompactRange(level, begin, end);
 			}
 		} finally {
@@ -1763,9 +1747,6 @@ public class DBImpl implements DB {
 
 		assert (level >= 0);
 		assert (level + 1 < DBFormat.kNumLevels);
-
-		System.out.printf("[DEBUG] DBImpl.TEST_CompactRange start, level=%d, begin=%s, end=%s\n", level, begin == null ? "<null>" : Strings.escapeString(begin),
-				end == null ? "<null>" : Strings.escapeString(end));
 
 		InternalKey begin_storage = null;
 		InternalKey end_storage = null;
@@ -1789,7 +1770,6 @@ public class DBImpl implements DB {
 
 		mutex.lock();
 		try {
-			System.out.printf("[DEBUG] DBImpl.TEST_CompactRange 3, manual.done=%s shuttingDown.get()=%s, bgError.ok()=%s\n", manual.done, shuttingDown.get(), bgError.ok());
 			while (!manual.done && shuttingDown.get() == null && bgError.ok()) {
 				if (manualCompaction == null) { // Idle
 					manualCompaction = manual;
@@ -1803,7 +1783,6 @@ public class DBImpl implements DB {
 				manualCompaction = null;
 			}
 		} finally {
-			System.out.println("[DEBUG] DBImpl.TEST_CompactRange 10");
 			mutex.unlock();
 		}
 	}

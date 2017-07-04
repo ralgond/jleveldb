@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.db;
 
 import com.tchaicatkovsky.jleveldb.SequentialFile;
@@ -17,24 +33,38 @@ public class LogReader {
 	final SequentialFile file;
 	final Reporter reporter;
 	final boolean checksum;
-	byte[] backingStore;  //char* const backing_store_;
+	byte[] backingStore;
 	Slice buffer;
-	boolean eof;   // Last Read() indicated EOF by returning < kBlockSize
+	/** 
+	 * Last Read() indicated EOF by returning < kBlockSize
+	 */
+	boolean eof;   
 
-	  // Offset of the last record returned by ReadRecord.
+	/**
+	 *  Offset of the last record returned by ReadRecord.
+	 */
 	long lastRecordOffset;
-	  // Offset of the first location past the end of buffer_.
+	
+	/** 
+	 * Offset of the first location past the end of buffer_.
+	 */
 	long endOfBufferOffset;
 
-	  // Offset at which to start looking for the first record to return
+	/**
+	 * Offset at which to start looking for the first record to return
+	 */
 	final long initialOffset;
 
-	  // True if we are resynchronizing after a seek (initial_offset_ > 0). In
-	  // particular, a run of kMiddleType and kLastType records can be silently
-	  // skipped in this mode
+	/**
+	 * True if we are resynchronizing after a seek (initialOffset > 0). In 
+	 * particular, a run of kMiddleType and kLastType records can be silently 
+	 * skipped in this mode
+	 */
 	boolean resyncing;
 
-	// Extend record types with the following special values
+	/** 
+	 * Extend record types with the following special values
+	 */
 	enum ExtendRecordType {
 	    Eof(LogFormat.kMaxRecordType + 1),
 	    // Returned whenever we find an invalid physical record.
@@ -54,18 +84,25 @@ public class LogReader {
 			return type;
 		}
 	}; 
-	  
-	  // Create a reader that will return log records from "*file".
-	  // "*file" must remain live while this Reader is in use.
-	  //
-	  // If "reporter" is non-NULL, it is notified whenever some data is
-	  // dropped due to a detected corruption.  "*reporter" must remain
-	  // live while this Reader is in use.
-	  //
-	  // If "checksum" is true, verify checksums if available.
-	  //
-	  // The Reader will start reading at the first record located at physical
-	  // position >= initial_offset within the file.
+
+	/**
+	 * Create a reader that will return log records from "*file". 
+	 * "*file" must remain live while this Reader is in use.</br></br>
+	 * 
+	 * If "reporter" is non-NULL, it is notified whenever some data is 
+	 * dropped due to a detected corruption.  "*reporter" must remain 
+	 * live while this Reader is in use.</br></br>
+	 * 
+	 * If "checksum" is true, verify checksums if available.</br></br>
+	 * 
+	 * The Reader will start reading at the first record located at physical 
+	 * position >= initialOffset within the file.
+	 * 
+	 * @param file
+	 * @param reporter
+	 * @param checksum
+	 * @param initialOffset
+	 */
 	public LogReader(SequentialFile file, Reporter reporter, boolean checksum,
 	         long initialOffset) {
 		this.file = file;
@@ -182,7 +219,6 @@ public class LogReader {
 		            // treat it as a corruption, just ignore the entire logical record.
 		            scratch.clear();
 		        }
-		    	System.out.println("[DEBUG] LogReader.readRecord, EOF");
 		        return false;
 		    } else if (recordType == ExtendRecordType.BadRecord.getType()) {
 		    	 if (inFragmentedRecord) {
@@ -200,16 +236,21 @@ public class LogReader {
 		}
 	}
 	
-	  // Returns the physical offset of the last record returned by ReadRecord.
-	  //
-	  // Undefined before the first call to ReadRecord.
+	/**
+	 * Returns the physical offset of the last record returned by ReadRecord.
+	 * 
+	 * Undefined before the first call to ReadRecord.
+	 * @return
+	 */
 	public long lastRecordOffset() {
 		return this.lastRecordOffset;
 	}
 	
-	  // Skips all blocks that are completely before "initial_offset_".
-	  //
-	  // Returns true on success. Handles reporting.
+	/**
+	 * Skips all blocks that are completely before "initialOffset".
+	 * 
+	 * @return Returns true on success. Handles reporting.
+	 */
 	boolean skipToInitialBlock() {
 		long offsetInBlock = initialOffset % LogFormat.kBlockSize;
 		long blockStartLocation = initialOffset - offsetInBlock;
@@ -234,7 +275,11 @@ public class LogReader {
 		return true;
 	}
 	
-	// Return type, or one of the preceding special values
+	/**
+	 *  Return type, or one of the preceding special values
+	 * @param result
+	 * @return
+	 */
 	int readPhysicalRecord(Slice result) {
 		while (true) {
 			if (buffer.size() < LogFormat.kHeaderSize) {
@@ -323,15 +368,18 @@ public class LogReader {
 		}
 	}
 	
-	  // Reports dropped bytes to the reporter.
-	  // buffer_ must be updated to remove the dropped bytes prior to invocation.
+	/**
+	 * Reports dropped bytes to the reporter.
+	 * buffer must be updated to remove the dropped bytes prior to invocation.
+	 * 
+	 * @param bytes
+	 * @param reason
+	 */
 	void reportCorruption(long bytes, String reason) {
-		System.out.printf("[DEBUG] LogReader.reportCorruption bytes=%d, reason=%s\n", bytes, reason);
 		reportDrop(bytes, Status.corruption(reason));
 	}
 	
 	void reportDrop(long bytes, Status reason) {
-		System.out.printf("[DEBUG] LogReader.reportDrop bytes=%d, reason=%s\n", bytes, reason);
 		if (reporter != null &&
 			      endOfBufferOffset - buffer.size() - bytes >= initialOffset) {
 			reporter.corruption((int)(bytes), reason);

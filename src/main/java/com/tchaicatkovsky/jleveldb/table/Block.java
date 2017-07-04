@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.table;
 
 import com.tchaicatkovsky.jleveldb.Iterator0;
@@ -23,19 +39,18 @@ public class Block {
 		data = contents.data;
 		size = data.size();
 		owned = contents.heapAllocated;
-		if (data.size() < 4) { //size_ < sizeof(uint32_t)
-			System.out.printf("[DEBUG] Block.<init> 1 size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
+		if (data.size() < 4) {
+			//System.out.printf("[DEBUG] Block.<init> 1 size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
 			size = 0; //Error marker
-			Thread.dumpStack();
 		} else {
-			int maxRestartsAllowed = (size - 4) / 4; //size_t max_restarts_allowed = (size_-sizeof(uint32_t)) / sizeof(uint32_t);
+			int maxRestartsAllowed = (size - 4) / 4;
 			if (numRestarts() > maxRestartsAllowed) {
 				// The size is too small for NumRestarts()
 				System.out.printf("[DEBUG] [DEBUG] Block.<init> 2 numRestarts=%d, maxRestartsAllowed=%d\n",
 						numRestarts(), maxRestartsAllowed);
 				size = 0;
 			} else {
-			    restartOffset = data.offset() + size - (1 + numRestarts()) * 4; //restart_offset_ = size_ - (1 + NumRestarts()) * sizeof(uint32_t);
+			    restartOffset = data.offset() + size - (1 + numRestarts()) * 4;
 		    }
 		}
 	}
@@ -49,8 +64,8 @@ public class Block {
 	}
 	
 	public Iterator0 newIterator(Comparator0 comparator) {
-		if (size < 4) { //if (size_ < sizeof(uint32_t))
-			System.out.printf("[DEBUG] Block.newIterator size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
+		if (size < 4) {
+			//System.out.printf("[DEBUG] Block.newIterator size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
 		    return Iterator0.newErrorIterator(Status.corruption("bad block contents"));
 		}
 		
@@ -64,8 +79,8 @@ public class Block {
 	}
 	
 	int numRestarts() {
-		assert(size >= 4); //assert(size_ >= sizeof(uint32_t));
-		return Coding.decodeFixedNat32(data.data(), data.offset() + size - 4); //DecodeFixed32(data_ + size_ - sizeof(uint32_t));
+		assert(size >= 4);
+		return Coding.decodeFixedNat32(data.data(), data.offset() + size - 4);
 	}
 	
 	static class Iter extends Iterator0 {
@@ -119,15 +134,17 @@ public class Block {
 		    return comparator.compare(a, b);
 		}
 		
-		// Return the offset in data_ just past the end of the current entry.
+		/**
+		 *  Return the offset in data just past the end of the current entry.
+		 * @return
+		 */
 		final int nextEntryOffset() {
-			//return value.offset + value.size(); //return (value_.data() + value_.size()) - data_;
+			
 			return value.offset() + value.size();
 		}
 		
 		final int getRestartPoint(int index) {
 		    assert(index < numRestarts);
-		    //DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t));
 		    return Coding.decodeFixedNat32(data, restartsOffset + index * 4) + dataOffset; 		
 		}
 		
@@ -138,7 +155,7 @@ public class Block {
 
 		    // parseNextKey() starts at the end of value, so set value accordingly
 		    int offset = getRestartPoint(index);
-		    value = new DefaultSlice(data, offset, 0);	//value_ = Slice(data_ + offset, 0);
+		    value = new DefaultSlice(data, offset, 0);
 		}
 		
 		public boolean valid() {

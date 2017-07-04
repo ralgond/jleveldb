@@ -2,6 +2,10 @@ package com.tchaicatkovsky.jleveldb.test;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -25,6 +29,7 @@ import com.tchaicatkovsky.jleveldb.ReadOptions;
 import com.tchaicatkovsky.jleveldb.Snapshot;
 import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.WritableFile;
+import com.tchaicatkovsky.jleveldb.WriteBatch;
 import com.tchaicatkovsky.jleveldb.WriteOptions;
 import com.tchaicatkovsky.jleveldb.db.DBImpl;
 import com.tchaicatkovsky.jleveldb.db.VersionEdit;
@@ -42,6 +47,7 @@ import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.ListUtils;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
@@ -636,488 +642,536 @@ public class TestDB {
 	@Test
 	public void testEmpty() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			assertTrue(r.db != null);
-			assertEquals("NOT_FOUND", r.get(new DefaultSlice("foo")));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				assertTrue(r.db != null);
+				assertEquals("NOT_FOUND", r.get(new DefaultSlice("foo")));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testReadWrite() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			System.out.println("[DEBUG] r.option_config=" + r.optionConfig);
-			assertTrue(r.put("foo", "v1").ok());
-			assertEquals("v1", r.get("foo"));
-			assertTrue(r.put("bar", "v2").ok());
-			assertTrue(r.put("foo", "v3").ok());
-			assertEquals("v3", r.get("foo"));
-			assertEquals("v2", r.get("bar"));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				System.out.println("[DEBUG] r.option_config=" + r.optionConfig);
+				assertTrue(r.put("foo", "v1").ok());
+				assertEquals("v1", r.get("foo"));
+				assertTrue(r.put("bar", "v2").ok());
+				assertTrue(r.put("foo", "v3").ok());
+				assertEquals("v3", r.get("foo"));
+				assertEquals("v2", r.get("bar"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testPutDeleteGet() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			assertTrue(r.db.put(new WriteOptions(), new DefaultSlice("foo"), new DefaultSlice("v1")).ok());
-			assertEquals("v1", r.get("foo"));
-			assertTrue(r.db.put(new WriteOptions(), new DefaultSlice("foo"), new DefaultSlice("v2")).ok());
-			assertEquals("v2", r.get("foo"));
-			assertTrue(r.db.delete(new WriteOptions(), new DefaultSlice("foo")).ok());
-			assertEquals("NOT_FOUND", r.get("foo"));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				assertTrue(r.db.put(new WriteOptions(), new DefaultSlice("foo"), new DefaultSlice("v1")).ok());
+				assertEquals("v1", r.get("foo"));
+				assertTrue(r.db.put(new WriteOptions(), new DefaultSlice("foo"), new DefaultSlice("v2")).ok());
+				assertEquals("v2", r.get("foo"));
+				assertTrue(r.db.delete(new WriteOptions(), new DefaultSlice("foo")).ok());
+				assertEquals("NOT_FOUND", r.get("foo"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetFromImmutableLayer() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			Options options = r.currentOptions().cloneOptions();
-			options.env = r.env;
-			options.writeBufferSize = 100000; // Small write buffer
-			r.reopen(options);
+		try {
+			do {
+				Options options = r.currentOptions().cloneOptions();
+				options.env = r.env;
+				options.writeBufferSize = 100000; // Small write buffer
+				r.reopen(options);
 
-			assertTrue(r.put("foo", "v1").ok());
-			assertEquals("v1", r.get("foo"));
+				assertTrue(r.put("foo", "v1").ok());
+				assertEquals("v1", r.get("foo"));
 
-			r.env.delayDataSync.set(r.env); // Block sync calls
-			r.put("k1", TestUtil.makeString(100000, 'x')); // Fill memtable
-			r.put("k2", TestUtil.makeString(100000, 'y')); // Trigger compaction
-			assertEquals("v1", r.get("foo"));
-			r.env.delayDataSync.set(null); // Release sync calls
-		} while (r.changeOptions());
+				r.env.delayDataSync.set(r.env); // Block sync calls
+				r.put("k1", TestUtil.makeString(100000, 'x')); // Fill memtable
+				r.put("k2", TestUtil.makeString(100000, 'y')); // Trigger compaction
+				assertEquals("v1", r.get("foo"));
+				r.env.delayDataSync.set(null); // Release sync calls
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetFromVersions() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			assertTrue(r.put("foo", "v1").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertEquals("v1", r.get("foo"));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				assertTrue(r.put("foo", "v1").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertEquals("v1", r.get("foo"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetMemUsage() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			assertTrue(r.put("foo", "v1").ok());
-			Object0<String> val = new Object0<String>();
-			assertTrue(r.db.getProperty("leveldb.approximate-memory-usage", val));
-			int mem_usage = Integer.parseInt(val.getValue());
-			assertTrue(mem_usage > 0);
-			assertTrue(mem_usage < 5 * 1024 * 1024);
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				assertTrue(r.put("foo", "v1").ok());
+				Object0<String> val = new Object0<String>();
+				assertTrue(r.db.getProperty("leveldb.approximate-memory-usage", val));
+				int mem_usage = Integer.parseInt(val.getValue());
+				assertTrue(mem_usage > 0);
+				assertTrue(mem_usage < 5 * 1024 * 1024);
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetSnapshot() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			// Try with both a short key and a long key
-			for (int i = 0; i < 2; i++) {
-				String key = (i == 0) ? "foo" : TestUtil.makeString(200, 'x');
-				assertTrue(r.put(key, "v1").ok());
-				Snapshot s1 = r.db.getSnapshot();
-				assertTrue(r.put(key, "v2").ok());
-				assertEquals("v2", r.get(key));
-				assertEquals("v1", r.get(key, s1));
-				r.dbfull().TEST_CompactMemTable();
-				assertEquals("v2", r.get(key));
-				assertEquals("v1", r.get(key, s1));
-				r.db.releaseSnapshot(s1);
-			}
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				// Try with both a short key and a long key
+				for (int i = 0; i < 2; i++) {
+					String key = (i == 0) ? "foo" : TestUtil.makeString(200, 'x');
+					assertTrue(r.put(key, "v1").ok());
+					Snapshot s1 = r.db.getSnapshot();
+					assertTrue(r.put(key, "v2").ok());
+					assertEquals("v2", r.get(key));
+					assertEquals("v1", r.get(key, s1));
+					r.dbfull().TEST_CompactMemTable();
+					assertEquals("v2", r.get(key));
+					assertEquals("v1", r.get(key, s1));
+					r.db.releaseSnapshot(s1);
+				}
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetLevel0Ordering() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			// Check that we process level-0 files in correct order. The code
-			// below generates two level-0 files where the earlier one comes
-			// before the later one in the level-0 file list since the earlier
-			// one has a smaller "smallest" key.
-			assertTrue(r.put("bar", "b").ok());
-			assertTrue(r.put("foo", "v1").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertTrue(r.put("foo", "v2").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertEquals("v2", r.get("foo"));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				// Check that we process level-0 files in correct order. The code
+				// below generates two level-0 files where the earlier one comes
+				// before the later one in the level-0 file list since the earlier
+				// one has a smaller "smallest" key.
+				assertTrue(r.put("bar", "b").ok());
+				assertTrue(r.put("foo", "v1").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertTrue(r.put("foo", "v2").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertEquals("v2", r.get("foo"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetOrderedByLevels() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			assertTrue(r.put("foo", "v1").ok());
-			r.compact(new DefaultSlice("a"), new DefaultSlice("z"));
-			assertEquals("v1", r.get("foo"));
-			assertTrue(r.put("foo", "v2").ok());
-			assertEquals("v2", r.get("foo"));
-			r.dbfull().TEST_CompactMemTable();
-			assertEquals("v2", r.get("foo"));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				assertTrue(r.put("foo", "v1").ok());
+				r.compact(new DefaultSlice("a"), new DefaultSlice("z"));
+				assertEquals("v1", r.get("foo"));
+				assertTrue(r.put("foo", "v2").ok());
+				assertEquals("v2", r.get("foo"));
+				r.dbfull().TEST_CompactMemTable();
+				assertEquals("v2", r.get("foo"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetPicksCorrectFile() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			// Arrange to have multiple files in a non-level-0 level.
-			assertTrue(r.put("a", "va").ok());
-			r.compact("a", "b");
-			assertTrue(r.put("x", "vx").ok());
-			r.compact("x", "y");
-			assertTrue(r.put("f", "vf").ok());
-			r.compact("f", "g");
-			assertEquals("va", r.get("a"));
-			assertEquals("vf", r.get("f"));
-			assertEquals("vx", r.get("x"));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				// Arrange to have multiple files in a non-level-0 level.
+				assertTrue(r.put("a", "va").ok());
+				r.compact("a", "b");
+				assertTrue(r.put("x", "vx").ok());
+				r.compact("x", "y");
+				assertTrue(r.put("f", "vf").ok());
+				r.compact("f", "g");
+				assertEquals("va", r.get("a"));
+				assertEquals("vf", r.get("f"));
+				assertEquals("vx", r.get("x"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testGetEncountersEmptyLevel() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			// Arrange for the following to happen:
-			// * sstable A in level 0
-			// * nothing in level 1
-			// * sstable B in level 2
-			// Then do enough get() calls to arrange for an automatic compaction
-			// of sstable A. A bug would cause the compaction to be marked as
-			// occurring at level 1 (instead of the correct level 0).
+		try {
+			do {
+				// Arrange for the following to happen:
+				// * sstable A in level 0
+				// * nothing in level 1
+				// * sstable B in level 2
+				// Then do enough get() calls to arrange for an automatic compaction
+				// of sstable A. A bug would cause the compaction to be marked as
+				// occurring at level 1 (instead of the correct level 0).
 
-			// Step 1: First place sstables in levels 0 and 2
-			int compaction_count = 0;
-			while (r.numTableFilesAtLevel(0) == 0 || r.numTableFilesAtLevel(2) == 0) {
-				assertTrue(compaction_count < 100);
-				compaction_count++;
-				r.put("a", "begin");
-				r.put("z", "end");
-				r.dbfull().TEST_CompactMemTable();
-			}
+				// Step 1: First place sstables in levels 0 and 2
+				int compaction_count = 0;
+				while (r.numTableFilesAtLevel(0) == 0 || r.numTableFilesAtLevel(2) == 0) {
+					assertTrue(compaction_count < 100);
+					compaction_count++;
+					r.put("a", "begin");
+					r.put("z", "end");
+					r.dbfull().TEST_CompactMemTable();
+				}
 
-			System.out.printf("[DEBUG] =================== level-0.size=%d, level-1=%d, level-2.size=%d\n", r.numTableFilesAtLevel(0), r.numTableFilesAtLevel(1), r.numTableFilesAtLevel(2));
+				System.out.printf("[DEBUG] =================== level-0.size=%d, level-1=%d, level-2.size=%d\n", r.numTableFilesAtLevel(0), r.numTableFilesAtLevel(1), r.numTableFilesAtLevel(2));
 
-			// Step 2: clear level 1 if necessary.
-			r.dbfull().TEST_CompactRange(1, null, null);
-			assertEquals(r.numTableFilesAtLevel(0), 1);
-			assertEquals(r.numTableFilesAtLevel(1), 0);
-			assertEquals(r.numTableFilesAtLevel(2), 1);
+				// Step 2: clear level 1 if necessary.
+				r.dbfull().TEST_CompactRange(1, null, null);
+				assertEquals(r.numTableFilesAtLevel(0), 1);
+				assertEquals(r.numTableFilesAtLevel(1), 0);
+				assertEquals(r.numTableFilesAtLevel(2), 1);
 
-			// Step 3: read a bunch of times
-			for (int i = 0; i < 1000; i++) {
-				assertEquals("NOT_FOUND", r.get("missing"));
-			}
+				// Step 3: read a bunch of times
+				for (int i = 0; i < 1000; i++) {
+					assertEquals("NOT_FOUND", r.get("missing"));
+				}
 
-			// Step 4: Wait for compaction to finish
-			delayMilliseconds(1000);
+				// Step 4: Wait for compaction to finish
+				delayMilliseconds(1000);
 
-			assertEquals(r.numTableFilesAtLevel(0), 0);
-		} while (r.changeOptions());
-		r.delete();
+				assertEquals(r.numTableFilesAtLevel(0), 0);
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testIterEmpty() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			Iterator0 iter = r.db.newIterator(new ReadOptions());
 
-		Iterator0 iter = r.db.newIterator(new ReadOptions());
+			iter.seekToFirst();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToFirst();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToLast();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToLast();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seek(new DefaultSlice("foo"));
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seek(new DefaultSlice("foo"));
-		assertEquals(r.iterStatus(iter), "(invalid)");
-
-		iter.delete();
-		r.delete();
+			iter.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testIterSingle() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			assertTrue(r.put("a", "va").ok());
+			Iterator0 iter = r.db.newIterator(new ReadOptions());
 
-		assertTrue(r.put("a", "va").ok());
-		Iterator0 iter = r.db.newIterator(new ReadOptions());
+			iter.seekToFirst();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToFirst();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToFirst();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
-		iter.seekToFirst();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToLast();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToLast();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToLast();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
-		iter.seekToLast();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seek(new DefaultSlice(""));
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seek(new DefaultSlice(""));
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seek(new DefaultSlice("a"));
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seek(new DefaultSlice("a"));
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seek(new DefaultSlice("b"));
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seek(new DefaultSlice("b"));
-		assertEquals(r.iterStatus(iter), "(invalid)");
-
-		iter.delete();
-		r.delete();
+			iter.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testIterMulti() throws Exception {
+
 		DBTestRunner r = new DBTestRunner();
+		try {
+			assertTrue(r.put("a", "va").ok());
+			assertTrue(r.put("b", "vb").ok());
+			assertTrue(r.put("c", "vc").ok());
+			Iterator0 iter = r.db.newIterator(new ReadOptions());
 
-		assertTrue(r.put("a", "va").ok());
-		assertTrue(r.put("b", "vb").ok());
-		assertTrue(r.put("c", "vc").ok());
-		Iterator0 iter = r.db.newIterator(new ReadOptions());
+			iter.seekToFirst();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "b->vb");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "c->vc");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToFirst();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToFirst();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "b->vb");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "c->vc");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
-		iter.seekToFirst();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToLast();
+			assertEquals(r.iterStatus(iter), "c->vc");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "b->vb");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToLast();
+			assertEquals(r.iterStatus(iter), "c->vc");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToLast();
-		assertEquals(r.iterStatus(iter), "c->vc");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "b->vb");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "(invalid)");
-		iter.seekToLast();
-		assertEquals(r.iterStatus(iter), "c->vc");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seek(new DefaultSlice(""));
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.seek(new DefaultSlice("a"));
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.seek(new DefaultSlice("ax"));
+			assertEquals(r.iterStatus(iter), "b->vb");
+			iter.seek(new DefaultSlice("b"));
+			assertEquals(r.iterStatus(iter), "b->vb");
+			iter.seek(new DefaultSlice("z"));
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seek(new DefaultSlice(""));
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.seek(new DefaultSlice("a"));
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.seek(new DefaultSlice("ax"));
-		assertEquals(r.iterStatus(iter), "b->vb");
-		iter.seek(new DefaultSlice("b"));
-		assertEquals(r.iterStatus(iter), "b->vb");
-		iter.seek(new DefaultSlice("z"));
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			// Switch from reverse to forward
+			iter.seekToLast();
+			iter.prev();
+			iter.prev();
+			iter.next();
+			assertEquals(r.iterStatus(iter), "b->vb");
 
-		// Switch from reverse to forward
-		iter.seekToLast();
-		iter.prev();
-		iter.prev();
-		iter.next();
-		assertEquals(r.iterStatus(iter), "b->vb");
+			// Switch from forward to reverse
+			iter.seekToFirst();
+			iter.next();
+			iter.next();
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "b->vb");
 
-		// Switch from forward to reverse
-		iter.seekToFirst();
-		iter.next();
-		iter.next();
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "b->vb");
+			// Make sure iter stays at snapshot
+			assertTrue(r.put("a", "va2").ok());
+			assertTrue(r.put("a2", "va3").ok());
+			assertTrue(r.put("b", "vb2").ok());
+			assertTrue(r.put("c", "vc2").ok());
+			assertTrue(r.delete(new DefaultSlice("b")).ok());
+			iter.seekToFirst();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "b->vb");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "c->vc");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToLast();
+			assertEquals(r.iterStatus(iter), "c->vc");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "b->vb");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		// Make sure iter stays at snapshot
-		assertTrue(r.put("a", "va2").ok());
-		assertTrue(r.put("a2", "va3").ok());
-		assertTrue(r.put("b", "vb2").ok());
-		assertTrue(r.put("c", "vc2").ok());
-		assertTrue(r.delete(new DefaultSlice("b")).ok());
-		iter.seekToFirst();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "b->vb");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "c->vc");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
-		iter.seekToLast();
-		assertEquals(r.iterStatus(iter), "c->vc");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "b->vb");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "(invalid)");
-
-		iter.delete();
-		r.delete();
+			iter.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testIterSmallAndLargeMix() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			assertTrue(r.put("a", "va").ok());
+			assertTrue(r.put("b", TestUtil.makeString(100000, 'b')).ok());
+			assertTrue(r.put("c", "vc").ok());
+			assertTrue(r.put("d", TestUtil.makeString(100000, 'd')).ok());
+			assertTrue(r.put("e", TestUtil.makeString(100000, 'e')).ok());
 
-		assertTrue(r.put("a", "va").ok());
-		assertTrue(r.put("b", TestUtil.makeString(100000, 'b')).ok());
-		assertTrue(r.put("c", "vc").ok());
-		assertTrue(r.put("d", TestUtil.makeString(100000, 'd')).ok());
-		assertTrue(r.put("e", TestUtil.makeString(100000, 'e')).ok());
+			Iterator0 iter = r.db.newIterator(new ReadOptions());
 
-		Iterator0 iter = r.db.newIterator(new ReadOptions());
+			iter.seekToFirst();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "b->" + TestUtil.makeString(100000, 'b'));
+			iter.next();
+			assertEquals(r.iterStatus(iter), "c->vc");
+			iter.next();
+			assertEquals(r.iterStatus(iter), "d->" + TestUtil.makeString(100000, 'd'));
+			iter.next();
+			assertEquals(r.iterStatus(iter), "e->" + TestUtil.makeString(100000, 'e'));
+			iter.next();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToFirst();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "b->" + TestUtil.makeString(100000, 'b'));
-		iter.next();
-		assertEquals(r.iterStatus(iter), "c->vc");
-		iter.next();
-		assertEquals(r.iterStatus(iter), "d->" + TestUtil.makeString(100000, 'd'));
-		iter.next();
-		assertEquals(r.iterStatus(iter), "e->" + TestUtil.makeString(100000, 'e'));
-		iter.next();
-		assertEquals(r.iterStatus(iter), "(invalid)");
+			iter.seekToLast();
+			assertEquals(r.iterStatus(iter), "e->" + TestUtil.makeString(100000, 'e'));
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "d->" + TestUtil.makeString(100000, 'd'));
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "c->vc");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "b->" + TestUtil.makeString(100000, 'b'));
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "a->va");
+			iter.prev();
+			assertEquals(r.iterStatus(iter), "(invalid)");
 
-		iter.seekToLast();
-		assertEquals(r.iterStatus(iter), "e->" + TestUtil.makeString(100000, 'e'));
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "d->" + TestUtil.makeString(100000, 'd'));
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "c->vc");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "b->" + TestUtil.makeString(100000, 'b'));
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "a->va");
-		iter.prev();
-		assertEquals(r.iterStatus(iter), "(invalid)");
-
-		iter.delete();
-		r.delete();
+			iter.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testIterMultiWithDelete() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				assertTrue(r.put("a", "va").ok());
+				assertTrue(r.put("b", "vb").ok());
+				assertTrue(r.put("c", "vc").ok());
+				assertTrue(r.delete(new DefaultSlice("b")).ok());
+				assertEquals("NOT_FOUND", r.get("b"));
 
-		do {
-			assertTrue(r.put("a", "va").ok());
-			assertTrue(r.put("b", "vb").ok());
-			assertTrue(r.put("c", "vc").ok());
-			assertTrue(r.delete(new DefaultSlice("b")).ok());
-			assertEquals("NOT_FOUND", r.get("b"));
-
-			Iterator0 iter = r.db.newIterator(new ReadOptions());
-			iter.seek(new DefaultSlice("c"));
-			assertEquals(r.iterStatus(iter), "c->vc");
-			iter.prev();
-			assertEquals(r.iterStatus(iter), "a->va");
-			iter.delete();
-		} while (r.changeOptions());
-
-		r.delete();
+				Iterator0 iter = r.db.newIterator(new ReadOptions());
+				iter.seek(new DefaultSlice("c"));
+				assertEquals(r.iterStatus(iter), "c->vc");
+				iter.prev();
+				assertEquals(r.iterStatus(iter), "a->va");
+				iter.delete();
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testRecover() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				assertTrue(r.put("foo", "v1").ok());
+				assertTrue(r.put("baz", "v5").ok());
 
-		do {
-			assertTrue(r.put("foo", "v1").ok());
-			assertTrue(r.put("baz", "v5").ok());
+				r.reopen();
+				assertEquals("v1", r.get("foo"));
 
-			r.reopen();
-			assertEquals("v1", r.get("foo"));
+				assertEquals("v1", r.get("foo"));
+				assertEquals("v5", r.get("baz"));
+				assertTrue(r.put("bar", "v2").ok());
+				assertTrue(r.put("foo", "v3").ok());
 
-			assertEquals("v1", r.get("foo"));
-			assertEquals("v5", r.get("baz"));
-			assertTrue(r.put("bar", "v2").ok());
-			assertTrue(r.put("foo", "v3").ok());
-
-			r.reopen();
-			assertEquals("v3", r.get("foo"));
-			assertTrue(r.put("foo", "v4").ok());
-			assertEquals("v4", r.get("foo"));
-			assertEquals("v2", r.get("bar"));
-			assertEquals("v5", r.get("baz"));
-		} while (r.changeOptions());
-
-		r.delete();
+				r.reopen();
+				assertEquals("v3", r.get("foo"));
+				assertTrue(r.put("foo", "v4").ok());
+				assertEquals("v4", r.get("foo"));
+				assertEquals("v2", r.get("bar"));
+				assertEquals("v5", r.get("baz"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testRecoveryWithEmptyLog() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-
-		do {
-			assertTrue(r.put("foo", "v1").ok());
-			assertTrue(r.put("foo", "v2").ok());
-			r.reopen();
-			r.reopen();
-			assertTrue(r.put("foo", "v3").ok());
-			r.reopen();
-			assertEquals("v3", r.get("foo"));
-		} while (r.changeOptions());
-		r.delete();
+		try {
+			do {
+				assertTrue(r.put("foo", "v1").ok());
+				assertTrue(r.put("foo", "v2").ok());
+				r.reopen();
+				r.reopen();
+				assertTrue(r.put("foo", "v3").ok());
+				r.reopen();
+				assertEquals("v3", r.get("foo"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testRecoverDuringMemtableCompaction() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				Options options = r.currentOptions().cloneOptions();
+				options.env = r.env;
+				options.writeBufferSize = 1000000;
+				r.reopen(options);
 
-		do {
-			Options options = r.currentOptions().cloneOptions();
-			options.env = r.env;
-			options.writeBufferSize = 1000000;
-			r.reopen(options);
+				// Trigger a long memtable compaction and reopen the database during it
+				assertTrue(r.put("foo", "v1").ok()); // Goes to 1st log file
+				assertTrue(r.put("big1", TestUtil.makeString(10000000, 'x')).ok()); // Fills memtable
+				assertTrue(r.put("big2", TestUtil.makeString(1000, 'y')).ok()); // Triggers compaction
+				assertTrue(r.put("bar", "v2").ok()); // Goes to new log file
 
-			// Trigger a long memtable compaction and reopen the database during it
-			assertTrue(r.put("foo", "v1").ok()); // Goes to 1st log file
-			assertTrue(r.put("big1", TestUtil.makeString(10000000, 'x')).ok()); // Fills memtable
-			assertTrue(r.put("big2", TestUtil.makeString(1000, 'y')).ok()); // Triggers compaction
-			assertTrue(r.put("bar", "v2").ok()); // Goes to new log file
+				r.reopen(options);
+				assertEquals("v1", r.get("foo"));
+				assertEquals("v2", r.get("bar"));
+				assertEquals(TestUtil.makeString(10000000, 'x'), r.get("big1"));
+				assertEquals(TestUtil.makeString(1000, 'y'), r.get("big2"));
 
-			r.reopen(options);
-			assertEquals("v1", r.get("foo"));
-			assertEquals("v2", r.get("bar"));
-			assertEquals(TestUtil.makeString(10000000, 'x'), r.get("big1"));
-			assertEquals(TestUtil.makeString(1000, 'y'), r.get("big2"));
+				assertEquals("v2", r.get("bar"));
+				assertEquals(TestUtil.makeString(10000000, 'x'), r.get("big1"));
 
-			assertEquals("v2", r.get("bar"));
-			assertEquals(TestUtil.makeString(10000000, 'x'), r.get("big1"));
+				assertEquals(TestUtil.makeString(1000, 'y'), r.get("big2"));
+				assertEquals("v1", r.get("foo"));
 
-			assertEquals(TestUtil.makeString(1000, 'y'), r.get("big2"));
-			assertEquals("v1", r.get("foo"));
-
-		} while (r.changeOptions());
-
-		r.delete();
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	static String Key(int i) {
@@ -1128,170 +1182,176 @@ public class TestDB {
 	public void testMinorCompactionsHappen() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			Options options = r.currentOptions().cloneOptions();
+			options.writeBufferSize = 10000;
+			r.reopen(options);
 
-		Options options = r.currentOptions().cloneOptions();
-		options.writeBufferSize = 10000;
-		r.reopen(options);
+			final int N = 500;
 
-		final int N = 500;
+			int starting_num_tables = r.totalTableFiles();
+			for (int i = 0; i < N; i++) {
+				assertTrue(r.put(Key(i), Key(i) + TestUtil.makeString(1000, 'v')).ok());
+			}
 
-		int starting_num_tables = r.totalTableFiles();
-		for (int i = 0; i < N; i++) {
-			assertTrue(r.put(Key(i), Key(i) + TestUtil.makeString(1000, 'v')).ok());
+			int ending_num_tables = r.totalTableFiles();
+			assertTrue(ending_num_tables > starting_num_tables);
+
+			for (int i = 0; i < N; i++) {
+				assertEquals(Key(i) + TestUtil.makeString(1000, 'v'), r.get(Key(i)));
+			}
+
+			Options options2 = r.currentOptions().cloneOptions();
+			options2.reuseLogs = true;
+			r.reopen(options2);
+
+			for (int i = 0; i < N; i++) {
+				assertEquals(Key(i) + TestUtil.makeString(1000, 'v'), r.get(Key(i)));
+			}
+		} finally {
+			r.delete();
 		}
-
-		int ending_num_tables = r.totalTableFiles();
-		assertTrue(ending_num_tables > starting_num_tables);
-
-		for (int i = 0; i < N; i++) {
-			assertEquals(Key(i) + TestUtil.makeString(1000, 'v'), r.get(Key(i)));
-		}
-
-		Options options2 = r.currentOptions().cloneOptions();
-		options2.reuseLogs = true;
-		r.reopen(options2);
-
-		for (int i = 0; i < N; i++) {
-			assertEquals(Key(i) + TestUtil.makeString(1000, 'v'), r.get(Key(i)));
-		}
-
-		r.delete();
 	}
 
 	@Test
 	public void testRecoverWithLargeLog() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			{
+				Options options = r.currentOptions().cloneOptions();
+				r.reopen(options);
+				assertTrue(r.put("big1", TestUtil.makeString(200000, '1')).ok());
+				assertTrue(r.put("big2", TestUtil.makeString(200000, '2')).ok());
+				assertTrue(r.put("small3", TestUtil.makeString(10, '3')).ok());
+				assertTrue(r.put("small4", TestUtil.makeString(10, '4')).ok());
+				assertEquals(r.numTableFilesAtLevel(0), 0);
+			}
 
-		{
+			// Make sure that if we re-open with a small write buffer size that
+			// we flush table files in the middle of a large log file.
 			Options options = r.currentOptions().cloneOptions();
+			options.writeBufferSize = 100000;
 			r.reopen(options);
-			assertTrue(r.put("big1", TestUtil.makeString(200000, '1')).ok());
-			assertTrue(r.put("big2", TestUtil.makeString(200000, '2')).ok());
-			assertTrue(r.put("small3", TestUtil.makeString(10, '3')).ok());
-			assertTrue(r.put("small4", TestUtil.makeString(10, '4')).ok());
-			assertEquals(r.numTableFilesAtLevel(0), 0);
+			assertEquals(r.numTableFilesAtLevel(0), 3);
+			assertEquals(TestUtil.makeString(200000, '1'), r.get("big1"));
+			assertEquals(TestUtil.makeString(200000, '2'), r.get("big2"));
+			assertEquals(TestUtil.makeString(10, '3'), r.get("small3"));
+			assertEquals(TestUtil.makeString(10, '4'), r.get("small4"));
+			assertTrue(r.numTableFilesAtLevel(0) > 1);
+		} finally {
+			r.delete();
 		}
-
-		// Make sure that if we re-open with a small write buffer size that
-		// we flush table files in the middle of a large log file.
-		Options options = r.currentOptions().cloneOptions();
-		options.writeBufferSize = 100000;
-		r.reopen(options);
-		assertEquals(r.numTableFilesAtLevel(0), 3);
-		assertEquals(TestUtil.makeString(200000, '1'), r.get("big1"));
-		assertEquals(TestUtil.makeString(200000, '2'), r.get("big2"));
-		assertEquals(TestUtil.makeString(10, '3'), r.get("small3"));
-		assertEquals(TestUtil.makeString(10, '4'), r.get("small4"));
-		assertTrue(r.numTableFilesAtLevel(0) > 1);
-
-		r.delete();
 	}
 
 	@Test
 	public void testCompactionsGenerateMultipleFiles() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			Options options = r.currentOptions().cloneOptions();
+			options.writeBufferSize = 100000000; // Large write buffer
+			r.reopen(options);
 
-		Options options = r.currentOptions().cloneOptions();
-		options.writeBufferSize = 100000000; // Large write buffer
-		r.reopen(options);
+			Random0 rnd = new Random0(301);
 
-		Random0 rnd = new Random0(301);
+			// Write 8MB (80 values, each 100K)
+			assertEquals(r.numTableFilesAtLevel(0), 0);
+			ArrayList<ByteBuf> values = new ArrayList<ByteBuf>();
+			for (int i = 0; i < 80; i++) {
+				values.add(randomString(rnd, 100000));
+				assertTrue(r.put(Key(i), values.get(i).encodeToString()).ok());
+			}
 
-		// Write 8MB (80 values, each 100K)
-		assertEquals(r.numTableFilesAtLevel(0), 0);
-		ArrayList<ByteBuf> values = new ArrayList<ByteBuf>();
-		for (int i = 0; i < 80; i++) {
-			values.add(randomString(rnd, 100000));
-			assertTrue(r.put(Key(i), values.get(i).encodeToString()).ok());
+			// Reopening moves updates to level-0
+			r.reopen(options);
+			r.dbfull().TEST_CompactRange(0, null, null);
+
+			assertEquals(r.numTableFilesAtLevel(0), 0);
+			assertTrue(r.numTableFilesAtLevel(1) > 1);
+			for (int i = 0; i < 80; i++) {
+				assertEquals(r.get(Key(i)), values.get(i).encodeToString());
+			}
+		} finally {
+			r.delete();
 		}
-
-		// Reopening moves updates to level-0
-		r.reopen(options);
-		r.dbfull().TEST_CompactRange(0, null, null);
-
-		assertEquals(r.numTableFilesAtLevel(0), 0);
-		assertTrue(r.numTableFilesAtLevel(1) > 1);
-		for (int i = 0; i < 80; i++) {
-			assertEquals(r.get(Key(i)), values.get(i).encodeToString());
-		}
-
-		r.delete();
 	}
 
 	@Test
 	public void testRepeatedWritesToSameKey() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			Options options = r.currentOptions().cloneOptions();
+			options.env = r.env;
+			options.writeBufferSize = 100000; // Small write buffer
+			r.reopen(options);
 
-		Options options = r.currentOptions().cloneOptions();
-		options.env = r.env;
-		options.writeBufferSize = 100000; // Small write buffer
-		r.reopen(options);
+			// We must have at most one file per level except for level-0,
+			// which may have up to kL0_StopWritesTrigger files.
+			final int kMaxFiles = DBFormat.kNumLevels + DBFormat.kL0_StopWritesTrigger;
 
-		// We must have at most one file per level except for level-0,
-		// which may have up to kL0_StopWritesTrigger files.
-		final int kMaxFiles = DBFormat.kNumLevels + DBFormat.kL0_StopWritesTrigger;
+			Random0 rnd = new Random0(301);
+			ByteBuf value = randomString(rnd, 2 * options.writeBufferSize);
 
-		Random0 rnd = new Random0(301);
-		ByteBuf value = randomString(rnd, 2 * options.writeBufferSize);
+			System.out.println("[DEBUG] ============= value.size=" + value.size());
 
-		System.out.println("[DEBUG] ============= value.size=" + value.size());
-
-		for (int i = 0; i < 5 * kMaxFiles; i++) {
-			r.put("key", value.encodeToString());
-			assertTrue(r.totalTableFiles() < kMaxFiles);
-			System.err.printf("========================================\nafter %d: %d files\n========================================\n", i + 1, r.totalTableFiles());
+			for (int i = 0; i < 5 * kMaxFiles; i++) {
+				r.put("key", value.encodeToString());
+				assertTrue(r.totalTableFiles() < kMaxFiles);
+				System.err.printf("========================================\nafter %d: %d files\n========================================\n", i + 1, r.totalTableFiles());
+			}
+		} finally {
+			r.delete();
 		}
-		r.delete();
 	}
 
 	@Test
 	public void testSparseMerge() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			Options options = r.currentOptions().cloneOptions();
+			options.compression = CompressionType.kNoCompression;
+			r.reopen(options);
 
-		Options options = r.currentOptions().cloneOptions();
-		options.compression = CompressionType.kNoCompression;
-		r.reopen(options);
+			r.fillLevels("A", "Z");
 
-		r.fillLevels("A", "Z");
+			// Suppose there is:
+			// small amount of data with prefix A
+			// large amount of data with prefix B
+			// small amount of data with prefix C
+			// and that recent updates have made small changes to all three
+			// prefixes.
+			// Check that we do not do a compaction that merges all of B in one
+			// shot.
+			String value = TestUtil.makeString(1000, 'x');
+			r.put("A", "va");
+			// Write approximately 100MB of "B" values
+			for (int i = 0; i < 100000; i++) {
+				String key = String.format("B%010d", i);
+				r.put(key, value);
+			}
+			r.put("C", "vc");
+			r.dbfull().TEST_CompactMemTable();
+			r.dbfull().TEST_CompactRange(0, null, null);
 
-		// Suppose there is:
-		// small amount of data with prefix A
-		// large amount of data with prefix B
-		// small amount of data with prefix C
-		// and that recent updates have made small changes to all three
-		// prefixes.
-		// Check that we do not do a compaction that merges all of B in one
-		// shot.
-		String value = TestUtil.makeString(1000, 'x');
-		r.put("A", "va");
-		// Write approximately 100MB of "B" values
-		for (int i = 0; i < 100000; i++) {
-			String key = String.format("B%010d", i);
-			r.put(key, value);
+			// Make sparse update
+			r.put("A", "va2");
+			r.put("B100", "bvalue2");
+			r.put("C", "vc2");
+			r.dbfull().TEST_CompactMemTable();
+
+			// Compactions should not cause us to create a situation where
+			// a file overlaps too much data at the next level.
+			assertTrue(r.dbfull().TEST_MaxNextLevelOverlappingBytes() <= 20 * 1048576);
+			r.dbfull().TEST_CompactRange(0, null, null);
+			assertTrue(r.dbfull().TEST_MaxNextLevelOverlappingBytes() <= 20 * 1048576);
+			r.dbfull().TEST_CompactRange(1, null, null);
+			assertTrue(r.dbfull().TEST_MaxNextLevelOverlappingBytes() <= 20 * 1048576);
+		} finally {
+			r.delete();
 		}
-		r.put("C", "vc");
-		r.dbfull().TEST_CompactMemTable();
-		r.dbfull().TEST_CompactRange(0, null, null);
-
-		// Make sparse update
-		r.put("A", "va2");
-		r.put("B100", "bvalue2");
-		r.put("C", "vc2");
-		r.dbfull().TEST_CompactMemTable();
-
-		// Compactions should not cause us to create a situation where
-		// a file overlaps too much data at the next level.
-		assertTrue(r.dbfull().TEST_MaxNextLevelOverlappingBytes() <= 20 * 1048576);
-		r.dbfull().TEST_CompactRange(0, null, null);
-		assertTrue(r.dbfull().TEST_MaxNextLevelOverlappingBytes() <= 20 * 1048576);
-		r.dbfull().TEST_CompactRange(1, null, null);
-		assertTrue(r.dbfull().TEST_MaxNextLevelOverlappingBytes() <= 20 * 1048576);
-
-		r.delete();
 	}
 
 	static boolean between(long val, long low, long high) {
@@ -1310,398 +1370,407 @@ public class TestDB {
 	public void testApproximateSizes() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				Options options = r.currentOptions().cloneOptions();
+				options.writeBufferSize = 100000000; // Large write buffer
+				options.compression = CompressionType.kNoCompression;
+				r.destroyAndReopen();
 
-		do {
-			Options options = r.currentOptions().cloneOptions();
-			options.writeBufferSize = 100000000; // Large write buffer
-			options.compression = CompressionType.kNoCompression;
-			r.destroyAndReopen();
-
-			assertTrue(between(r.size(slice(""), slice("xyz")), 0, 0));
-			r.reopen(options);
-			assertTrue(between(r.size(slice(""), slice("xyz")), 0, 0));
-
-			// Write 8MB (80 values, each 100K)
-			assertEquals(r.numTableFilesAtLevel(0), 0);
-			final int N = 80;
-			final int S1 = 100000;
-			final int S2 = 105000; // Allow some expansion from metadata
-			Random0 rnd = new Random0(301);
-			for (int i = 0; i < N; i++) {
-				assertTrue(r.put(Key(i), randomString(rnd, S1)).ok());
-			}
-
-			// 0 because GetApproximateSizes() does not account for memtable
-			// space
-			assertTrue(between(r.size(slice(""), slice(Key(50))), 0, 0));
-
-			if (options.reuseLogs) {
-				// Recovery will reuse memtable, and GetApproximateSizes() does
-				// not
-				// account for memtable usage;
+				assertTrue(between(r.size(slice(""), slice("xyz")), 0, 0));
 				r.reopen(options);
-				assertTrue(between(r.size(slice(""), slice(Key(50))), 0, 0));
-				continue;
-			}
+				assertTrue(between(r.size(slice(""), slice("xyz")), 0, 0));
 
-			// Check sizes across recovery by reopening a few times
-			for (int run = 0; run < 3; run++) {
-				r.reopen(options);
-
-				for (int compact_start = 0; compact_start < N; compact_start += 10) {
-					for (int i = 0; i < N; i += 10) {
-						assertTrue(between(r.size(slice(""), slice(Key(i))), S1 * i, S2 * i));
-						assertTrue(between(r.size(slice(""), slice(Key(i) + ".suffix")), S1 * (i + 1), S2 * (i + 1)));
-						assertTrue(between(r.size(slice(Key(i)), slice(Key(i + 10))), S1 * 10, S2 * 10));
-					}
-					assertTrue(between(r.size(slice(""), slice(Key(50))), S1 * 50, S2 * 50));
-					assertTrue(between(r.size(slice(""), slice(Key(50) + ".suffix")), S1 * 50, S2 * 50));
-
-					String cstart_str = Key(compact_start);
-					String cend_str = Key(compact_start + 9);
-					Slice cstart = slice(cstart_str);
-					Slice cend = slice(cend_str);
-					r.dbfull().TEST_CompactRange(0, cstart, cend);
+				// Write 8MB (80 values, each 100K)
+				assertEquals(r.numTableFilesAtLevel(0), 0);
+				final int N = 80;
+				final int S1 = 100000;
+				final int S2 = 105000; // Allow some expansion from metadata
+				Random0 rnd = new Random0(301);
+				for (int i = 0; i < N; i++) {
+					assertTrue(r.put(Key(i), randomString(rnd, S1)).ok());
 				}
 
-				assertEquals(r.numTableFilesAtLevel(0), 0);
-				assertTrue(r.numTableFilesAtLevel(1) > 0);
-			}
-		} while (r.changeOptions());
+				// 0 because GetApproximateSizes() does not account for memtable
+				// space
+				assertTrue(between(r.size(slice(""), slice(Key(50))), 0, 0));
 
-		r.delete();
+				if (options.reuseLogs) {
+					// Recovery will reuse memtable, and GetApproximateSizes() does
+					// not
+					// account for memtable usage;
+					r.reopen(options);
+					assertTrue(between(r.size(slice(""), slice(Key(50))), 0, 0));
+					continue;
+				}
+
+				// Check sizes across recovery by reopening a few times
+				for (int run = 0; run < 3; run++) {
+					r.reopen(options);
+
+					for (int compact_start = 0; compact_start < N; compact_start += 10) {
+						for (int i = 0; i < N; i += 10) {
+							assertTrue(between(r.size(slice(""), slice(Key(i))), S1 * i, S2 * i));
+							assertTrue(between(r.size(slice(""), slice(Key(i) + ".suffix")), S1 * (i + 1), S2 * (i + 1)));
+							assertTrue(between(r.size(slice(Key(i)), slice(Key(i + 10))), S1 * 10, S2 * 10));
+						}
+						assertTrue(between(r.size(slice(""), slice(Key(50))), S1 * 50, S2 * 50));
+						assertTrue(between(r.size(slice(""), slice(Key(50) + ".suffix")), S1 * 50, S2 * 50));
+
+						String cstart_str = Key(compact_start);
+						String cend_str = Key(compact_start + 9);
+						Slice cstart = slice(cstart_str);
+						Slice cend = slice(cend_str);
+						r.dbfull().TEST_CompactRange(0, cstart, cend);
+					}
+
+					assertEquals(r.numTableFilesAtLevel(0), 0);
+					assertTrue(r.numTableFilesAtLevel(1) > 0);
+				}
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testApproximateSizes_MixOfSmallAndLarge() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				Options options = r.currentOptions().cloneOptions();
+				options.compression = CompressionType.kNoCompression;
+				r.reopen();
 
-		do {
-			Options options = r.currentOptions().cloneOptions();
-			options.compression = CompressionType.kNoCompression;
-			r.reopen();
+				Random0 rnd = new Random0(301);
+				ByteBuf big1 = randomString(rnd, 100000);
+				assertTrue(r.put(Key(0), randomString(rnd, 10000)).ok());
+				assertTrue(r.put(Key(1), randomString(rnd, 10000)).ok());
+				assertTrue(r.put(Key(2), big1).ok());
+				assertTrue(r.put(Key(3), randomString(rnd, 10000)).ok());
+				assertTrue(r.put(Key(4), big1).ok());
+				assertTrue(r.put(Key(5), randomString(rnd, 10000)).ok());
+				assertTrue(r.put(Key(6), randomString(rnd, 300000)).ok());
+				assertTrue(r.put(Key(7), randomString(rnd, 10000)).ok());
 
-			Random0 rnd = new Random0(301);
-			ByteBuf big1 = randomString(rnd, 100000);
-			assertTrue(r.put(Key(0), randomString(rnd, 10000)).ok());
-			assertTrue(r.put(Key(1), randomString(rnd, 10000)).ok());
-			assertTrue(r.put(Key(2), big1).ok());
-			assertTrue(r.put(Key(3), randomString(rnd, 10000)).ok());
-			assertTrue(r.put(Key(4), big1).ok());
-			assertTrue(r.put(Key(5), randomString(rnd, 10000)).ok());
-			assertTrue(r.put(Key(6), randomString(rnd, 300000)).ok());
-			assertTrue(r.put(Key(7), randomString(rnd, 10000)).ok());
+				if (options.reuseLogs) {
+					// Need to force a memtable compaction since recovery does not
+					// do so.
+					assertTrue(r.dbfull().TEST_CompactMemTable().ok());
+				}
 
-			if (options.reuseLogs) {
-				// Need to force a memtable compaction since recovery does not
-				// do so.
-				assertTrue(r.dbfull().TEST_CompactMemTable().ok());
-			}
+				// Check sizes across recovery by reopening a few times
+				for (int run = 0; run < 3; run++) {
+					r.reopen(options);
 
-			// Check sizes across recovery by reopening a few times
-			for (int run = 0; run < 3; run++) {
-				r.reopen(options);
+					assertTrue(between(r.size(slice(""), slice(Key(0))), 0, 0));
+					assertTrue(between(r.size(slice(""), slice(Key(1))), 10000, 11000));
+					assertTrue(between(r.size(slice(""), slice(Key(2))), 20000, 21000));
+					assertTrue(between(r.size(slice(""), slice(Key(3))), 120000, 121000));
+					assertTrue(between(r.size(slice(""), slice(Key(4))), 130000, 131000));
+					assertTrue(between(r.size(slice(""), slice(Key(5))), 230000, 231000));
+					assertTrue(between(r.size(slice(""), slice(Key(6))), 240000, 241000));
+					assertTrue(between(r.size(slice(""), slice(Key(7))), 540000, 541000));
+					assertTrue(between(r.size(slice(""), slice(Key(8))), 550000, 560000));
 
-				assertTrue(between(r.size(slice(""), slice(Key(0))), 0, 0));
-				assertTrue(between(r.size(slice(""), slice(Key(1))), 10000, 11000));
-				assertTrue(between(r.size(slice(""), slice(Key(2))), 20000, 21000));
-				assertTrue(between(r.size(slice(""), slice(Key(3))), 120000, 121000));
-				assertTrue(between(r.size(slice(""), slice(Key(4))), 130000, 131000));
-				assertTrue(between(r.size(slice(""), slice(Key(5))), 230000, 231000));
-				assertTrue(between(r.size(slice(""), slice(Key(6))), 240000, 241000));
-				assertTrue(between(r.size(slice(""), slice(Key(7))), 540000, 541000));
-				assertTrue(between(r.size(slice(""), slice(Key(8))), 550000, 560000));
+					assertTrue(between(r.size(slice(Key(3)), slice(Key(5))), 110000, 111000));
 
-				assertTrue(between(r.size(slice(Key(3)), slice(Key(5))), 110000, 111000));
-
-				r.dbfull().TEST_CompactRange(0, null, null);
-			}
-		} while (r.changeOptions());
-
-		r.delete();
+					r.dbfull().TEST_CompactRange(0, null, null);
+				}
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testIteratorPinsRef() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			r.put("foo", "hello");
 
-		r.put("foo", "hello");
+			// Get iterator that will yield the current contents of the DB.
+			Iterator0 iter = r.db.newIterator(new ReadOptions());
 
-		// Get iterator that will yield the current contents of the DB.
-		Iterator0 iter = r.db.newIterator(new ReadOptions());
+			// Write to force compactions
+			r.put("foo", "newvalue1");
+			for (int i = 0; i < 100; i++) {
+				assertTrue(r.put(Key(i), Key(i) + TestUtil.makeString(100000, 'v')).ok()); // 100K values
+			}
+			r.put("foo", "newvalue2");
 
-		// Write to force compactions
-		r.put("foo", "newvalue1");
-		for (int i = 0; i < 100; i++) {
-			assertTrue(r.put(Key(i), Key(i) + TestUtil.makeString(100000, 'v')).ok()); // 100K values
+			iter.seekToFirst();
+			assertTrue(iter.valid());
+			assertEquals("foo", iter.key().encodeToString());
+			assertEquals("hello", iter.value().encodeToString());
+			iter.next();
+			assertTrue(!iter.valid());
+			iter.delete();
+		} finally {
+			r.delete();
 		}
-		r.put("foo", "newvalue2");
-
-		iter.seekToFirst();
-		assertTrue(iter.valid());
-		assertEquals("foo", iter.key().encodeToString());
-		assertEquals("hello", iter.value().encodeToString());
-		iter.next();
-		assertTrue(!iter.valid());
-		iter.delete();
-
-		r.delete();
 	}
 
 	@Test
 	public void testSnapshot() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				r.put("foo", "v1");
+				final Snapshot s1 = r.db.getSnapshot();
+				r.put("foo", "v2");
+				final Snapshot s2 = r.db.getSnapshot();
+				r.put("foo", "v3");
+				final Snapshot s3 = r.db.getSnapshot();
 
-		do {
-			r.put("foo", "v1");
-			final Snapshot s1 = r.db.getSnapshot();
-			r.put("foo", "v2");
-			final Snapshot s2 = r.db.getSnapshot();
-			r.put("foo", "v3");
-			final Snapshot s3 = r.db.getSnapshot();
+				r.put("foo", "v4");
+				assertEquals("v1", r.get("foo", s1));
+				assertEquals("v2", r.get("foo", s2));
+				assertEquals("v3", r.get("foo", s3));
+				assertEquals("v4", r.get("foo"));
 
-			r.put("foo", "v4");
-			assertEquals("v1", r.get("foo", s1));
-			assertEquals("v2", r.get("foo", s2));
-			assertEquals("v3", r.get("foo", s3));
-			assertEquals("v4", r.get("foo"));
+				r.db.releaseSnapshot(s3);
+				assertEquals("v1", r.get("foo", s1));
+				assertEquals("v2", r.get("foo", s2));
+				assertEquals("v4", r.get("foo"));
 
-			r.db.releaseSnapshot(s3);
-			assertEquals("v1", r.get("foo", s1));
-			assertEquals("v2", r.get("foo", s2));
-			assertEquals("v4", r.get("foo"));
+				r.db.releaseSnapshot(s1);
+				assertEquals("v2", r.get("foo", s2));
+				assertEquals("v4", r.get("foo"));
 
-			r.db.releaseSnapshot(s1);
-			assertEquals("v2", r.get("foo", s2));
-			assertEquals("v4", r.get("foo"));
-
-			r.db.releaseSnapshot(s2);
-			assertEquals("v4", r.get("foo"));
-		} while (r.changeOptions());
-
-		r.delete();
+				r.db.releaseSnapshot(s2);
+				assertEquals("v4", r.get("foo"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
-	// TODO
 	@Test
 	public void testHiddenValuesAreRemoved() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				Random0 rnd = new Random0(301);
+				r.fillLevels("a", "z");
 
-		do {
-			Random0 rnd = new Random0(301);
-			r.fillLevels("a", "z");
+				ByteBuf big = randomString(rnd, 50000);
+				r.put("foo", big);
+				r.put("pastfoo", "v");
+				final Snapshot snapshot = r.db.getSnapshot();
+				r.put("foo", "tiny");
+				r.put("pastfoo2", "v2"); // Advance sequence number one more
 
-			ByteBuf big = randomString(rnd, 50000);
-			r.put("foo", big);
-			r.put("pastfoo", "v");
-			final Snapshot snapshot = r.db.getSnapshot();
-			r.put("foo", "tiny");
-			r.put("pastfoo2", "v2"); // Advance sequence number one more
+				assertTrue(r.dbfull().TEST_CompactMemTable().ok());
+				assertTrue(r.numTableFilesAtLevel(0) > 0);
 
-			assertTrue(r.dbfull().TEST_CompactMemTable().ok());
-			assertTrue(r.numTableFilesAtLevel(0) > 0);
+				assertEquals(big.encodeToString(), r.get("foo", snapshot));
+				assertTrue(between(r.size(slice(""), slice("pastfoo")), 50000, 60000));
 
-			assertEquals(big.encodeToString(), r.get("foo", snapshot));
-			System.out.printf("[DEBUG] testHiddenValuesAreRemoved 2, size=%d\n", r.size(slice(""), slice("pastfoo")));
-			assertTrue(between(r.size(slice(""), slice("pastfoo")), 50000, 60000));
+				r.db.releaseSnapshot(snapshot);
+				assertEquals(r.allEntriesFor(slice("foo")), "[ tiny, " + big.encodeToString() + " ]");
 
-			r.db.releaseSnapshot(snapshot);
-			assertEquals(r.allEntriesFor(slice("foo")), "[ tiny, " + big + " ]");
-			Slice x = slice("x");
-			r.dbfull().TEST_CompactRange(0, null, x);
-			assertEquals(r.allEntriesFor(slice("foo")), "[ tiny ]");
-			assertEquals(r.numTableFilesAtLevel(0), 0);
-			assertTrue(r.numTableFilesAtLevel(1) >= 1);
-			r.dbfull().TEST_CompactRange(1, null, x);
-			assertEquals(r.allEntriesFor(slice("foo")), "[ tiny ]");
+				Slice x = slice("x");
+				r.dbfull().TEST_CompactRange(0, null, x);
+				assertEquals(r.allEntriesFor(slice("foo")), "[ tiny ]");
+				assertEquals(r.numTableFilesAtLevel(0), 0);
+				assertTrue(r.numTableFilesAtLevel(1) >= 1);
 
-			assertTrue(between(r.size(slice(""), slice("pastfoo")), 0, 1000));
-		} while (r.changeOptions());
-
-		r.delete();
+				r.dbfull().TEST_CompactRange(1, null, x);
+				assertEquals(r.allEntriesFor(slice("foo")), "[ tiny ]");
+				assertTrue(between(r.size(slice(""), slice("pastfoo")), 0, 1000));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testDeletionMarkers1() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			r.put("foo", "v1");
 
-		r.put("foo", "v1");
+			assertTrue(r.dbfull().TEST_CompactMemTable().ok());
 
-		assertTrue(r.dbfull().TEST_CompactMemTable().ok());
+			final int last = DBFormat.kMaxMemCompactLevel;
 
-		final int last = DBFormat.kMaxMemCompactLevel;
+			assertEquals(r.numTableFilesAtLevel(last), 1); // foo => v1 is now in last level
 
-		assertEquals(r.numTableFilesAtLevel(last), 1); // foo => v1 is now in last level
+			// Place a table at level last-1 to prevent merging with preceding mutation
+			r.put("a", "begin");
+			r.put("z", "end");
+			r.dbfull().TEST_CompactMemTable();
+			assertEquals(r.numTableFilesAtLevel(last), 1);
+			assertEquals(r.numTableFilesAtLevel(last - 1), 1);
 
-		// Place a table at level last-1 to prevent merging with preceding mutation
-		r.put("a", "begin");
-		r.put("z", "end");
-		r.dbfull().TEST_CompactMemTable();
-		assertEquals(r.numTableFilesAtLevel(last), 1);
-		assertEquals(r.numTableFilesAtLevel(last - 1), 1);
+			r.delete("foo");
+			r.put("foo", "v2");
+			assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
+			assertTrue(r.dbfull().TEST_CompactMemTable().ok()); // Moves to level last-2
 
-		r.delete("foo");
-		r.put("foo", "v2");
-		assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
-		assertTrue(r.dbfull().TEST_CompactMemTable().ok()); // Moves to level last-2
+			assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
+			Slice z = slice("z");
+			r.dbfull().TEST_CompactRange(last - 2, null, z);
 
-		assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
-		Slice z = slice("z");
-		r.dbfull().TEST_CompactRange(last - 2, null, z);
+			// DEL eliminated, but v1 remains because we aren't compacting that level
+			// (DEL can be eliminated because v2 hides v1).
+			assertEquals(r.allEntriesFor(slice("foo")), "[ v2, v1 ]");
+			r.dbfull().TEST_CompactRange(last - 1, null, null);
 
-		// DEL eliminated, but v1 remains because we aren't compacting that level
-		// (DEL can be eliminated because v2 hides v1).
-		assertEquals(r.allEntriesFor(slice("foo")), "[ v2, v1 ]");
-		r.dbfull().TEST_CompactRange(last - 1, null, null);
-
-		// Merging last-1 w/ last, so we are the base level for "foo", so DEL is
-		// removed. (as is v1).
-		assertEquals(r.allEntriesFor(slice("foo")), "[ v2 ]");
-
-		r.delete();
+			// Merging last-1 w/ last, so we are the base level for "foo", so DEL is
+			// removed. (as is v1).
+			assertEquals(r.allEntriesFor(slice("foo")), "[ v2 ]");
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testDeletionMarkers2() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			r.put("foo", "v1");
+			assertTrue(r.dbfull().TEST_CompactMemTable().ok());
+			final int last = DBFormat.kMaxMemCompactLevel;
+			assertEquals(r.numTableFilesAtLevel(last), 1); // foo => v1 is now in last level
 
-		r.put("foo", "v1");
-		assertTrue(r.dbfull().TEST_CompactMemTable().ok());
-		final int last = DBFormat.kMaxMemCompactLevel;
-		assertEquals(r.numTableFilesAtLevel(last), 1); // foo => v1 is now in last level
+			// Place a table at level last-1 to prevent merging with preceding
+			// mutation
+			r.put("a", "begin");
+			r.put("z", "end");
+			r.dbfull().TEST_CompactMemTable();
+			assertEquals(r.numTableFilesAtLevel(last), 1);
+			assertEquals(r.numTableFilesAtLevel(last - 1), 1);
 
-		// Place a table at level last-1 to prevent merging with preceding
-		// mutation
-		r.put("a", "begin");
-		r.put("z", "end");
-		r.dbfull().TEST_CompactMemTable();
-		assertEquals(r.numTableFilesAtLevel(last), 1);
-		assertEquals(r.numTableFilesAtLevel(last - 1), 1);
-
-		r.delete("foo");
-		assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
-		assertTrue(r.dbfull().TEST_CompactMemTable().ok()); // Moves to level
-															// last-2
-		assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
-		r.dbfull().TEST_CompactRange(last - 2, null, null);
-		// DEL kept: "last" file overlaps
-		assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
-		r.dbfull().TEST_CompactRange(last - 1, null, null);
-		// Merging last-1 w/ last, so we are the base level for "foo", so
-		// DEL is removed. (as is v1).
-		assertEquals(r.allEntriesFor(slice("foo")), "[ ]");
-
-		r.delete();
+			r.delete("foo");
+			assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
+			assertTrue(r.dbfull().TEST_CompactMemTable().ok()); // Moves to level
+																// last-2
+			assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
+			r.dbfull().TEST_CompactRange(last - 2, null, null);
+			// DEL kept: "last" file overlaps
+			assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
+			r.dbfull().TEST_CompactRange(last - 1, null, null);
+			// Merging last-1 w/ last, so we are the base level for "foo", so
+			// DEL is removed. (as is v1).
+			assertEquals(r.allEntriesFor(slice("foo")), "[ ]");
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testOverlapInLevel0() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				assertEquals(DBFormat.kMaxMemCompactLevel, 2);
 
-		do {
-			assertEquals(DBFormat.kMaxMemCompactLevel, 2);
+				// Fill levels 1 and 2 to disable the pushing of new memtables to
+				// levels > 0.
+				assertTrue(r.put("100", "v100").ok());
+				assertTrue(r.put("999", "v999").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertTrue(r.delete("100").ok());
+				assertTrue(r.delete("999").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertEquals("0,1,1", r.filesPerLevel());
 
-			// Fill levels 1 and 2 to disable the pushing of new memtables to
-			// levels > 0.
-			assertTrue(r.put("100", "v100").ok());
-			assertTrue(r.put("999", "v999").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertTrue(r.delete("100").ok());
-			assertTrue(r.delete("999").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertEquals("0,1,1", r.filesPerLevel());
+				// Make files spanning the following ranges in level-0:
+				// files[0] 200 .. 900
+				// files[1] 300 .. 500
+				// Note that files are sorted by smallest key.
+				assertTrue(r.put("300", "v300").ok());
+				assertTrue(r.put("500", "v500").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertTrue(r.put("200", "v200").ok());
+				assertTrue(r.put("600", "v600").ok());
+				assertTrue(r.put("900", "v900").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertEquals("2,1,1", r.filesPerLevel());
 
-			// Make files spanning the following ranges in level-0:
-			// files[0] 200 .. 900
-			// files[1] 300 .. 500
-			// Note that files are sorted by smallest key.
-			assertTrue(r.put("300", "v300").ok());
-			assertTrue(r.put("500", "v500").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertTrue(r.put("200", "v200").ok());
-			assertTrue(r.put("600", "v600").ok());
-			assertTrue(r.put("900", "v900").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertEquals("2,1,1", r.filesPerLevel());
+				// Compact away the placeholder files we created initially
+				r.dbfull().TEST_CompactRange(1, null, null);
+				r.dbfull().TEST_CompactRange(2, null, null);
+				assertEquals("2", r.filesPerLevel());
 
-			// Compact away the placeholder files we created initially
-			r.dbfull().TEST_CompactRange(1, null, null);
-			r.dbfull().TEST_CompactRange(2, null, null);
-			assertEquals("2", r.filesPerLevel());
-
-			// Do a memtable compaction. Before bug-fix, the compaction would
-			// not detect the overlap with level-0 files and would incorrectly
-			// place
-			// the deletion in a deeper level.
-			assertTrue(r.delete("600").ok());
-			r.dbfull().TEST_CompactMemTable();
-			assertEquals("3", r.filesPerLevel());
-			assertEquals("NOT_FOUND", r.get("600"));
-		} while (r.changeOptions());
-
-		r.delete();
+				// Do a memtable compaction. Before bug-fix, the compaction would
+				// not detect the overlap with level-0 files and would incorrectly
+				// place
+				// the deletion in a deeper level.
+				assertTrue(r.delete("600").ok());
+				r.dbfull().TEST_CompactMemTable();
+				assertEquals("3", r.filesPerLevel());
+				assertEquals("NOT_FOUND", r.get("600"));
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testL0_CompactionBug_Issue44_a() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
-
-		r.reopen();
-		assertTrue(r.put("b", "v").ok());
-		r.reopen();
-		assertTrue(r.delete("b").ok());
-		assertTrue(r.delete("a").ok());
-		r.reopen();
-		assertTrue(r.delete("a").ok());
-		r.reopen();
-		assertTrue(r.put("a", "v").ok());
-		r.reopen();
-		r.reopen();
-		assertEquals("(a->v)", r.contents());
-		delayMilliseconds(1000); // Wait for compaction to finish
-		assertEquals("(a->v)", r.contents());
-
-		r.delete();
+		try {
+			r.reopen();
+			assertTrue(r.put("b", "v").ok());
+			r.reopen();
+			assertTrue(r.delete("b").ok());
+			assertTrue(r.delete("a").ok());
+			r.reopen();
+			assertTrue(r.delete("a").ok());
+			r.reopen();
+			assertTrue(r.put("a", "v").ok());
+			r.reopen();
+			r.reopen();
+			assertEquals("(a->v)", r.contents());
+			delayMilliseconds(1000); // Wait for compaction to finish
+			assertEquals("(a->v)", r.contents());
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testL0_CompactionBug_Issue44_b() throws Exception {
 
 		DBTestRunner r = new DBTestRunner();
-
-		r.reopen();
-		r.put("", "");
-		r.reopen();
-		r.delete("e");
-		r.put("", "");
-		r.reopen();
-		r.put("c", "cv");
-		r.reopen();
-		r.put("", "");
-		r.reopen();
-		r.put("", "");
-		delayMilliseconds(1000); // Wait for compaction to finish
-		r.reopen();
-		r.put("d", "dv");
-		r.reopen();
-		r.put("", "");
-		r.reopen();
-		r.delete("d");
-		r.delete("b");
-		r.reopen();
-		assertEquals("(->)(c->cv)", r.contents());
-		delayMilliseconds(1000); // Wait for compaction to finish
-		assertEquals("(->)(c->cv)", r.contents());
-
-		r.delete();
+		try {
+			r.reopen();
+			r.put("", "");
+			r.reopen();
+			r.delete("e");
+			r.put("", "");
+			r.reopen();
+			r.put("c", "cv");
+			r.reopen();
+			r.put("", "");
+			r.reopen();
+			r.put("", "");
+			delayMilliseconds(1000); // Wait for compaction to finish
+			r.reopen();
+			r.put("d", "dv");
+			r.reopen();
+			r.put("", "");
+			r.reopen();
+			r.delete("d");
+			r.delete("b");
+			r.reopen();
+			assertEquals("(->)(c->cv)", r.contents());
+			delayMilliseconds(1000); // Wait for compaction to finish
+			assertEquals("(->)(c->cv)", r.contents());
+		} finally {
+			r.delete();
+		}
 	}
 
 	static class NewComparator extends Comparator0 {
@@ -1722,20 +1791,20 @@ public class TestDB {
 		}
 	};
 
-	// TODO
 	@Test
 	public void testComparatorCheck() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-
-		NewComparator cmp = new NewComparator();
-		Options new_options = r.currentOptions().cloneOptions();
-		new_options.comparator = cmp;
-		Status s = r.tryReopen(new_options);
-		assertTrue(!s.ok());
-		System.out.println("s=" + s);
-		assertTrue(s.toString().indexOf("comparator") >= 0);
-
-		r.delete();
+		try {
+			NewComparator cmp = new NewComparator();
+			Options newOptions = r.currentOptions().cloneOptions();
+			newOptions.comparator = cmp;
+			Status s = r.tryReopen(newOptions);
+			assertTrue(!s.ok());
+			System.out.println("s=" + s);
+			assertTrue(s.toString().indexOf("comparator") >= 0);
+		} finally {
+			r.delete();
+		}
 	}
 
 	static class NumberComparator extends Comparator0 {
@@ -1773,442 +1842,449 @@ public class TestDB {
 	@Test
 	public void testCustomComparator() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-
-		NumberComparator cmp = new NumberComparator();
-		Options new_options = r.currentOptions().cloneOptions();
-		new_options.createIfMissing = true;
-		new_options.comparator = cmp;
-		new_options.filterPolicy = null; // Cannot use bloom filters
-		new_options.writeBufferSize = 1000; // Compact more often
-		r.destroyAndReopen(new_options);
-		assertTrue(r.put("[10]", "ten").ok());
-		assertTrue(r.put("[0x14]", "twenty").ok());
-		for (int i = 0; i < 2; i++) {
-			assertEquals("ten", r.get("[10]"));
-			assertEquals("ten", r.get("[0xa]"));
-			assertEquals("twenty", r.get("[20]"));
-			assertEquals("twenty", r.get("[0x14]"));
-			assertEquals("NOT_FOUND", r.get("[15]"));
-			assertEquals("NOT_FOUND", r.get("[0xf]"));
-			r.compact("[0]", "[9999]");
-		}
-
-		for (int run = 0; run < 2; run++) {
-			for (int i = 0; i < 1000; i++) {
-				String s = String.format("[%d]", i * 10);
-				assertTrue(r.put(s, s).ok());
+		try {
+			NumberComparator cmp = new NumberComparator();
+			Options new_options = r.currentOptions().cloneOptions();
+			new_options.createIfMissing = true;
+			new_options.comparator = cmp;
+			new_options.filterPolicy = null; // Cannot use bloom filters
+			new_options.writeBufferSize = 1000; // Compact more often
+			r.destroyAndReopen(new_options);
+			assertTrue(r.put("[10]", "ten").ok());
+			assertTrue(r.put("[0x14]", "twenty").ok());
+			for (int i = 0; i < 2; i++) {
+				assertEquals("ten", r.get("[10]"));
+				assertEquals("ten", r.get("[0xa]"));
+				assertEquals("twenty", r.get("[20]"));
+				assertEquals("twenty", r.get("[0x14]"));
+				assertEquals("NOT_FOUND", r.get("[15]"));
+				assertEquals("NOT_FOUND", r.get("[0xf]"));
+				r.compact("[0]", "[9999]");
 			}
-			r.compact("[0]", "[1000000]");
-		}
 
-		r.delete();
-		r = null;
+			for (int run = 0; run < 2; run++) {
+				for (int i = 0; i < 1000; i++) {
+					String s = String.format("[%d]", i * 10);
+					assertTrue(r.put(s, s).ok());
+				}
+				r.compact("[0]", "[1000000]");
+			}
+
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testManualCompaction() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			assertEquals(DBFormat.kMaxMemCompactLevel, 2);
 
-		assertEquals(DBFormat.kMaxMemCompactLevel, 2);
+			r.makeTables(3, "p", "q");
+			assertEquals("1,1,1", r.filesPerLevel());
 
-		r.makeTables(3, "p", "q");
-		assertEquals("1,1,1", r.filesPerLevel());
+			// Compaction range falls before files
+			r.compact("", "c");
+			assertEquals("1,1,1", r.filesPerLevel());
 
-		// Compaction range falls before files
-		r.compact("", "c");
-		assertEquals("1,1,1", r.filesPerLevel());
+			// Compaction range falls after files
+			r.compact("r", "z");
+			assertEquals("1,1,1", r.filesPerLevel());
 
-		// Compaction range falls after files
-		r.compact("r", "z");
-		assertEquals("1,1,1", r.filesPerLevel());
+			// Compaction range overlaps files
+			r.compact("p1", "p9");
+			assertEquals("0,0,1", r.filesPerLevel());
 
-		// Compaction range overlaps files
-		r.compact("p1", "p9");
-		assertEquals("0,0,1", r.filesPerLevel());
+			// Populate a different range
+			r.makeTables(3, "c", "e");
+			assertEquals("1,1,2", r.filesPerLevel());
 
-		// Populate a different range
-		r.makeTables(3, "c", "e");
-		assertEquals("1,1,2", r.filesPerLevel());
+			// Compact just the new range
+			r.compact("b", "f");
+			assertEquals("0,0,2", r.filesPerLevel());
 
-		// Compact just the new range
-		r.compact("b", "f");
-		assertEquals("0,0,2", r.filesPerLevel());
+			// Compact all
+			r.makeTables(1, "a", "z");
+			assertEquals("0,1,2", r.filesPerLevel());
+			r.db.compactRange(null, null);
+			assertEquals("0,0,1", r.filesPerLevel());
 
-		// Compact all
-		r.makeTables(1, "a", "z");
-		assertEquals("0,1,2", r.filesPerLevel());
-		r.db.compactRange(null, null);
-		assertEquals("0,0,1", r.filesPerLevel());
-
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testDBOpen_Options() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			String dbname = TestUtil.tmpDir() + "/db_options_test";
+			LevelDB.destroyDB(dbname, new Options());
 
-		String dbname = TestUtil.tmpDir() + "/db_options_test";
-		LevelDB.destroyDB(dbname, new Options());
+			// Does not exist, and create_if_missing == false: error
+			Object0<DB> db0 = new Object0<>();
+			Options opts = new Options();
+			opts.createIfMissing = false;
+			Status s = LevelDB.newDB(opts, dbname, db0);
+			DB db = db0.getValue();
+			assertTrue(s.toString().indexOf("does not exist") >= 0);
+			assertTrue(db == null);
 
-		// Does not exist, and create_if_missing == false: error
-		Object0<DB> db0 = new Object0<>();
-		Options opts = new Options();
-		opts.createIfMissing = false;
-		Status s = LevelDB.newDB(opts, dbname, db0);
-		DB db = db0.getValue();
-		assertTrue(s.toString().indexOf("does not exist") >= 0);
-		assertTrue(db == null);
+			// Does not exist, and create_if_missing == true: OK
+			opts.createIfMissing = true;
+			db0.setValue(null);
+			s = LevelDB.newDB(opts, dbname, db0);
+			db = db0.getValue();
+			assertTrue(s.ok());
+			assertTrue(db != null);
 
-		// Does not exist, and create_if_missing == true: OK
-		opts.createIfMissing = true;
-		db0.setValue(null);
-		s = LevelDB.newDB(opts, dbname, db0);
-		db = db0.getValue();
-		assertTrue(s.ok());
-		assertTrue(db != null);
+			db.close();
+			db = null;
 
-		db.close();
-		db = null;
+			// Does exist, and error_if_exists == true: error
+			opts.createIfMissing = false;
+			opts.errorIfExists = true;
+			db0.setValue(null);
+			s = LevelDB.newDB(opts, dbname, db0);
+			db = db0.getValue();
+			assertTrue(s.toString().indexOf("exists") >= 0);
+			assertTrue(db == null);
 
-		// Does exist, and error_if_exists == true: error
-		opts.createIfMissing = false;
-		opts.errorIfExists = true;
-		db0.setValue(null);
-		s = LevelDB.newDB(opts, dbname, db0);
-		db = db0.getValue();
-		assertTrue(s.toString().indexOf("exists") >= 0);
-		assertTrue(db == null);
+			// Does exist, and error_if_exists == false: OK
+			opts.createIfMissing = true;
+			opts.errorIfExists = false;
+			db0.setValue(null);
+			s = LevelDB.newDB(opts, dbname, db0);
+			db = db0.getValue();
+			assertTrue(s.ok());
+			assertTrue(db != null);
 
-		// Does exist, and error_if_exists == false: OK
-		opts.createIfMissing = true;
-		opts.errorIfExists = false;
-		db0.setValue(null);
-		s = LevelDB.newDB(opts, dbname, db0);
-		db = db0.getValue();
-		assertTrue(s.ok());
-		assertTrue(db != null);
+			db.close();
 
-		db.close();
-		;
-		db = null;
+			db = null;
 
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testLocking() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			Object0<DB> db2 = new Object0<>();
+			Status s = LevelDB.newDB(r.currentOptions().cloneOptions(), r.dbname, db2);
+			assertTrue(!s.ok());
 
-		Object0<DB> db2 = new Object0<>();
-		Status s = LevelDB.newDB(r.currentOptions().cloneOptions(), r.dbname, db2);
-		assertTrue(!s.ok());
-
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	// Check that number of files does not grow when we are out of space
 	@Test
 	public void testNoSpace() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			Options options = r.currentOptions().cloneOptions();
+			options.env = r.env;
+			r.reopen(options);
 
-		Options options = r.currentOptions().cloneOptions();
-		options.env = r.env;
-		r.reopen(options);
-
-		assertTrue(r.put("foo", "v1").ok());
-		assertEquals("v1", r.get("foo"));
-		r.compact("a", "z");
-		final int num_files = r.countFiles();
-		r.env.noSpace.set(r.env); // Force out-of-space errors
-		for (int i = 0; i < 10; i++) {
-			for (int level = 0; level < DBFormat.kNumLevels - 1; level++) {
-				r.dbfull().TEST_CompactRange(level, null, null);
+			assertTrue(r.put("foo", "v1").ok());
+			assertEquals("v1", r.get("foo"));
+			r.compact("a", "z");
+			final int num_files = r.countFiles();
+			r.env.noSpace.set(r.env); // Force out-of-space errors
+			for (int i = 0; i < 10; i++) {
+				for (int level = 0; level < DBFormat.kNumLevels - 1; level++) {
+					r.dbfull().TEST_CompactRange(level, null, null);
+				}
 			}
-		}
-		r.env.noSpace.set(null);
-		assertTrue(r.countFiles() < num_files + 3);
+			r.env.noSpace.set(null);
+			assertTrue(r.countFiles() < num_files + 3);
 
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testNonWritableFileSystem() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-
-		Options options = r.currentOptions().cloneOptions();
-		options.writeBufferSize = 1000;
-		options.env = r.env;
-		r.reopen(options);
-		assertTrue(r.put("foo", "v1").ok());
-		r.env.nonWritable.set(r.env); // Force errors for new files
-		String big = TestUtil.makeString(100000, 'x');
-		int errors = 0;
-		for (int i = 0; i < 20; i++) {
-			System.err.printf("iter %d; errors %d\n", i, errors);
-			if (!r.put("foo", big).ok()) {
-				errors++;
-				delayMilliseconds(100);
+		try {
+			Options options = r.currentOptions().cloneOptions();
+			options.writeBufferSize = 1000;
+			options.env = r.env;
+			r.reopen(options);
+			assertTrue(r.put("foo", "v1").ok());
+			r.env.nonWritable.set(r.env); // Force errors for new files
+			String big = TestUtil.makeString(100000, 'x');
+			int errors = 0;
+			for (int i = 0; i < 20; i++) {
+				System.err.printf("iter %d; errors %d\n", i, errors);
+				if (!r.put("foo", big).ok()) {
+					errors++;
+					delayMilliseconds(100);
+				}
 			}
-		}
-		assertTrue(errors > 0);
-		r.env.nonWritable.set(null);
+			assertTrue(errors > 0);
+			r.env.nonWritable.set(null);
 
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testWriteSyncError() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			// Check that log sync errors cause the DB to disallow future writes.
 
-		// Check that log sync errors cause the DB to disallow future writes.
+			// (a) Cause log sync calls to fail
+			Options options = r.currentOptions().cloneOptions();
+			options.env = r.env;
+			r.reopen(options);
+			r.env.dataSyncError.set(r.env);
 
-		// (a) Cause log sync calls to fail
-		Options options = r.currentOptions().cloneOptions();
-		options.env = r.env;
-		r.reopen(options);
-		r.env.dataSyncError.set(r.env);
+			// (b) Normal write should succeed
+			WriteOptions w = new WriteOptions();
+			assertTrue(r.db.put(w, new DefaultSlice("k1"), new DefaultSlice("v1")).ok());
+			assertEquals("v1", r.get("k1"));
 
-		// (b) Normal write should succeed
-		WriteOptions w = new WriteOptions();
-		assertTrue(r.db.put(w, new DefaultSlice("k1"), new DefaultSlice("v1")).ok());
-		assertEquals("v1", r.get("k1"));
+			// (c) Do a sync write; should fail
+			w.sync = true;
+			assertTrue(!r.db.put(w, new DefaultSlice("k2"), new DefaultSlice("v2")).ok());
+			assertEquals("v1", r.get("k1"));
+			assertEquals("NOT_FOUND", r.get("k2"));
 
-		// (c) Do a sync write; should fail
-		w.sync = true;
-		assertTrue(!r.db.put(w, new DefaultSlice("k2"), new DefaultSlice("v2")).ok());
-		assertEquals("v1", r.get("k1"));
-		assertEquals("NOT_FOUND", r.get("k2"));
+			// (d) make sync behave normally
+			r.env.dataSyncError.set(null);
 
-		// (d) make sync behave normally
-		r.env.dataSyncError.set(null);
+			// (e) Do a non-sync write; should fail
+			w.sync = false;
+			assertTrue(!r.db.put(w, new DefaultSlice("k3"), new DefaultSlice("v3")).ok());
+			assertEquals("v1", r.get("k1"));
+			assertEquals("NOT_FOUND", r.get("k2"));
+			assertEquals("NOT_FOUND", r.get("k3"));
 
-		// (e) Do a non-sync write; should fail
-		w.sync = false;
-		assertTrue(!r.db.put(w, new DefaultSlice("k3"), new DefaultSlice("v3")).ok());
-		assertEquals("v1", r.get("k1"));
-		assertEquals("NOT_FOUND", r.get("k2"));
-		assertEquals("NOT_FOUND", r.get("k3"));
-
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testManifestWriteError() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		// Test for the following problem:
-		// (a) Compaction produces file F
-		// (b) Log record containing F is written to MANIFEST file, but Sync()
-		// fails
-		// (c) GC deletes F
-		// (d) After reopening DB, reads fail since deleted F is named in log
-		// record
+		try {
+			// Test for the following problem:
+			// (a) Compaction produces file F
+			// (b) Log record containing F is written to MANIFEST file, but Sync()
+			// fails
+			// (c) GC deletes F
+			// (d) After reopening DB, reads fail since deleted F is named in log
+			// record
 
-		// We iterate twice. In the second iteration, everything is the
-		// same except the log record never makes it to the MANIFEST file.
-		for (int iter = 0; iter < 2; iter++) {
-			AtomicReference<Object> error_type = (iter == 0) ? r.env.manifestSyncError : r.env.manifestWriteError;
+			// We iterate twice. In the second iteration, everything is the
+			// same except the log record never makes it to the MANIFEST file.
+			for (int iter = 0; iter < 2; iter++) {
+				AtomicReference<Object> error_type = (iter == 0) ? r.env.manifestSyncError : r.env.manifestWriteError;
 
-			// Insert foo=>bar mapping
-			Options options = r.currentOptions().cloneOptions();
-			options.env = r.env;
-			options.createIfMissing = true;
-			options.errorIfExists = false;
-			r.destroyAndReopen(options);
-			assertTrue(r.put("foo", "bar").ok());
-			assertEquals("bar", r.get("foo"));
+				// Insert foo=>bar mapping
+				Options options = r.currentOptions().cloneOptions();
+				options.env = r.env;
+				options.createIfMissing = true;
+				options.errorIfExists = false;
+				r.destroyAndReopen(options);
+				assertTrue(r.put("foo", "bar").ok());
+				assertEquals("bar", r.get("foo"));
 
-			// Memtable compaction (will succeed)
-			r.dbfull().TEST_CompactMemTable();
-			assertEquals("bar", r.get("foo"));
-			final int last = DBFormat.kMaxMemCompactLevel;
-			assertEquals(r.numTableFilesAtLevel(last), 1); // foo=>bar is now in
-															// last level
+				// Memtable compaction (will succeed)
+				r.dbfull().TEST_CompactMemTable();
+				assertEquals("bar", r.get("foo"));
+				final int last = DBFormat.kMaxMemCompactLevel;
+				assertEquals(r.numTableFilesAtLevel(last), 1); // foo=>bar is now in
+																// last level
 
-			// Merging compaction (will fail)
-			error_type.set(r.env);
-			r.dbfull().TEST_CompactRange(last, null, null); // Should fail
-			assertEquals("bar", r.get("foo"));
+				// Merging compaction (will fail)
+				error_type.set(r.env);
+				r.dbfull().TEST_CompactRange(last, null, null); // Should fail
+				assertEquals("bar", r.get("foo"));
 
-			// Recovery: should not lose data
-			error_type.set(null);
-			r.reopen(options);
-			assertEquals("bar", r.get("foo"));
+				// Recovery: should not lose data
+				error_type.set(null);
+				r.reopen(options);
+				assertEquals("bar", r.get("foo"));
+			}
+		} finally {
+			r.delete();
 		}
-
-		r.delete();
 	}
 
 	@Test
 	public void testMissingSSTFile() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		assertTrue(r.put("foo", "bar").ok());
-		assertEquals("bar", r.get("foo"));
+		try {
+			assertTrue(r.put("foo", "bar").ok());
+			assertEquals("bar", r.get("foo"));
 
-		// Dump the memtable to disk.
-		r.dbfull().TEST_CompactMemTable();
-		assertEquals("bar", r.get("foo"));
+			// Dump the memtable to disk.
+			r.dbfull().TEST_CompactMemTable();
+			assertEquals("bar", r.get("foo"));
 
-		r.close();
-		assertTrue(r.deleteAnSSTFile());
-		Options options = r.currentOptions().cloneOptions();
-		options.paranoidChecks = true;
-		Status s = r.tryReopen(options);
-		assertTrue(!s.ok());
-		assertTrue(s.toString().indexOf("issing") >= 0);
+			r.close();
+			assertTrue(r.deleteAnSSTFile());
+			Options options = r.currentOptions().cloneOptions();
+			options.paranoidChecks = true;
+			Status s = r.tryReopen(options);
+			assertTrue(!s.ok());
+			assertTrue(s.toString().indexOf("issing") >= 0);
 
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testStillReadSST() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		assertTrue(r.put("foo", "bar").ok());
-		assertEquals("bar", r.get("foo"));
+		try {
+			assertTrue(r.put("foo", "bar").ok());
+			assertEquals("bar", r.get("foo"));
 
-		// Dump the memtable to disk.
-		r.dbfull().TEST_CompactMemTable();
-		assertEquals("bar", r.get("foo"));
-		r.close();
-		assertTrue(r.renameLDBToSST() > 0);
-		Options options = r.currentOptions().cloneOptions();
-		options.paranoidChecks = true;
-		Status s = r.tryReopen(options);
-		assertTrue(s.ok());
-		assertEquals("bar", r.get("foo"));
-		r.delete();
+			// Dump the memtable to disk.
+			r.dbfull().TEST_CompactMemTable();
+			assertEquals("bar", r.get("foo"));
+			r.close();
+			assertTrue(r.renameLDBToSST() > 0);
+			Options options = r.currentOptions().cloneOptions();
+			options.paranoidChecks = true;
+			Status s = r.tryReopen(options);
+			assertTrue(s.ok());
+			assertEquals("bar", r.get("foo"));
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testFilesDeletedAfterCompaction() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-
-		assertTrue(r.put("foo", "v2").ok());
-		r.compact("a", "z");
-		final int num_files = r.countFiles();
-
-		PrintStream defaultOut = System.out;
-		System.setOut(new PrintStream(new DummyOutputStream()));
-
-		for (int i = 0; i < 10; i++) {
+		try {
 			assertTrue(r.put("foo", "v2").ok());
 			r.compact("a", "z");
-		}
+			final int num_files = r.countFiles();
 
-		System.setOut(defaultOut);
+			PrintStream defaultOut = System.out;
+			System.setOut(new PrintStream(new DummyOutputStream()));
 
-		System.out.printf("DB.dataRange: %s", r.db.debugDataRange());
+			for (int i = 0; i < 10; i++) {
+				assertTrue(r.put("foo", "v2").ok());
+				r.compact("a", "z");
+			}
 
-		assertEquals(r.countFiles(), num_files);
+			System.setOut(defaultOut);
+			//
+			// System.out.printf("DB.dataRange: %s", r.db.debugDataRange());
 
-		r.delete();
-	}
+			assertEquals(r.countFiles(), num_files);
 
-	@Test
-	public void testBloomFilter0() throws Exception {
-		TestBloom.BloomRun br = new TestBloom.BloomRun();
-		final int N = 10000;
-		for (int i = 0; i < N; i++) {
-			br.add(new DefaultSlice(Key(i)));
-		}
-
-		for (int i = 0; i < N; i++) {
-			assertTrue(br.matches(new DefaultSlice(Key(i))));
+		} finally {
+			r.delete();
 		}
 	}
 
 	@Test
 	public void testBloomFilter01() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			r.destroyAndReopen();
 
-		r.destroyAndReopen();
+			r.env.countRandomReads = true;
+			Options options = r.currentOptions().cloneOptions();
+			options.env = r.env;
+			options.blockCache = Cache.newLRUCache(0); // Prevent cache hits
+			options.filterPolicy = BloomFilterPolicy.newBloomFilterPolicy(10);
 
-		r.env.countRandomReads = true;
-		Options options = r.currentOptions().cloneOptions();
-		options.env = r.env;
-		options.blockCache = Cache.newLRUCache(0); // Prevent cache hits
-		options.filterPolicy = BloomFilterPolicy.newBloomFilterPolicy(10);
+			r.reopen(options);
 
-		r.reopen(options);
+			final int N = 1000;
+			for (int i = 0; i < N; i++)
+				assertTrue(r.put(Key(i), Key(i)).ok());
 
-		final int N = 1000;
-		for (int i = 0; i < N; i++)
-			assertTrue(r.put(Key(i), Key(i)).ok());
+			System.out.println("\n[DEBUG] TestDB.testBloomFilter compact start");
 
-		System.out.println("\n[DEBUG] TestDB.testBloomFilter compact start");
+			r.compact("a", "z");
 
-		r.compact("a", "z");
+			for (int i = 0; i < N; i++)
+				assertEquals(r.get(Key(i)), Key(i));
 
-		for (int i = 0; i < N; i++)
-			assertEquals(r.get(Key(i)), Key(i));
-
-		r.delete();
+		} finally {
+			r.delete();
+		}
 	}
 
 	@Test
 	public void testBloomFilter() throws Exception {
 		DBTestRunner r = new DBTestRunner();
+		try {
+			r.destroyAndReopen();
 
-		r.destroyAndReopen();
+			r.env.countRandomReads = true;
+			Options options = r.currentOptions().cloneOptions();
+			options.env = r.env;
+			options.blockCache = Cache.newLRUCache(0); // Prevent cache hits
+			options.filterPolicy = BloomFilterPolicy.newBloomFilterPolicy(10);
 
-		r.env.countRandomReads = true;
-		Options options = r.currentOptions().cloneOptions();
-		options.env = r.env;
-		options.blockCache = Cache.newLRUCache(0); // Prevent cache hits
-		options.filterPolicy = BloomFilterPolicy.newBloomFilterPolicy(10);
+			r.reopen(options);
 
-		r.reopen(options);
+			// Populate multiple layers
+			final int N = 10000;
+			for (int i = 0; i < N; i++) {
+				assertTrue(r.put(Key(i), Key(i)).ok());
+			}
 
-		// Populate multiple layers
-		final int N = 10000;
-		for (int i = 0; i < N; i++) {
-			assertTrue(r.put(Key(i), Key(i)).ok());
+			r.compact("a", "z");
+
+			for (int i = 0; i < N; i += 100) {
+				assertTrue(r.put(Key(i), Key(i)).ok());
+			}
+
+			r.dbfull().TEST_CompactMemTable();
+
+			// Prevent auto compactions triggered by seeks
+			r.env.delayDataSync.set(r.env);
+
+			// Lookup present keys. Should rarely read from small sstable.
+			r.env.randomReadCounter.set(0);
+
+			for (int i = 0; i < N; i++) {
+				assertEquals(Key(i), r.get(Key(i)));
+			}
+
+			int reads = (int) r.env.randomReadCounter.get();
+			System.err.printf("%d present => %d reads\n", N, reads);
+			assertTrue(reads >= N);
+			assertTrue(reads <= N + 2 * N / 100);
+
+			// Lookup present keys. Should rarely read from either sstable.
+			r.env.randomReadCounter.set(0);
+			for (int i = 0; i < N; i++) {
+				assertEquals("NOT_FOUND", r.get(Key(i) + ".missing"));
+			}
+			reads = (int) r.env.randomReadCounter.get();
+			System.err.printf("%d missing => %d reads\n", N, reads);
+			assertTrue(reads <= 3 * N / 100);
+
+			r.env.delayDataSync.set(null);
+			r.close();
+			options.blockCache.delete();
+			options.filterPolicy.delete();
+
+		} finally {
+			r.delete();
 		}
-
-		System.out.println("\n[DEBUG] TestDB.testBloomFilter compact start");
-
-		r.compact("a", "z");
-
-		System.out.printf("[DEBUG] TestDB.testBloomFilter, dataRange=%s\n", r.db.debugDataRange());
-
-		for (int i = 0; i < N; i += 100) {
-			assertTrue(r.put(Key(i), Key(i)).ok());
-		}
-
-		System.out.println("\n[DEBUG] TestDB.testBloomFilter TEST_CompactMemTable start");
-
-		r.dbfull().TEST_CompactMemTable();
-
-		System.out.printf("[DEBUG] TestDB.testBloomFilter TEST_CompactMemTable end dataRange=%s\n\n", r.db.debugDataRange());
-
-		// Prevent auto compactions triggered by seeks
-		r.env.delayDataSync.set(r.env);
-
-		// Lookup present keys. Should rarely read from small sstable.
-		r.env.randomReadCounter.set(0);
-
-		for (int i = 0; i < N; i++) {
-			assertEquals(Key(i), r.get(Key(i)));
-		}
-
-		int reads = (int) r.env.randomReadCounter.get();
-		System.err.printf("%d present => %d reads\n", N, reads);
-		assertTrue(reads >= N);
-		assertTrue(reads <= N + 2 * N / 100);
-
-		// Lookup present keys. Should rarely read from either sstable.
-		r.env.randomReadCounter.set(0);
-		for (int i = 0; i < N; i++) {
-			assertEquals("NOT_FOUND", r.get(Key(i) + ".missing"));
-		}
-		reads = (int) r.env.randomReadCounter.get();
-		System.err.printf("%d missing => %d reads\n", N, reads);
-		assertTrue(reads <= 3 * N / 100);
-
-		r.env.delayDataSync.set(null);
-		r.close();
-		options.blockCache.delete();
-		options.filterPolicy.delete();
-		r.delete();
 	}
 
 	static final int kNumThreads = 4;
@@ -2311,40 +2387,43 @@ public class TestDB {
 	@Test
 	public void testMultiThreaded() throws Exception {
 		DBTestRunner r = new DBTestRunner();
-		do {
-			// Initialize state
-			MTState mt = new MTState();
-			mt.test = r;
-			mt.stop.set(null);
-			for (int id = 0; id < kNumThreads; id++) {
-				mt.counter[id].set(0);
-				mt.threadDone(id).set(null);
-			}
-
-			// Start threads
-			MTThread[] thread = new MTThread[kNumThreads];
-			for (int id = 0; id < kNumThreads; id++) {
-				thread[id] = new MTThread();
-				thread[id].state = mt;
-				thread[id].id = id;
-				r.env.startThread(new MTThreadBody(thread[id]));
-			}
-
-			// Let them run for a while
-			delayMilliseconds(kTestSeconds * 1000);
-
-			// Stop the threads and wait for them to finish
-			mt.stop.set(mt);
-			for (int id = 0; id < kNumThreads; id++) {
-				while (mt.threadDone(id).get() == null) {
-					delayMilliseconds(100);
+		try {
+			do {
+				// Initialize state
+				MTState mt = new MTState();
+				mt.test = r;
+				mt.stop.set(null);
+				for (int id = 0; id < kNumThreads; id++) {
+					mt.counter[id].set(0);
+					mt.threadDone(id).set(null);
 				}
-			}
-		} while (r.changeOptions());
-		r.delete();
+
+				// Start threads
+				MTThread[] thread = new MTThread[kNumThreads];
+				for (int id = 0; id < kNumThreads; id++) {
+					thread[id] = new MTThread();
+					thread[id].state = mt;
+					thread[id].id = id;
+					r.env.startThread(new MTThreadBody(thread[id]));
+				}
+
+				// Let them run for a while
+				delayMilliseconds(kTestSeconds * 1000);
+
+				// Stop the threads and wait for them to finish
+				mt.stop.set(mt);
+				for (int id = 0; id < kNumThreads; id++) {
+					while (mt.threadDone(id).get() == null) {
+						delayMilliseconds(100);
+					}
+				}
+			} while (r.changeOptions());
+		} finally {
+			r.delete();
+		}
 	}
 
-	static ByteBuf RandomKey(Random0 rnd) {
+	static ByteBuf randomKey(Random0 rnd) {
 		int len = (int) (rnd.oneIn(3) ? 1 // Short sometimes to encourage
 											// collisions
 				: (rnd.oneIn(100) ? rnd.skewed(10) : rnd.uniform(10)));
@@ -2414,5 +2493,344 @@ public class TestDB {
 		BM_LogAndApply(1000, 100);
 		BM_LogAndApply(1000, 10000);
 		BM_LogAndApply(100, 100000);
+	}
+
+	static class SliceComparator implements Comparator<Slice> {
+		Comparator0 cmp;
+
+		public SliceComparator() {
+			cmp = BytewiseComparatorImpl.getInstance();
+		}
+
+		public SliceComparator(Comparator0 c) {
+			cmp = c;
+		}
+
+		public int compare(Slice a, Slice b) {
+			return cmp.compare(a, b);
+		}
+	};
+
+	static SliceComparator kSliceComparator = new SliceComparator();
+
+	static class SliceEntry {
+		public Slice key;
+		public Slice value;
+
+		public SliceEntry(Slice key, Slice value) {
+			this.key = key;
+			this.value = value;
+		}
+	}
+
+	static class SliceEntryComparator implements Comparator<SliceEntry> {
+		Comparator0 cmp;
+
+		public SliceEntryComparator() {
+			cmp = BytewiseComparatorImpl.getInstance();
+		}
+
+		public SliceEntryComparator(Comparator0 c) {
+			cmp = c;
+		}
+
+		public int compare(SliceEntry a, SliceEntry b) {
+			return cmp.compare(a.key, b.key);
+		}
+
+		public void setComparator(Comparator0 cmp) {
+			this.cmp = cmp;
+		}
+	};
+
+	static SliceEntryComparator kSliceEntryComparator = new SliceEntryComparator();
+
+	static class ModelIter extends Iterator0 {
+		ArrayList<SliceEntry> kvList = new ArrayList<>();
+		boolean owned; // Do we own map
+		int iterPos = -1;
+
+		public ModelIter(TreeMap<Slice, Slice> kvmap, boolean owned) {
+			for (Map.Entry<Slice, Slice> e : kvmap.entrySet()) {
+				kvList.add(new SliceEntry(e.getKey(), e.getValue()));
+			}
+		}
+
+		@Override
+		public boolean valid() {
+			return (iterPos >= 0 && iterPos < kvList.size());
+		}
+
+		@Override
+		public void seekToFirst() {
+			iterPos = 0;
+		}
+
+		@Override
+		public void seekToLast() {
+			iterPos = kvList.size() - 1;
+		}
+
+		@Override
+		public void seek(Slice target) {
+			SliceEntry e = new SliceEntry(target, null);
+			iterPos = ListUtils.lowerBound(kvList, e, kSliceEntryComparator);
+		}
+
+		@Override
+		public void next() {
+			iterPos++;
+		}
+
+		@Override
+		public void prev() {
+			iterPos--;
+		}
+
+		@Override
+		public Slice key() {
+			return kvList.get(iterPos).key;
+		}
+
+		@Override
+		public Slice value() {
+			return kvList.get(iterPos).value;
+		}
+
+		@Override
+		public Status status() {
+			return Status.ok0();
+		}
+	}
+
+	static class ModelDB implements DB {
+		Options options;
+		TreeMap<Slice, Slice> map = new TreeMap<>(kSliceComparator);
+
+		static class ModelSnapshot extends Snapshot {
+			public TreeMap<Slice, Slice> map = new TreeMap<>(kSliceComparator);
+		}
+
+		public ModelDB(Options opt) {
+			options = opt.cloneOptions();
+		}
+
+		@Override
+		public Status open(Options options, String name) throws Exception {
+			this.options = options.cloneOptions();
+			return Status.ok0();
+		}
+
+		@Override
+		public Status put(WriteOptions opt, Slice key, Slice value) throws Exception {
+			WriteBatch batch = new WriteBatch();
+			batch.put(key, value);
+			return write(opt, batch);
+		}
+
+		@Override
+		public Status delete(WriteOptions opt, Slice key) throws Exception {
+			WriteBatch batch = new WriteBatch();
+			batch.delete(key);
+			return write(opt, batch);
+		}
+
+		static class Handler implements WriteBatch.Handler {
+			public TreeMap<Slice, Slice> map;
+
+			public void put(Slice key, Slice value) {
+				map.put(key, value);
+			}
+
+			public void delete(Slice key) {
+				map.remove(key);
+			}
+		}
+
+		@Override
+		public Status write(WriteOptions options, WriteBatch updates) throws Exception {
+			Handler handler = new Handler();
+			handler.map = map;
+			return updates.iterate(handler);
+		}
+
+		@Override
+		public Status get(ReadOptions options, Slice key, ByteBuf value) throws Exception {
+			assert (false);
+			return Status.notFound();
+		}
+
+		@Override
+		public Iterator0 newIterator(ReadOptions options) {
+			if (options.snapshot == null) {
+				TreeMap<Slice, Slice> saved = new TreeMap<>(kSliceComparator);
+				saved.putAll(map);
+				return new ModelIter(saved, true);
+			} else {
+				TreeMap<Slice, Slice> snapshotState = ((ModelSnapshot) (options.snapshot)).map;
+				return new ModelIter(snapshotState, false);
+			}
+		}
+
+		@Override
+		public Snapshot getSnapshot() {
+			ModelSnapshot snapshot = new ModelSnapshot();
+			snapshot.map = map;
+			return snapshot;
+		}
+
+		@Override
+		public void releaseSnapshot(Snapshot snapshot) {
+
+		}
+
+		@Override
+		public boolean getProperty(String property, Object0<String> value) {
+			return false;
+		}
+
+		@Override
+		public void getApproximateSizes(List<Range> range, List<Long> sizes) {
+			for (int i = 0; i < range.size(); i++)
+				sizes.add(0L);
+		}
+
+		@Override
+		public void compactRange(Slice begin, Slice end) throws Exception {
+
+		}
+
+		@Override
+		public void close() {
+
+		}
+
+		@Override
+		public String debugDataRange() {
+			return "";
+		}
+	}
+
+	static boolean compareIterators(int step, DB model, DB db, Snapshot modelSnap, Snapshot dbSnap) {
+		ReadOptions options = new ReadOptions();
+		options.snapshot = modelSnap;
+		Iterator0 miter = model.newIterator(options);
+		options.snapshot = dbSnap;
+		Iterator0 dbiter = db.newIterator(options);
+		boolean ok = true;
+		int count = 0;
+
+		miter.seekToFirst();
+		dbiter.seekToFirst();
+		System.err.printf("miter.key=%s, dbiter.key=%s\n", Strings.escapeString(miter.key()), Strings.escapeString(dbiter.key()));
+
+		for (miter.seekToFirst(), dbiter.seekToFirst(); ok && miter.valid() && dbiter.valid(); miter.next(), dbiter.next()) {
+			count++;
+			if (miter.key().compare(dbiter.key()) != 0) {
+				System.err.printf("step %d: Key mismatch: '%s' vs. '%s'\n", step, Strings.escapeString(miter.key()), Strings.escapeString(dbiter.key()));
+				ok = false;
+				break;
+			}
+
+			if (miter.value().compare(dbiter.value()) != 0) {
+				System.err.printf("step %d: Value mismatch for key '%s': '%s' vs. '%s'\n", step, Strings.escapeString(miter.key()), Strings.escapeString(miter.value()),
+						Strings.escapeString(miter.value()));
+				ok = false;
+			}
+		}
+
+		if (ok) {
+			if (miter.valid() != dbiter.valid()) {
+				System.err.printf("step %d: Mismatch at end of iterators: %d vs. %d\n", step, miter.valid(), dbiter.valid());
+				ok = false;
+			}
+		}
+
+		System.err.printf("%d entries compared: ok=%s\n", count, ok);
+		miter.delete();
+		dbiter.delete();
+
+		return ok;
+	}
+
+	//TODO
+	public void testRandomized() throws Exception {
+		Random0 rnd = new Random0(TestUtil.randomSeed());
+
+		DBTestRunner r = new DBTestRunner();
+		try {
+			do {
+				ModelDB model = new ModelDB(r.currentOptions().cloneOptions());
+				final int N = 10000;
+				Snapshot modelSnap = null;
+				Snapshot dbSnap = null;
+				ByteBuf k = null;
+				ByteBuf v = null;
+
+				for (int step = 0; step < N; step++) {
+					if (step % 100 == 0) {
+						System.err.printf("Step %d of %d\n", step, N);
+					}
+					// TODO(sanjay): Test Get() works
+					long p = rnd.uniform(100);
+					if (p < 45) { // Put
+						k = randomKey(rnd);
+						v = randomString(rnd, (int) (rnd.oneIn(20) ? 100 + rnd.uniform(100) : rnd.uniform(8)));
+						assertTrue(model.put(new WriteOptions(), k, v).ok());
+						assertTrue(r.db.put(new WriteOptions(), k, v).ok());
+
+					} else if (p < 90) { // Delete
+						k = randomKey(rnd);
+						assertTrue(model.delete(new WriteOptions(), k).ok());
+						assertTrue(r.db.delete(new WriteOptions(), k).ok());
+
+					} else { // Multi-element batch
+						WriteBatch b = new WriteBatch();
+						final long num = rnd.uniform(8);
+						for (int i = 0; i < num; i++) {
+							if (i == 0 || !rnd.oneIn(10)) {
+								k = randomKey(rnd);
+							} else {
+								// Periodically re-use the same key from the previous iter, so
+								// we have multiple entries in the write batch for the same key
+							}
+							if (rnd.oneIn(2)) {
+								v = randomString(rnd, (int) rnd.uniform(10));
+								b.put(k, v);
+							} else {
+								b.delete(k);
+							}
+						}
+						assertTrue(model.write(new WriteOptions(), b).ok());
+						assertTrue(r.db.write(new WriteOptions(), b).ok());
+					}
+
+					if ((step % 100) == 0) {
+						assertTrue(compareIterators(step, model, r.db, null, null));
+						assertTrue(compareIterators(step, model, r.db, modelSnap, dbSnap));
+						// Save a snapshot from each DB this time that we'll use next
+						// time we compare things, to make sure the current state is
+						// preserved with the snapshot
+						if (modelSnap != null)
+							model.releaseSnapshot(modelSnap);
+						if (dbSnap != null)
+							r.db.releaseSnapshot(dbSnap);
+
+						r.reopen();
+						assertTrue(compareIterators(step, model, r.db, null, null));
+
+						modelSnap = model.getSnapshot();
+						dbSnap = r.db.getSnapshot();
+					}
+				}
+				if (modelSnap != null)
+					model.releaseSnapshot(modelSnap);
+				if (dbSnap != null)
+					r.db.releaseSnapshot(dbSnap);
+			} while (r.changeOptions());
+
+		} finally {
+			r.delete();
+		}
 	}
 }

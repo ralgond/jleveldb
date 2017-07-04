@@ -103,4 +103,29 @@ public class TestListUtils {
 //		System.out.println(ListUtils.lowerBound(l, 19, cmp));
 //		System.out.println(ListUtils.lowerBound(l, 20, cmp));
 	}
+	
+	@Test
+	public void testLowerBound01() {
+		ArrayList<Integer> l = new ArrayList<>();
+		l.add(3);
+		l.add(3);
+		l.add(3);
+		l.add(6);
+		l.add(6);
+		l.add(6);
+		
+		Comparator<Integer> cmp = new Comparator<Integer>() {
+			public int compare(Integer a, Integer b) {
+				return Integer.compare(a, b);
+			}
+		};
+		
+
+		assertEquals(ListUtils.lowerBound(l, 0, cmp), 0);
+		assertEquals(ListUtils.lowerBound(l, 2, cmp), 0);
+		assertEquals(ListUtils.lowerBound(l, 3, cmp), 0);
+		assertEquals(ListUtils.lowerBound(l, 4, cmp), 3);
+		assertEquals(ListUtils.lowerBound(l, 6, cmp), 3);
+		assertEquals(ListUtils.lowerBound(l, 7, cmp), 6);
+	}
 }

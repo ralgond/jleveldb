@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.table;
 
 import com.tchaicatkovsky.jleveldb.CompressionType;
@@ -85,8 +101,7 @@ public class TableBuilder {
 
 	public void delete() {
 		if (rep != null) {
-			assert (rep.closed); // Catch errors where caller forgot to call
-									// finish()
+			assert (rep.closed); // Catch errors where caller forgot to call finish()
 			if (rep.filterBlockBuilder != null)
 				rep.filterBlockBuilder.delete();
 			rep.delete();
@@ -125,8 +140,6 @@ public class TableBuilder {
 			
 			assert (ret > 0);
 		}
-
-		//System.out.println("[DEBUG] TableBuilder.add 1");
 		
 		if (r.pendingIndexEntry) {
 			assert (r.dataBlockBuilder.empty());
@@ -137,13 +150,11 @@ public class TableBuilder {
 			r.pendingIndexEntry = false;
 		}
 		
-		//System.out.println("[DEBUG] TableBuilder.add 2");
 
 		if (r.filterBlockBuilder != null) {
 			r.filterBlockBuilder.addKey(key);
 		}
 		
-		//System.out.println("[DEBUG] TableBuilder.add 3");
 
 		r.lastKey.assign(key.data(), key.offset(), key.size());
 		r.numEntries++;
@@ -153,8 +164,6 @@ public class TableBuilder {
 		if (estimatedBlockSize >= r.options.blockSize) {
 			flush();
 		}
-		
-		//System.out.println("[DEBUG] TableBuilder.add 4");
 	}
 
 	/**

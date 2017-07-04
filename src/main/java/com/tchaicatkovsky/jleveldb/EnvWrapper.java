@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb;
 
 import java.util.List;
@@ -8,23 +24,21 @@ import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 /**
- * An implementation of Env that forwards all calls to another Env.
- * May be useful to clients who wish to override just part of the
- * functionality of another Env.
+ * An implementation of Env that forwards all calls to another Env. May be useful to clients who wish to override just part of the functionality of another Env.
  * 
  * @author thuang
  */
 public class EnvWrapper implements Env {
 	Env target;
-	
+
 	public EnvWrapper(Env env) {
 		target = env;
 	}
-	
+
 	public Env target() {
 		return target;
 	}
-	
+
 	@Override
 	public Status newSequentialFile(String fname, Object0<SequentialFile> result) {
 		return target.newSequentialFile(fname, result);
@@ -89,7 +103,7 @@ public class EnvWrapper implements Env {
 	public Status unlockFile(FileLock0 lock) {
 		return target.unlockFile(lock);
 	}
-	
+
 	@Override
 	public void schedule(Runnable r) {
 		target.schedule(r);
@@ -119,7 +133,7 @@ public class EnvWrapper implements Env {
 	public Status writeStringToFile(Slice data, String fname) {
 		return target.writeStringToFile(data, fname);
 	}
-	
+
 	@Override
 	public Status writeStringToFileSync(Slice data, String fname) {
 		return target.writeStringToFileSync(data, fname);

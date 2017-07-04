@@ -32,14 +32,16 @@ import java.util.ArrayList;
 
 public class TestRecovery {
 	static class RecoveryRunner {
-		String dbname;
+		String dbname = TestUtil.tmpDir() + "/recovery_test";
 		Env env;
 		DB db;
 		
-		public RecoveryRunner() {
+		public RecoveryRunner() throws Exception {
 			env = LevelDB.defaultEnv();
 			assertNotNull(env);
 			db = null;
+			LevelDB.destroyDB(dbname, new Options());
+			open();
 		}
 		
 		public void delete() {
@@ -73,8 +75,10 @@ public class TestRecovery {
 		}
 		
 		public void close() {
-		    db.close();
-		    db = null;
+			if (db != null) {
+			    db.close();
+			    db = null;
+			}
 		}
 		
 		public void open(Options options) {
@@ -147,13 +151,49 @@ public class TestRecovery {
 		    return FileName.getLogFileName(dbname, number);
 		}
 		
+		public String tblName(long number) {
+			return FileName.getTableFileName(dbname, number);
+		}
+		
 		public int deleteLogFiles() {
 		    ArrayList<Long> logs = getFiles(FileType.LogFile);
+		    
 		    for (int i = 0; i < logs.size(); i++) {
-		    	Status s = env.deleteFile(logName(logs.get(i)));
+		    	String logName = logName(logs.get(i));
+		    	Status s = env.deleteFile(logName);
 		    	assertTrue(s.ok());
 		    }
+	
 		    return logs.size();
+		}
+		
+		public int deleteTableFiles() {
+			ArrayList<Long> tbls = getFiles(FileType.TableFile);
+
+		    for (int i = 0; i < tbls.size(); i++) {
+		    	String tblName = tblName(tbls.get(i));
+		    	Status s = env.deleteFile(tblName);
+		    	assertTrue(s.ok());
+		    }
+		    return tbls.size();
+		}
+		
+		public void dumpTableFiles() {
+			System.out.println("\n[DEBUG] dump table files: ");
+			ArrayList<Long> tbls = getFiles(FileType.TableFile);
+			for (int i = 0; i < tbls.size(); i++) {
+		    	String tblName = tblName(tbls.get(i));
+		    	System.out.printf("[DEBUG] tbl name: %s\n", tblName);
+		    }
+		}
+		
+		public void dumpLogFiles() {
+			System.out.println("\n[DEBUG] dump log files: ");
+			ArrayList<Long> tbls = getFiles(FileType.LogFile);
+			for (int i = 0; i < tbls.size(); i++) {
+		    	String logName = logName(tbls.get(i));
+		    	System.out.printf("[DEBUG] log name: %s\n", logName);
+		    }
 		}
 		
 		public long firstLogFile() {
@@ -227,10 +267,11 @@ public class TestRecovery {
 		r.open();
 		assertEquals(old_manifest, r.manifestFileName());
 		assertEquals("bar", r.get("foo").encodeToString());
+		
+		r.delete();
 	}
 	
-	
-	@Test
+	//TODO
 	public void testLargeManifestCompacted() throws Exception {
 		RecoveryRunner r = new RecoveryRunner();
 		if (!r.canAppend()) {
@@ -266,17 +307,27 @@ public class TestRecovery {
 		r.open();
 		assertEquals(new_manifest, r.manifestFileName());
 		assertEquals("bar", r.get("foo").encodeToString());
+		
+		r.delete();
 	}
 	
 	@Test
 	public void testNoLogFiles() throws Exception {
 		RecoveryRunner r = new RecoveryRunner();
+		
 		assertTrue(r.put("foo", "bar").ok());
+		
+		r.close();
+		
 		assertEquals(1, r.deleteLogFiles());
+		
 		r.open();
+		
 		assertEquals("NOT_FOUND", r.get("foo").encodeToString());
 		r.open();
 		assertEquals("NOT_FOUND", r.get("foo").encodeToString());
+		
+		r.delete();
 	}
 	
 	@Test
@@ -309,6 +360,8 @@ public class TestRecovery {
 			assertEquals(number, r.firstLogFile());
 			assertEquals("bar", r.get("foo").encodeToString());
 		}
+		
+		r.delete();
 	}
 	
 	@Test
@@ -324,20 +377,22 @@ public class TestRecovery {
 		r.close();
 		assertEquals(0, r.numTables());
 		assertEquals(1, r.numLogs());
-		long old_log_file = r.firstLogFile();
+		long oldLogFile = r.firstLogFile();
 
 		// Force creation of multiple memtables by reducing the write buffer size.
 		Options opt = new Options();
 		opt.reuseLogs = true;
 		opt.writeBufferSize = (kNum*100) / 2;
 		r.open(opt);
-		assertTrue(2 < r.numTables());
+		assertTrue(2 <= r.numTables());
 		assertEquals(1, r.numLogs());
-		assertTrue(old_log_file != r.firstLogFile());
+		assertTrue(oldLogFile != r.firstLogFile());
 		for (int i = 0; i < kNum; i++) {
 			String s = String.format("%050d", i);
-			assertEquals(s, r.get(s));
+			assertEquals(s, r.get(s).encodeToString());
 		}
+		
+		r.delete();
 	}
 	
 	@Test
@@ -345,30 +400,34 @@ public class TestRecovery {
 		RecoveryRunner r = new RecoveryRunner();
 		assertTrue(r.put("foo", "bar").ok());
 		r.close();
+		
 		assertEquals(1, r.numLogs());
-
+		
 		// Make a bunch of uncompacted log files.
-		long old_log = r.firstLogFile();
-		r.makeLogFile(old_log+1, 1000, new DefaultSlice("hello"), new DefaultSlice("world"));
-		r.makeLogFile(old_log+2, 1001, new DefaultSlice("hi"), new DefaultSlice("there"));
-		r.makeLogFile(old_log+3, 1002, new DefaultSlice("foo"), new DefaultSlice("bar2"));
+		long oldLog = r.firstLogFile();
+		r.makeLogFile(oldLog+1, 1000, new DefaultSlice("hello"), new DefaultSlice("world"));
+		r.makeLogFile(oldLog+2, 1001, new DefaultSlice("hi"), new DefaultSlice("there"));
+		r.makeLogFile(oldLog+3, 1002, new DefaultSlice("foo"), new DefaultSlice("bar2"));
 
+		
 		// Recover and check that all log files were processed.
 		r.open();
-		assertTrue(1 < r.numTables());
+		
+		assertTrue(1 <= r.numTables());
 		assertEquals(1, r.numLogs());
-		long new_log = r.firstLogFile();
-		assertTrue(old_log+3 < new_log);
+		long newLog = r.firstLogFile();
+		
+		assertTrue(oldLog+3 <= newLog);
 		assertEquals("bar2", r.get("foo").encodeToString());
 		assertEquals("world", r.get("hello").encodeToString());
 		assertEquals("there", r.get("hi").encodeToString());
 
 		// Test that previous recovery produced recoverable state.
 		r.open();
-		assertTrue(1 < r.numTables());
+		assertTrue(1 <= r.numTables());
 		assertEquals(1, r.numLogs());
 		if (r.canAppend()) {
-			assertEquals(new_log, r.firstLogFile());
+			assertEquals(newLog, r.firstLogFile());
 		}
 		assertEquals("bar2", r.get("foo").encodeToString());
 		assertEquals("world", r.get("hello").encodeToString());
@@ -376,15 +435,17 @@ public class TestRecovery {
 
 		// Check that introducing an older log file does not cause it to be re-read.
 		r.close();
-		r.makeLogFile(old_log+1, 2000, new DefaultSlice("hello"), new DefaultSlice("stale write"));
+		r.makeLogFile(oldLog+1, 2000, new DefaultSlice("hello"), new DefaultSlice("stale write"));
 		r.open();
-		assertTrue(1 < r.numTables());
+		assertTrue(1 <= r.numTables());
 		assertEquals(1, r.numLogs());
 		if (r.canAppend()) {
-			assertTrue(new_log < r.firstLogFile());
+			assertEquals(newLog, r.firstLogFile());
 		}
 		assertEquals("bar2", r.get("foo").encodeToString());
 		assertEquals("world", r.get("hello").encodeToString());
 		assertEquals("there", r.get("hi").encodeToString());
+		
+		r.delete();
 	}
 }

@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.db;
 
 import java.util.ArrayList;
@@ -708,23 +724,10 @@ public class VersionSet {
 		    InternalKey largest = new InternalKey();
 		    getRange(c.input(0), smallest, largest);
 		    // Note that the next call will discard the file we placed in
-		    // c->inputs_[0] earlier and replace it with an overlapping set
+		    // c.inputs[0] earlier and replace it with an overlapping set
 		    // which will include the picked file.
-		    
-//		    System.out.printf("[DEBUG] VersionSet.pickCompaction before call getOverlappingInputs, smallest=%s, largest=%s\n", 
-//		    		Strings.escapeString(smallest.encode()), Strings.escapeString(largest.encode()));
-//		    for (int i = 0; i < c.input(0).size(); i++) {
-//		    	System.out.printf("[DEBUG] VersionSet.pickCompaction call getOverlappingInputs, f=%s\n", c.input(0, i).debugString());
-//		    }
-		    
 		    current.getOverlappingInputs(0, smallest, largest, c.input(0));
-		    
-//		    System.out.printf("[DEBUG] VersionSet.pickCompaction after call getOverlappingInputs, smallest=%s, largest=%s\n", 
-//		    		Strings.escapeString(smallest.encode()), Strings.escapeString(largest.encode()));
-//		    for (int i = 0; i < c.input(0).size(); i++) {
-//		    	System.out.printf("[DEBUG] VersionSet.pickCompaction call getOverlappingInputs, f=%s\n", c.input(0, i).debugString());
-//		    }
-//		    assert(!c.input(0).isEmpty());
+		    assert(!c.input(0).isEmpty());
 		}
 
 		setupOtherInputs(c);
@@ -811,19 +814,6 @@ public class VersionSet {
 		}
 		return result;
 	}
-	
-//	static Iterator0 getFileIterator(Object arg, ReadOptions options, Slice fileValue) {
-//		TableCache cache = (TableCache)(arg);
-//		if (fileValue.size() != 16) {
-//			return Iterator0.newErrorIterator(Status.corruption("FileReader invoked with unexpected value"));
-//		} else {
-//			return cache.newIterator(options,
-//					Coding.decodeFixedNat64(fileValue.data(), fileValue.offset),
-//					Coding.decodeFixedNat64(fileValue.data(), fileValue.offset + 8));
-//		}
-//	}
-	
-	
 	
 	/**
 	 *  Create an iterator that reads over the compaction inputs for "c".

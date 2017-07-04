@@ -46,6 +46,7 @@ import com.tchaicatkovsky.jleveldb.util.Strings;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
+
 public class TestTable {
 	// Return reverse of "key".
 	// Used to test non-lexicographic comparators.

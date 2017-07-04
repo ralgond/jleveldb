@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.util;
 
 import java.io.DataInputStream;
@@ -34,19 +50,26 @@ import sun.nio.ch.DirectBuffer;
 
 @SuppressWarnings("restriction")
 public class EnvImpl implements Env {
-
-	// Helper class to limit resource usage to avoid exhaustion.
-	// Currently used to limit read-only file descriptors and mmap file usage
-	// so that we do not end up running out of file descriptors, virtual memory,
-	// or running into kernel performance problems for very large databases.
+	/**
+	 * Helper class to limit resource usage to avoid exhaustion.
+	 * Currently used to limit read-only file descriptors and mmap file usage 
+	 * so that we do not end up running out of file descriptors, virtual memory,
+	 * or running into kernel performance problems for very large databases.
+	 */
 	class Limiter {
-		// Limit maximum number of resources to |n|.
+		/** 
+		 * Limit maximum number of resources to |n|.
+		 * @param n
+		 */
 		public Limiter(long n) {
 			setAllowed(n);
 		}
-
-		// If another resource is available, acquire it and return true.
-		// Else return false.
+ 
+		/**
+		 *  If another resource is available, acquire it and return true.
+		 *  Else return false.
+		 * @return
+		 */
 		public boolean acquire() {
 			if (getAllowed() <= 0) {
 				return false;
@@ -65,8 +88,10 @@ public class EnvImpl implements Env {
 			}
 		}
 
-		// Release a resource acquired by a previous call to Acquire() that returned
-		// true.
+		/**
+		 * Release a resource acquired by a previous call to Acquire() that returned
+		 * true.
+		 */
 		void release() {
 			mu.lock();
 			try {
@@ -238,7 +263,8 @@ public class EnvImpl implements Env {
 		public void close() {
 			try {
 				if (file != null) {
-					((DirectBuffer) buffer).cleaner().clean();
+					if (buffer != null && ((DirectBuffer) buffer).cleaner() != null)
+						((DirectBuffer) buffer).cleaner().clean();
 					file.close();
 					file = null;
 				}
@@ -255,7 +281,6 @@ public class EnvImpl implements Env {
 			if (offset + n > fileSize)
 				return Status.ioError(filename + " MmapReadableFile.read failed: exceed file size");
 
-			// TODO: should create a new buffer in each operation
 			MappedByteBuffer tmpBuf = null;
 			try {
 				tmpBuf = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, fileSize);

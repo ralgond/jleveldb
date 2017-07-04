@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.db;
 
 import com.tchaicatkovsky.jleveldb.Status;
@@ -11,11 +27,17 @@ import com.tchaicatkovsky.jleveldb.util.Slice;
 public class LogWriter {
 	
 	WritableFile dest;
-	int blockOffset;       // Current offset in block
 	
-	  // crc32c values for all supported record types.  These are
-	  // pre-computed to reduce the overhead of computing the crc of the
-	  // record type stored in the header.
+	/**
+	 * Current offset in block
+	 */
+	int blockOffset;
+
+	/**
+	 * crc32c values for all supported record types.  These are
+	 * pre-computed to reduce the overhead of computing the crc of the 
+	 * record type stored in the header.
+	 */
 	long typeCrc[] = new long[LogFormat.kMaxRecordType + 1];
 	  
 	static void initTypeCrc(long[] typeCrc) {
@@ -26,18 +48,27 @@ public class LogWriter {
 		}
 	}
 	
-	  // Create a writer that will append data to "*dest".
-	  // "*dest" must be initially empty.
-	  // "*dest" must remain live while this Writer is in use.
+	/**
+	 * Create a writer that will append data to "dest".</br>
+	 * "dest" must be initially empty.</br>
+	 * "dest" must remain live while this Writer is in use.</br>
+	 * 
+	 * @param dest
+	 */
 	public LogWriter(WritableFile dest) {
 		this.dest = dest;
 		blockOffset = 0;
 		initTypeCrc(typeCrc);
 	}
 	
-	  // Create a writer that will append data to "*dest".
-	  // "*dest" must have initial length "dest_length".
-	  // "*dest" must remain live while this Writer is in use.
+	/**
+	 * Create a writer that will append data to "dest".</br>
+	 * "dest" must have initial length "dest_length".</br>
+	 * "dest" must remain live while this Writer is in use.</br>
+	 * 
+	 * @param dest
+	 * @param destLength
+	 */
 	public LogWriter(WritableFile dest, long destLength) {
 		this.dest = dest;
 		blockOffset = (int)(destLength % LogFormat.kBlockSize);
@@ -94,7 +125,6 @@ public class LogWriter {
 		return s;
 	}
 	
-	//Status emitPhysicalRecord(RecordType type, const char* ptr, size_t length);
 	Status emitPhysicalRecord(RecordType t, byte[] ptr, int offset, int n) {
 		assert(n <= 0xffff);  // Must fit in two bytes
 		assert(blockOffset + LogFormat.kHeaderSize + n <= LogFormat.kBlockSize);
@@ -123,6 +153,6 @@ public class LogWriter {
 	}
 	
 	public void delete() {
-
+		
 	}
 }

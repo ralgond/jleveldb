@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.db;
 
 import java.util.Comparator;
@@ -189,18 +205,7 @@ public class MemTable {
 		int valueSize = value.size();
 		int internalKeySize = userKeySize + 8;
 		int encodedLen = Coding.varNatLength(internalKeySize) + internalKeySize + Coding.varNatLength(valueSize) + valueSize;
-		
-//		ByteBuf buf = ByteBufFactory.defaultByteBuf();
-//		buf.init(new byte[encodedLen], encodedLen);
-//		buf.writeVarNat32(internalKeySize);
-//		keyOffset = buf.position();
-//		buf.append(key.data, key.offset, key.size());
-//		buf.writeFixedNat64((seq << 8) | (type.type() & 0xFFL));
-//		buf.writeVarNat32(valueSize);
-//		valueOffset = buf.position();
-//		buf.append(value.data, value.offset, value.size());
-//		assert(buf.size() == encodedLen);
-		
+				
 		Slice s = arena.allocate(encodedLen);
 		byte[] data = s.data();
 		int initialOffset = s.offset();
@@ -215,10 +220,6 @@ public class MemTable {
 		if (value.size() > 0)
 			System.arraycopy(value.data(), value.offset(), data, valueOffset, value.size());
 		s.incrOffset(value.size());
-//		if (s.offset() - initialOffset != encodedLen) {
-//			System.out.printf("[DEBUG] memtable, s.offset=%d, initialOffset=%d, encodedLen=%d\n",
-//					s.offset(), initialOffset, encodedLen);
-//		}
 		assert(s.offset() - initialOffset == encodedLen);
 		
 		

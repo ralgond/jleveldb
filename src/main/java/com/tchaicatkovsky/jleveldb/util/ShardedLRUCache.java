@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.tchaicatkovsky.jleveldb.util;
 
 //LRU cache implementation
@@ -29,11 +45,11 @@ public class ShardedLRUCache extends Cache {
 		LRUHandle nextHash;
 		LRUHandle next;
 		LRUHandle prev;
-		int charge; //size_t charge;      // TODO(opt): Only allow uint32_t?
+		int charge;			//TODO: Should use long 
 		int keyLength;
-		boolean inCache;      // Whether entry is in the cache.
-		int refs;      // References, including cache reference, if present.
-		long hash;      // Hash of key(); used for fast sharding and comparisons
+		boolean inCache;    // Whether entry is in the cache.
+		int refs;      		// References, including cache reference, if present.
+		long hash;      	// Hash of key(); used for fast sharding and comparisons
 		Slice keyData;
 		
 		Slice key() {
@@ -47,11 +63,12 @@ public class ShardedLRUCache extends Cache {
 		}
 	}
 	
-	// We provide our own simple hash table since it removes a whole bunch
-	// of porting hacks and is also faster than some of the built-in hash
-	// table implementations in some of the compiler/runtime combinations
-	// we have tested.  E.g., readrandom speeds up by ~5% over the g++
-	// 4.4.3's builtin hashtable.
+	/**
+	 * We provide our own simple hash table since it removes a whole bunch 
+	 * of porting hacks and is also faster than some of the built-in hash 
+	 * table implementations in some of the compiler/runtime combinations 
+	 * we have tested.
+	 */
 	static class HandleTable {
 		// The table consists of an array of buckets where each bucket is
 		// a linked list of cache entries that hash into the bucket.
@@ -145,22 +162,32 @@ public class ShardedLRUCache extends Cache {
 		}
 	}
 	
-	// A single shard of sharded cache.
+	/** 
+	 * A single shard of sharded cache.
+	 */
 	class SingleShardLRUCache {
-		// Initialized before use.
+		/** 
+		 * Initialized before use.
+		 */
 		int capacity;
 
-		// mutex_ protects the following state.
+		/**
+		 * mutex protects the following state.
+		 */
 		Mutex mutex = new Mutex();
 		int usage;
 
-		// Dummy head of LRU list.
-		// lru.prev is newest entry, lru.next is oldest entry.
-		// Entries have refs==1 and in_cache==true.
+		/**
+		 * Dummy head of LRU list.
+		 * lru.prev is newest entry, lru.next is oldest entry.
+		 * Entries have refs==1 and in_cache==true.
+		 */
 		LRUHandle lru = new LRUHandle();
 
-		// Dummy head of in-use list.
-		// Entries are in use by clients, and have refs >= 2 and in_cache==true.
+		/**
+		 * Dummy head of in-use list.
+		 * Entries are in use by clients, and have refs >= 2 and inCache==true.
+		 */
 		LRUHandle inUse = new LRUHandle();
 
 		HandleTable table = new HandleTable();
@@ -206,12 +233,23 @@ public class ShardedLRUCache extends Cache {
 			}
 		}
 		
-		// Separate from constructor so caller can easily make an array of LRUCache
+		/** 
+		 * Separate from constructor so caller can easily make an array of LRUCache
+		 * @param capacity
+		 */
 		void setCapacity(int capacity) { 
 			this.capacity = capacity; 
 		}
 		
-		// Like Cache methods, but with an extra "hash" parameter.
+		/** 
+		 * Like Cache methods, but with an extra "hash" parameter.
+		 * @param key
+		 * @param hash
+		 * @param value
+		 * @param charge
+		 * @param deleter
+		 * @return
+		 */
 		Cache.Handle insert(Slice key, long hash, Object value, int charge, Deleter deleter) {
 			mutex.lock();
 			try {
@@ -431,8 +469,8 @@ public class ShardedLRUCache extends Cache {
 	}
 
 	@Override
-	public int totalCharge() {
-		int total = 0;
+	public long totalCharge() {
+		long total = 0;
 	    for (int s = 0; s < kNumShards; s++) {
 	      total += shard[s].totalCharge();
 	    }

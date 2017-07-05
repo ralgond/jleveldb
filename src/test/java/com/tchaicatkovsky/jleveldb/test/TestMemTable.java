@@ -13,9 +13,9 @@ import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -27,11 +27,11 @@ public class TestMemTable {
 		InternalKeyComparator ikcmp = new InternalKeyComparator(BytewiseComparatorImpl.getInstance());
 		
 		MemTable memtable = new MemTable(ikcmp);
-		memtable.add(1, ValueType.Value, new UnpooledSlice("1"), new UnpooledSlice("1"));
-		memtable.add(1, ValueType.Value, new UnpooledSlice("2"), new UnpooledSlice("2"));
-		memtable.add(1, ValueType.Value, new UnpooledSlice("3"), new UnpooledSlice("3"));
-		memtable.add(1, ValueType.Value, new UnpooledSlice("4"), new UnpooledSlice("4"));
-		memtable.add(1, ValueType.Value, new UnpooledSlice("5"), new UnpooledSlice("5"));
+		memtable.add(1, ValueType.Value, SliceFactory.newUnpooled("1"), SliceFactory.newUnpooled("1"));
+		memtable.add(1, ValueType.Value, SliceFactory.newUnpooled("2"), SliceFactory.newUnpooled("2"));
+		memtable.add(1, ValueType.Value, SliceFactory.newUnpooled("3"), SliceFactory.newUnpooled("3"));
+		memtable.add(1, ValueType.Value, SliceFactory.newUnpooled("4"), SliceFactory.newUnpooled("4"));
+		memtable.add(1, ValueType.Value, SliceFactory.newUnpooled("5"), SliceFactory.newUnpooled("5"));
 		
 		String[] ary = new String[]{"1","2","3","4","5"};
 		int idx = 0;
@@ -39,45 +39,34 @@ public class TestMemTable {
 		it.seekToFirst();
 		while (it.valid()) {
 			Slice ikey = it.key();
-			//System.out.println(k.encodeToString());
 			assertEquals(DBFormat.extractUserKey(ikey).encodeToString(), ary[idx++]);
 			it.next();
 		}
 		it.delete();
 		it = null;
 		
-		//System.out.println("ApproximateMemoryUsage: "+memtable.approximateMemoryUsage()+" bytes");
-		//System.out.println("entry count: "+memtable.entrySize());
-		
 		boolean ret = false;
 		Object0<Status> s = new Object0<Status>();
 		ByteBuf buf = ByteBufFactory.newUnpooled();
-		ret = memtable.get(new LookupKey(new UnpooledSlice("1"), 1), buf, s);
-		//System.out.println("find 1, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());
+		ret = memtable.get(new LookupKey(SliceFactory.newUnpooled("1"), 1), buf, s);
 		assertTrue(ret);
 		
-		ret = memtable.get(new LookupKey(new UnpooledSlice("2"), 1), buf, s);
-		//System.out.println("find 2, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());
+		ret = memtable.get(new LookupKey(SliceFactory.newUnpooled("2"), 1), buf, s);
 		assertTrue(ret);
 		
-		ret = memtable.get(new LookupKey(new UnpooledSlice("3"), 1), buf, s);
-		//System.out.println("find 3, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());
+		ret = memtable.get(new LookupKey(SliceFactory.newUnpooled("3"), 1), buf, s);
 		assertTrue(ret);
 		
-		ret = memtable.get(new LookupKey(new UnpooledSlice("4"), 1), buf, s);
-		//System.out.println("find 4, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());
+		ret = memtable.get(new LookupKey(SliceFactory.newUnpooled("4"), 1), buf, s);
 		assertTrue(ret);
 		
-		ret = memtable.get(new LookupKey(new UnpooledSlice("5"), 1), buf, s);
-		//System.out.println("find 5, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());
+		ret = memtable.get(new LookupKey(SliceFactory.newUnpooled("5"), 1), buf, s);
 		assertTrue(ret);
 		
-		ret = memtable.get(new LookupKey(new UnpooledSlice("6"), 1), buf, s);
-		//System.out.println("find 6, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());
+		ret = memtable.get(new LookupKey(SliceFactory.newUnpooled("6"), 1), buf, s);
 		assertFalse(ret);
 		
-		ret = memtable.get(new LookupKey(new UnpooledSlice("0"), 1), buf, s);
-		//System.out.println("find 0, ret="+ret+", result="+s.getValue()+", value="+buf.encodeToString());
+		ret = memtable.get(new LookupKey(SliceFactory.newUnpooled("0"), 1), buf, s);
 		assertFalse(ret);
 	}
 }

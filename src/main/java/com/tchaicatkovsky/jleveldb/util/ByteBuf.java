@@ -62,38 +62,38 @@ public interface ByteBuf extends Slice {
 	 * append 32bit fixed natural number.
 	 * @param value
 	 */
-	public void writeFixedNat32(int value);
+	public void addFixedNat32(int value);
 	
 	/**
 	 * append 32bit fixed natural number.
 	 * @param value
 	 */
-	public void writeFixedNat32Long(long value);
+	public void addFixedNat32Long(long value);
 	
 	/**
 	 * append 64bit fixed natural number.
 	 * @param value
 	 */
-	public void writeFixedNat64(long value);
+	public void addFixedNat64(long value);
 	
 	/**
 	 * append 32bit var natural number.
 	 * @param value
 	 * @throws Exception
 	 */
-	public void writeVarNat32(int value);
+	public void addVarNat32(int value);
 	
 	/**
 	 * append 32bit var natural number.
 	 * @param value
 	 */
-	public void writeVarNat64(long value);
+	public void addVarNat64(long value);
 	
 	/**
 	 * append slice.
 	 * @param value
 	 */
-	public void writeLengthPrefixedSlice(Slice value);
+	public void addLengthPrefixedSlice(Slice value);
 	
 	/**
 	 * read 32bit fixed natural number.

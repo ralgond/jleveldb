@@ -17,8 +17,8 @@
 package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class ParsedInternalKey {
@@ -47,10 +47,10 @@ public class ParsedInternalKey {
 	private final static long kSequenceNumberMask = ~(0x0FFL << (64 - 8));
 	
 	/**
-	 * Attempt to parse an internal key from "internal_key".  On success,
-	 * stores the parsed data in "*result", and returns true.</br>
+	 * Attempt to parse an internal key from "internalKey".  On success,
+	 * stores the parsed data in "result", and returns true.</br>
 	 * 
-	 * On error, returns false, leaves "*result" in an undefined state.
+	 * On error, returns false, leaves "result" in an undefined state.
 	 * @param internalKey
 	 * @return
 	 */
@@ -69,7 +69,7 @@ public class ParsedInternalKey {
 		} else {
 			return false;
 		}
-	    userKey = new UnpooledSlice(internalKey.data(), internalKey.offset(), n - 8);
+	    userKey = SliceFactory.newUnpooled(internalKey.data(), internalKey.offset(), n - 8);
 	    
 	    return true;
 	}

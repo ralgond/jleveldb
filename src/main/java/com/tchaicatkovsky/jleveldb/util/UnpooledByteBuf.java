@@ -267,35 +267,35 @@ public class UnpooledByteBuf implements ByteBuf {
 	}
 
 	@Override
-	final public void writeFixedNat32(int value) {
+	final public void addFixedNat32(int value) {
 		require(4);
 		Coding.encodeFixedNat32(data, limit, limit+4, value);
 		limit += 4;
 	}
 	
 	@Override
-	final public void writeFixedNat32Long(long value) {
+	final public void addFixedNat32Long(long value) {
 		require(4);
 		Coding.encodeFixedNat32Long(data, limit, limit+4, value);
 		limit += 4;
 	}
 
 	@Override
-	final public void writeFixedNat64(long value) {
+	final public void addFixedNat64(long value) {
 		require(8);
 		Coding.encodeFixedNat64(data, limit, limit+8, value);
 		limit += 8;
 	}
 
 	@Override
-	final public void writeVarNat32(int value) {
+	final public void addVarNat32(int value) {
 		byte[] tmp = new byte[8]; //TODO
 		int offset = Coding.encodeVarNat32(tmp, 0, 8, value);
 		append(tmp, offset);
 	}
 
 	@Override
-	final public void writeVarNat64(long value) {
+	final public void addVarNat64(long value) {
 		byte[] tmp = new byte[16]; //TODO
 		int offset = Coding.encodeVarNat64(tmp, 0, 16, value);
 		append(tmp, offset);
@@ -303,8 +303,8 @@ public class UnpooledByteBuf implements ByteBuf {
 	
 
 	@Override
-	final public void writeLengthPrefixedSlice(Slice value) {
-		writeVarNat32(value.size());
+	final public void addLengthPrefixedSlice(Slice value) {
+		addVarNat32(value.size());
 		append(value.data(), value.offset(), value.size());
 	}
 	
@@ -335,7 +335,7 @@ public class UnpooledByteBuf implements ByteBuf {
 	@Override
 	final public Slice readLengthPrefixedSlice() {
 		int size = readVarNat32();
-		Slice slice = new UnpooledSlice();
+		Slice slice = SliceFactory.newUnpooled();
 		slice.init(new byte[size], 0, size);
 		System.arraycopy(data, offset, slice.data(), 0, size);
 		offset += size;

@@ -16,9 +16,12 @@
  */
 package com.tchaicatkovsky.jleveldb.db.format;
 
-// Value types encoded as the last component of internal keys.
-// DO NOT CHANGE THESE ENUM VALUES: they are embedded in the on-disk
-// data structures.
+/**
+ * Value types encoded as the last component of internal keys.</br></br>
+ * 
+ * DO NOT CHANGE THESE ENUM VALUES: they are embedded in the on-disk 
+ * data structures.
+ */
 public enum ValueType {
     Deletion((byte)0x0),
     Value((byte)0x1);

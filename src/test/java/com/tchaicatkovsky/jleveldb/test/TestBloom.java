@@ -12,8 +12,8 @@ import com.tchaicatkovsky.jleveldb.util.BloomFilterPolicy;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class TestBloom {
 	
@@ -21,7 +21,7 @@ public class TestBloom {
 
 	static Slice key(int i, byte[] buffer, int offset) {
 	  Coding.encodeFixedNat32(buffer, offset, i);
-	  return new UnpooledSlice(buffer, offset, 4);
+	  return SliceFactory.newUnpooled(buffer, offset, 4);
 	}
 	
 	public static class BloomRun {
@@ -47,7 +47,7 @@ public class TestBloom {
 		public void build() {
 		    ArrayList<Slice> keySlices = new ArrayList<>();
 		    for (int i = 0; i < keys.size(); i++) {
-		    	keySlices.add(new UnpooledSlice(keys.get(i)));
+		    	keySlices.add(SliceFactory.newUnpooled(keys.get(i)));
 		    }
 		    filter.clear();
 		    
@@ -78,7 +78,7 @@ public class TestBloom {
 			if (!keys.isEmpty()) {
 		    	build();
 		    }
-		    return policy.keyMayMatch(s, new UnpooledSlice(filter));
+		    return policy.keyMayMatch(s, SliceFactory.newUnpooled(filter));
 		}
 		
 		public double falsePositiveRate() {
@@ -96,19 +96,19 @@ public class TestBloom {
 	@Test
 	public void testEmptyFilter() {
 		BloomRun r = new BloomRun();
-		assertFalse(r.matches(new UnpooledSlice("hello")));
-		assertFalse(r.matches(new UnpooledSlice("world")));
+		assertFalse(r.matches(SliceFactory.newUnpooled("hello")));
+		assertFalse(r.matches(SliceFactory.newUnpooled("world")));
 	}
 	
 	@Test
 	public void testSmall() {
 		BloomRun r = new BloomRun();
-		r.add(new UnpooledSlice("hello"));
-		r.add(new UnpooledSlice("world"));
-		assertTrue(r.matches(new UnpooledSlice("hello")));
-		assertTrue(r.matches(new UnpooledSlice("world")));
-		assertFalse(r.matches(new UnpooledSlice("x")));
-		assertFalse(r.matches(new UnpooledSlice("foo")));
+		r.add(SliceFactory.newUnpooled("hello"));
+		r.add(SliceFactory.newUnpooled("world"));
+		assertTrue(r.matches(SliceFactory.newUnpooled("hello")));
+		assertTrue(r.matches(SliceFactory.newUnpooled("world")));
+		assertFalse(r.matches(SliceFactory.newUnpooled("x")));
+		assertFalse(r.matches(SliceFactory.newUnpooled("foo")));
 	}
 	
 	static int nextLength(int length) {

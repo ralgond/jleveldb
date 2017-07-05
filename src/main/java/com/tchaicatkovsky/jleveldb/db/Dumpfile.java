@@ -32,10 +32,10 @@ import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.table.Table;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class Dumpfile {
 	// Dump the contents of the file named by fname in text format to
@@ -70,7 +70,7 @@ public class Dumpfile {
 			r += status.toString();
 			r += '\n';
 			byte[] b = r.getBytes();
-			dst.append(new UnpooledSlice(b, 0, b.length));
+			dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 		}
 	};
 	
@@ -90,7 +90,7 @@ public class Dumpfile {
 		CorruptionReporter reporter = new CorruptionReporter();
 		reporter.dst = dst;
 		LogReader reader = new LogReader(file, reporter, true, 0);
-		Slice record = new UnpooledSlice();
+		Slice record = SliceFactory.newUnpooled();
 		ByteBuf scratch = ByteBufFactory.newUnpooled();
 		while (reader.readRecord(record, scratch)) {
 			//(*func)(reader.LastRecordOffset(), record, dst);
@@ -116,14 +116,14 @@ public class Dumpfile {
 			appendEscapedStringTo(r, value);
 			r += "'\n";
 			byte[] b = r.getBytes();
-			dst.append(new UnpooledSlice(b, 0, b.length));
+			dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 		}
 		public void delete(Slice key) {
 			String r = "  del '";
 			appendEscapedStringTo(r, key);
 			r += "'\n";
 			byte[] b = r.getBytes();
-			dst.append(new UnpooledSlice(b, 0, b.length));
+			dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 		}
 	}
 	
@@ -139,7 +139,7 @@ public class Dumpfile {
 				r += record.size();
 				r += " is too small\n";
 				byte[] b = r.getBytes();
-				dst.append(new UnpooledSlice(b, 0, b.length));
+				dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 				return;
 			}
 			WriteBatch batch = new WriteBatch();
@@ -148,13 +148,13 @@ public class Dumpfile {
 		  	r += WriteBatchInternal.sequence(batch);
 		  	r += '\n';
 		  	byte[] b = r.getBytes();
-		  	dst.append(new UnpooledSlice(b, 0, b.length));
+		  	dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 		  	WriteBatchItemPrinter batchItemPrinter = new WriteBatchItemPrinter();
 		  	batchItemPrinter.dst = dst;
 		  	Status s = batch.iterate(batchItemPrinter);
 		  	if (!s.ok()) {
 		  		byte[] b2 = ("  error: " + s.toString() + "\n").getBytes();
-		  		dst.append(new UnpooledSlice(b2, 0, b2.length));
+		  		dst.append(SliceFactory.newUnpooled(b2, 0, b2.length));
 		  	}
 		}
 	}
@@ -179,7 +179,7 @@ public class Dumpfile {
 				r += edit.debugString();
 			}
 			byte[] b = r.getBytes();
-			dst.append(new UnpooledSlice(b, 0, b.length));
+			dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 		}
 	}
 	
@@ -226,7 +226,7 @@ public class Dumpfile {
 				  appendEscapedStringTo(r, iter.value());
 				  r += "'\n";
 				  byte[] b = r.getBytes();
-				  dst.append(new UnpooledSlice(b, 0, b.length));
+				  dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 			  } else {
 				  r = "'";
 				  appendEscapedStringTo(r, key.userKey);
@@ -244,13 +244,13 @@ public class Dumpfile {
 				  appendEscapedStringTo(r, iter.value());
 				  r += "'\n";
 				  byte[] b = r.getBytes();
-				  dst.append(new UnpooledSlice(b, 0, b.length));
+				  dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 			  }
 		  }
 		  s = iter.status();
 		  if (!s.ok()) {
 			  byte[] b = ("iterator error: " + s.toString() + "\n").getBytes();
-			  dst.append(new UnpooledSlice(b, 0, b.length));
+			  dst.append(SliceFactory.newUnpooled(b, 0, b.length));
 		  }
 
 		  iter.delete();

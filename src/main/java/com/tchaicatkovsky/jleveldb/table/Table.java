@@ -28,9 +28,9 @@ import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator.BlockFunction;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class Table {
 
@@ -98,7 +98,7 @@ public class Table {
 				byte[] cacheKeyBuffer = new byte[16];
 				Coding.encodeFixedNat64(cacheKeyBuffer, 0, table.rep.cacheId);
 				Coding.encodeFixedNat64(cacheKeyBuffer, 8, handle.offset());
-				Slice key = new UnpooledSlice(cacheKeyBuffer, 0, 16);
+				Slice key = SliceFactory.newUnpooled(cacheKeyBuffer, 0, 16);
 				cacheHandle = blockCache.lookup(key);
 				if (cacheHandle != null) {
 					block = (Block) (blockCache.value(cacheHandle));
@@ -237,7 +237,7 @@ public class Table {
 	}
 
 	Slice internalKey2UserKey(Slice ikey) {
-		return new UnpooledSlice(ikey.data(), ikey.offset(), ikey.size() - 8);
+		return SliceFactory.newUnpooled(ikey.data(), ikey.offset(), ikey.size() - 8);
 	}
 
 	public Status internalGet(ReadOptions options, Slice ikey, Object arg, HandleResult handleResult) {
@@ -249,9 +249,9 @@ public class Table {
 			Slice handleValue = iiter.value().clone();
 			FilterBlockReader filter = rep.filter;
 			BlockHandle handle = new BlockHandle();
-			if (filter != null && handle.decodeFrom(handleValue).ok() && !filter.keyMayMatch(handle.offset(), ikey)) {
+			if (filter != null && handle.decodeFrom(handleValue).ok() && 
+					!filter.keyMayMatch(handle.offset(), ikey)) {
 				// Not found
-				// System.out.printf("[DEBUG] Table.internalGet filter not match, ikey=%s\n", Strings.escapeString(ikey));
 			} else {
 				Iterator0 blockIter = blockReader(this, options, iiter.value());
 				blockIter.seek(ikey);
@@ -283,8 +283,6 @@ public class Table {
 		}
 		BlockContents contents = new BlockContents();
 
-		System.out.printf("[DEBUG] readMeta, footer.metaindexHandle=%s\n", footer.metaindexHandle());
-
 		if (!Format.readBlock(rep.file, opt, footer.metaindexHandle(), contents).ok()) {
 			// Do not propagate errors since meta info is not needed for operation
 			return;
@@ -294,8 +292,8 @@ public class Table {
 		Iterator0 iter = meta.newIterator(BytewiseComparatorImpl.getInstance());
 		String key = "filter.";
 		key += (rep.options.filterPolicy.name());
-		iter.seek(new UnpooledSlice(key));
-		if (iter.valid() && iter.key().equals(new UnpooledSlice(key))) {
+		iter.seek(SliceFactory.newUnpooled(key));
+		if (iter.valid() && iter.key().equals(SliceFactory.newUnpooled(key))) {
 			readFilter(iter.value());
 		}
 		iter.delete(); // delete iter;
@@ -317,8 +315,6 @@ public class Table {
 		}
 		BlockContents block = new BlockContents();
 
-		System.out.printf("[DEBUG] readFilter, filterHandle=%s\n", filterHandle);
-
 		if (!Format.readBlock(rep.file, opt, filterHandle, block).ok()) {
 			return;
 		}
@@ -335,7 +331,7 @@ public class Table {
 			return Status.corruption("file is too short to be an sstable");
 
 		byte footerSpace[] = new byte[Footer.kEncodedLength];
-		Slice footerInput = new UnpooledSlice();
+		Slice footerInput = SliceFactory.newUnpooled();
 		Status s = file.read(size - Footer.kEncodedLength, Footer.kEncodedLength, footerInput, footerSpace);
 		if (!s.ok())
 			return s;

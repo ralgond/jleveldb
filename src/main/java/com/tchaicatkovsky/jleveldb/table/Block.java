@@ -24,9 +24,9 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class Block {
@@ -40,14 +40,11 @@ public class Block {
 		size = data.size();
 		owned = contents.heapAllocated;
 		if (data.size() < 4) {
-			//System.out.printf("[DEBUG] Block.<init> 1 size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
 			size = 0; //Error marker
 		} else {
 			int maxRestartsAllowed = (size - 4) / 4;
 			if (numRestarts() > maxRestartsAllowed) {
 				// The size is too small for NumRestarts()
-				System.out.printf("[DEBUG] [DEBUG] Block.<init> 2 numRestarts=%d, maxRestartsAllowed=%d\n",
-						numRestarts(), maxRestartsAllowed);
 				size = 0;
 			} else {
 			    restartOffset = data.offset() + size - (1 + numRestarts()) * 4;
@@ -65,7 +62,6 @@ public class Block {
 	
 	public Iterator0 newIterator(Comparator0 comparator) {
 		if (size < 4) {
-			//System.out.printf("[DEBUG] Block.newIterator size=%d, data={offset:%d,size:%d}\n", size, data.offset(), data.size());
 		    return Iterator0.newErrorIterator(Status.corruption("bad block contents"));
 		}
 		
@@ -112,7 +108,7 @@ public class Block {
 			this.current = restartsOffset;
 			this.restartIndex = numRestarts;
 			key = ByteBufFactory.newUnpooled();
-			value = new UnpooledSlice(data, dataOffset, 0);
+			value = SliceFactory.newUnpooled(data, dataOffset, 0);
 			assert(this.numRestarts > 0);
 			this.status = Status.ok0();
 		}
@@ -155,7 +151,7 @@ public class Block {
 
 		    // parseNextKey() starts at the end of value, so set value accordingly
 		    int offset = getRestartPoint(index);
-		    value = new UnpooledSlice(data, offset, 0);
+		    value = SliceFactory.newUnpooled(data, offset, 0);
 		}
 		
 		public boolean valid() {
@@ -206,8 +202,8 @@ public class Block {
 		    Integer0 shared = new Integer0();
 		    Integer0 nonShared = new Integer0();
 		    Integer0 valueLength = new Integer0();
-		    Slice slice = new UnpooledSlice();
-		    Slice midKey = new UnpooledSlice();
+		    Slice slice = SliceFactory.newUnpooled();
+		    Slice midKey = SliceFactory.newUnpooled();
 		    while (left < right) {
 		    	int mid = (left + right + 1) / 2;
 		    	int regionOffset = getRestartPoint(mid);
@@ -276,7 +272,7 @@ public class Block {
 		
 		public Slice key() {
 			assert(valid());
-		    return new UnpooledSlice(key);
+		    return SliceFactory.newUnpooled(key);
 		}
 		
 		public Slice value() {
@@ -306,7 +302,7 @@ public class Block {
 		    	return false;
 		    }
 		    
-		    Slice slice = new UnpooledSlice(data, current, restartsOffset - current);
+		    Slice slice = SliceFactory.newUnpooled(data, current, restartsOffset - current);
 		    
 		    // Decode next entry
 		    Integer0 shared = new Integer0();
@@ -321,7 +317,7 @@ public class Block {
 		    } else {
 		    	key.resize(shared.getValue());
 		    	key.append(slice.data(), slice.offset(), nonShared.getValue());
-		    	value = new UnpooledSlice(slice.data(), slice.offset()+nonShared.getValue(), valueLength.getValue());
+		    	value = SliceFactory.newUnpooled(slice.data(), slice.offset()+nonShared.getValue(), valueLength.getValue());
 
 		    	while (restartIndex + 1 < numRestarts &&
 		                getRestartPoint(restartIndex + 1) < current) {

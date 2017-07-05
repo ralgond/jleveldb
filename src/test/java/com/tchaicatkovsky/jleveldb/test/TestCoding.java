@@ -10,8 +10,8 @@ import org.junit.Test;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
 public class TestCoding {
@@ -21,7 +21,7 @@ public class TestCoding {
 		ByteBuf s = ByteBufFactory.newUnpooled();
 
 		for (int v = 0; v < 100000; v++) {
-			s.writeFixedNat32(v);
+			s.addFixedNat32(v);
 		}
 
 		byte[] p = s.data();
@@ -39,8 +39,8 @@ public class TestCoding {
 
 		for (int power = 0; power <= 62; power++) {
 			long v = 1L << power;
-			s.writeFixedNat64(v + 0);
-			s.writeFixedNat64(v + 1);
+			s.addFixedNat64(v + 0);
+			s.addFixedNat64(v + 1);
 		}
 
 		byte[] p = s.data();
@@ -63,7 +63,7 @@ public class TestCoding {
 	public void testEncodingOutput() {
 		ByteBuf dst = ByteBufFactory.newUnpooled();
 
-		dst.writeFixedNat32(0x04030201);
+		dst.addFixedNat32(0x04030201);
 		assertEquals(4, dst.size());
 		assertEquals(0x01, (int) (dst.getByte(0) & 0xff));
 		assertEquals(0x02, (int) (dst.getByte(1) & 0xff));
@@ -71,7 +71,7 @@ public class TestCoding {
 		assertEquals(0x04, (int) (dst.getByte(3) & 0xff));
 
 		dst.clear();
-		dst.writeFixedNat64(0x0807060504030201L);
+		dst.addFixedNat64(0x0807060504030201L);
 		assertEquals(8, dst.size());
 		assertEquals(0x01, (int) (dst.getByte(0) & 0xff));
 		assertEquals(0x02, (int) (dst.getByte(1) & 0xff));
@@ -90,10 +90,10 @@ public class TestCoding {
 			int v = (i / 32) << (i % 32);
 			while (v < 0)
 				v = v + Integer.MAX_VALUE;
-			s.writeVarNat32(v);
+			s.addVarNat32(v);
 		}
 
-		Slice p = new UnpooledSlice(s);
+		Slice p = SliceFactory.newUnpooled(s);
 		for (int i = 0; i < (32 * 32); i++) {
 			int v = (i / 32) << (i % 32);
 			while (v < 0)
@@ -125,10 +125,10 @@ public class TestCoding {
 
 		ByteBuf s = ByteBufFactory.newUnpooled();
 		for (int i = 0; i < values.size(); i++) {
-			s.writeVarNat64(values.get(i));
+			s.addVarNat64(values.get(i));
 		}
 
-		Slice p = new UnpooledSlice(s);
+		Slice p = SliceFactory.newUnpooled(s);
 		for (int i = 0; i < values.size(); i++) {
 			int oldOffset = p.offset();
 			long actual = Coding.popVarNat64(p);
@@ -163,13 +163,13 @@ public class TestCoding {
 	@Test
 	public void testStrings() {
 		ByteBuf s = ByteBufFactory.newUnpooled();
-		s.writeLengthPrefixedSlice(new UnpooledSlice(""));
-		s.writeLengthPrefixedSlice(new UnpooledSlice("foo"));
-		s.writeLengthPrefixedSlice(new UnpooledSlice("bar"));
-		s.writeLengthPrefixedSlice(new UnpooledSlice(TestUtil.makeString(200, 'x')));
+		s.addLengthPrefixedSlice(SliceFactory.newUnpooled(""));
+		s.addLengthPrefixedSlice(SliceFactory.newUnpooled("foo"));
+		s.addLengthPrefixedSlice(SliceFactory.newUnpooled("bar"));
+		s.addLengthPrefixedSlice(SliceFactory.newUnpooled(TestUtil.makeString(200, 'x')));
 
-		Slice input = new UnpooledSlice(s);
-		Slice v = new UnpooledSlice();
+		Slice input = SliceFactory.newUnpooled(s);
+		Slice v = SliceFactory.newUnpooled();
 		assertTrue(Coding.popLengthPrefixedSlice(input, v));
 		assertEquals("", v.encodeToString());
 		assertTrue(Coding.popLengthPrefixedSlice(input, v));

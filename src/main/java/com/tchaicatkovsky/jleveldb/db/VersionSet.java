@@ -42,13 +42,13 @@ import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator;
 import com.tchaicatkovsky.jleveldb.util.Boolean0;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.IntLongPair;
 import com.tchaicatkovsky.jleveldb.util.ListUtils;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 /**
  * The representation of a DBImpl consists of a set of Versions.  The
@@ -79,7 +79,7 @@ public class VersionSet {
 	WritableFile descriptorFile;
 	LogWriter descriptorLog;
 	Version dummyVersions; // Head of circular doubly-linked list of versions.
-	Version current; // == dummy_versions_.prev_
+	Version current; // == dummyVersions.prev
 	
 	/**
 	 *  Per-level key at which the next compaction at that level should start.
@@ -94,7 +94,7 @@ public class VersionSet {
 	    this.tableCache = tableCache;
 	    icmp = cmp;
 	    nextFileNumber = 2;
-	    manifestFileNumber = 0;  // Filled by Recover()
+	    manifestFileNumber = 0;  // Filled by recover()
 	    lastSequence = 0;
 	    logNumber = 0;
 	    prevLogNumber = 0;
@@ -311,20 +311,9 @@ public class VersionSet {
 		        // File is deleted: do nothing
 			} else {
 		        ArrayList<FileMetaData> files = v.levelFiles(level);
-
 		        if (level > 0 && !files.isEmpty()) {
 		        	// Must not overlap
 		        	int ret = vset.icmp.compare(files.get(files.size()-1).largest, f.smallest);
-		        	if (!(ret < 0)) {
-		        		System.out.printf("[DEBUG] maybeAddFile 1, ret=%d, files.get(files.size()-1).largest=%s, f.smallest=%s\n",
-		        				ret, files.get(files.size()-1).largest.debugString(), f.smallest.debugString());
-		        		System.out.printf("[DEBUG] maybeAddFile f=%s\n", f.debugString());
-		        		System.out.printf("[DEBUG] maybeAddFile 2:\n");
-		        		System.out.printf("[DEBUG] maybeAddFile 3 level=%d\n", level);
-		        		for (int i = 0; i < files.size(); i++) {
-		        			System.out.printf("[DEBUG] maybeAddFile 3 [%d] file=%s\n", i, files.get(i).debugString());
-		        		}
-		        	}
 		        	assert(ret < 0);
 		        }
 		        f.refs++;
@@ -335,12 +324,13 @@ public class VersionSet {
 	
 	
 	/**
-	 * Apply *edit to the current version to form a new descriptor that
+	 * Apply edit to the current version to form a new descriptor that
 	 * is both saved to persistent state and installed as the new
-	 * current version.  Will release *mu while actually writing to the file.
+	 * current version.  Will release mu while actually writing to the file.
 	 * </br></br>
-	 * REQUIRES: *mu is held on entry.</br>
-	 * REQUIRES: no other thread concurrently calls LogAndApply()
+	 * 
+	 * REQUIRES: mu is held on entry.</br>
+	 * REQUIRES: no other thread concurrently calls logAndApply()
 	 * 
 	 * @param edit
 	 * @param mu
@@ -359,8 +349,6 @@ public class VersionSet {
 		}
 		edit.setNextFile(nextFileNumber);
 		edit.setLastSequence(lastSequence);
-
-		//System.out.println("[DEBUG] VersionSet.logAndApply, edit="+edit.debugString());
 		
 		Version v = new Version(this);
 		{
@@ -399,7 +387,7 @@ public class VersionSet {
 			if (s.ok()) {
 				ByteBuf record = ByteBufFactory.newUnpooled();
 			    edit.encodeTo(record);
-			    s = descriptorLog.addRecord(new UnpooledSlice(record));
+			    s = descriptorLog.addRecord(SliceFactory.newUnpooled(record));
 			    if (s.ok()) {
 			    	s = descriptorFile.sync();
 			    }
@@ -486,7 +474,7 @@ public class VersionSet {
 				LogReporter reporter = new LogReporter();
 				reporter.status = s;
 				LogReader reader = new LogReader(file, reporter, true, 0);
-				Slice record = new UnpooledSlice();
+				Slice record = SliceFactory.newUnpooled();
 				ByteBuf scratch = ByteBufFactory.newUnpooled();
 				while (reader.readRecord(record, scratch) && s.ok()) {
 					VersionEdit edit = new VersionEdit();
@@ -598,10 +586,10 @@ public class VersionSet {
 	}
 	
 	/**
-	 * Arrange to reuse "file_number" unless a newer file number has
-	 * already been allocated.
-	 * </br></br>
-	 * REQUIRES: "file_number" was returned by a call to NewFileNumber().
+	 * Arrange to reuse "fileNumber" unless a newer file number has
+	 * already been allocated. </br></br>
+	 * 
+	 * REQUIRES: "fileNumber" was returned by a call to newFileNumber().
 	 * @param file_number
 	 */
 	public void reuseFileNumber(long fileNumber) {
@@ -686,7 +674,6 @@ public class VersionSet {
 		final boolean sizeCompaction = (current.compactionScore >= 1.0);
 		final boolean seekCompaction = (current.fileToCompact != null);
 		if (sizeCompaction) {
-			System.out.println("[DEBUG] VersionSet.pickCompaction Size-Compaction");
 		    level = current.compactionLevel;
 		    assert(level >= 0);
 		    assert(level+1 < DBFormat.kNumLevels);
@@ -709,8 +696,6 @@ public class VersionSet {
 		    level = current.fileToCompactLevel;
 		    c = new Compaction(options, level);
 		    c.input(0).add(current.fileToCompact);
-		    
-		    System.out.printf("[DEBUG] VersionSet.pickCompaction Seek-Compaction level=%d\n", level);
 		} else {
 		    return null;
 		}
@@ -1048,9 +1033,6 @@ public class VersionSet {
 		getRange(c.input(0), smallest, largest);
 		
 		current.getOverlappingInputs(level+1, smallest, largest, c.input(1));
-
-		System.out.printf("[DEBUG] setupOtherInputs, level-%d=%s, level-%d=%s\n",
-				c.level, dumpFileNumberList(c.input(0)), c.level+1, dumpFileNumberList(c.input(1)));
 		
 		// Get entire range covered by compaction
 		InternalKey allStart = new InternalKey();
@@ -1112,10 +1094,6 @@ public class VersionSet {
 		// key range next time.
 		compactPointer[level] = ByteBufFactory.newUnpooled(largest.rep().data(), largest.rep().size());
 		c.edit.setCompactPointer(level, largest);
-		
-
-		System.out.printf("[DEBUG] setupOtherInputs 2, level-%d=%s, level-%d=%s\n",
-				c.level, dumpFileNumberList(c.input(0)), c.level+1, dumpFileNumberList(c.input(1)));
 	}
 	
 	Status writeSnapshot(LogWriter log) {
@@ -1146,7 +1124,7 @@ public class VersionSet {
 		  ByteBuf record = ByteBufFactory.newUnpooled();
 		  record.require(1); //TODO
 		  edit.encodeTo(record);
-		  return log.addRecord(new UnpooledSlice(record)); //TODO: new DefaultSlice(record)->record
+		  return log.addRecord(SliceFactory.newUnpooled(record)); //TODO: new DefaultSlice(record)->record
 	}
 
 	

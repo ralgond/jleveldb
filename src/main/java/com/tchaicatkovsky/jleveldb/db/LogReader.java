@@ -21,11 +21,13 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Crc32C;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class LogReader {
-	// Interface for reporting errors.
+	/** 
+	 * Interface for reporting errors.
+	 */
 	public static interface Reporter {
 		void corruption(int bytes, Status status);
 	}
@@ -35,18 +37,19 @@ public class LogReader {
 	final boolean checksum;
 	byte[] backingStore;
 	Slice buffer;
+	
 	/** 
-	 * Last Read() indicated EOF by returning < kBlockSize
+	 * Last read() indicated EOF by returning < kBlockSize
 	 */
 	boolean eof;   
 
 	/**
-	 *  Offset of the last record returned by ReadRecord.
+	 *  Offset of the last record returned by readRecord.
 	 */
 	long lastRecordOffset;
 	
 	/** 
-	 * Offset of the first location past the end of buffer_.
+	 * Offset of the first location past the end of buffer.
 	 */
 	long endOfBufferOffset;
 
@@ -67,11 +70,14 @@ public class LogReader {
 	 */
 	enum ExtendRecordType {
 	    Eof(LogFormat.kMaxRecordType + 1),
-	    // Returned whenever we find an invalid physical record.
-	    // Currently there are three situations in which this happens:
-	    // * The record has an invalid CRC (ReadPhysicalRecord reports a drop)
-	    // * The record is a 0-length record (No drop is reported)
-	    // * The record is below constructor's initial_offset (No drop is reported)
+	    
+	    /**
+	     * Returned whenever we find an invalid physical record.</br>
+	     * Currently there are three situations in which this happens:</br>
+	     * The record has an invalid CRC (ReadPhysicalRecord reports a drop)</br>
+	     * The record is a 0-length record (No drop is reported)</br>
+	     * The record is below constructor's initialOffset (No drop is reported)</br>
+	     */
 	    BadRecord(LogFormat.kMaxRecordType + 2);
 		
 		private int type;
@@ -86,11 +92,11 @@ public class LogReader {
 	}; 
 
 	/**
-	 * Create a reader that will return log records from "*file". 
-	 * "*file" must remain live while this Reader is in use.</br></br>
+	 * Create a reader that will return log records from "file". 
+	 * "file" must remain live while this Reader is in use.</br></br>
 	 * 
-	 * If "reporter" is non-NULL, it is notified whenever some data is 
-	 * dropped due to a detected corruption.  "*reporter" must remain 
+	 * If "reporter" is non-null, it is notified whenever some data is 
+	 * dropped due to a detected corruption.  "reporter" must remain 
 	 * live while this Reader is in use.</br></br>
 	 * 
 	 * If "checksum" is true, verify checksums if available.</br></br>
@@ -110,7 +116,7 @@ public class LogReader {
 		this.checksum = checksum;
 		
 		backingStore = new byte[LogFormat.kBlockSize];
-		buffer = new UnpooledSlice();
+		buffer = SliceFactory.newUnpooled();
 		eof = false;
 		lastRecordOffset = 0;
 		endOfBufferOffset = 0;
@@ -124,6 +130,7 @@ public class LogReader {
 	 * "scratch" as temporary storage.  The contents filled in record
 	 * will only be valid until the next mutating operation on this
 	 * reader or the next mutation to scratch.
+	 * 
 	 * @param record
 	 * @param scratch
 	 * @return
@@ -144,7 +151,7 @@ public class LogReader {
 		// 0 is a dummy value to make compilers happy
 		long prospectiveRecordOffset = 0;
 
-		Slice fragment = new UnpooledSlice();
+		Slice fragment = SliceFactory.newUnpooled();
 		while (true) {
 			int recordType = readPhysicalRecord(fragment);
 			
@@ -242,7 +249,7 @@ public class LogReader {
 	 * Undefined before the first call to ReadRecord.
 	 * @return
 	 */
-	public long lastRecordOffset() {
+	final long lastRecordOffset() {
 		return this.lastRecordOffset;
 	}
 	
@@ -276,9 +283,8 @@ public class LogReader {
 	}
 	
 	/**
-	 *  Return type, or one of the preceding special values
-	 * @param result
-	 * @return
+	 * @param result [OUTPUT]
+	 * @return Return type, or one of the preceding special values.
 	 */
 	int readPhysicalRecord(Slice result) {
 		while (true) {

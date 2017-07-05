@@ -16,8 +16,8 @@
  */
 package com.tchaicatkovsky.jleveldb;
 
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class EmptyIterator0 extends Iterator0 {
 
@@ -65,13 +65,13 @@ public class EmptyIterator0 extends Iterator0 {
 	@Override
 	public Slice key() {
 		assert (false);
-		return new UnpooledSlice();
+		return SliceFactory.newUnpooled();
 	}
 
 	@Override
 	public Slice value() {
 		assert (false);
-		return new UnpooledSlice();
+		return SliceFactory.newUnpooled();
 	}
 
 	@Override

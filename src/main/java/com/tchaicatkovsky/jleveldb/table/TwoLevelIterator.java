@@ -17,13 +17,12 @@
 package com.tchaicatkovsky.jleveldb.table;
 
 import com.tchaicatkovsky.jleveldb.Iterator0;
-import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.ReadOptions;
 import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class TwoLevelIterator extends Iterator0 {
 	
@@ -161,8 +160,6 @@ public class TwoLevelIterator extends Iterator0 {
 	
 	void skipEmptyDataBlocksForward(){
 		while (dataIter.iter() == null || !dataIter.valid()) {
-			Logger0.debug("TwoLevelIterator.skipEmptyDataBlocksForward, dataIter.valid()=%s\n", 
-					dataIter.valid());
 			// Move to next block
 			if (!indexIter.valid()) {
 				setDataIterator(null);
@@ -200,15 +197,13 @@ public class TwoLevelIterator extends Iterator0 {
 			setDataIterator(null);
 		} else {
 			Slice handle = indexIter.value();
-			if (dataIter.iter() != null && handle.compare(new UnpooledSlice(dataBlockHandle)) == 0) {
+			if (dataIter.iter() != null && handle.compare(SliceFactory.newUnpooled(dataBlockHandle)) == 0) {
 				// dataIter is already constructed with this iterator, so
 			    // no need to change anything
-				Logger0.debug("TwoLevelIterator.initDataBlock 1\n");
 			} else {
 				Iterator0 iter = blockFunction.run(arg, options, handle);
 				dataBlockHandle.assign(handle.data(), handle.offset(), handle.size());
 			    setDataIterator(iter);
-			    Logger0.debug("TwoLevelIterator.initDataBlock 2, iter.class=%s\n", iter.getClass().getName());
 			}
 		}
 	}

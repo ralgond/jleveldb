@@ -40,12 +40,12 @@ import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.CondVar;
 import com.tchaicatkovsky.jleveldb.util.Crc32C;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Histogram;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
 import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
@@ -57,29 +57,7 @@ public class DBBench {
 			+ "fillrand100K," + "fillseq100K," + "readseq," + "readrand100K,";
 	static String[] FLAGS_benchmarks2 = FLAGS_benchmarks.split(",");
 
-	// Comma-separated list of operations to run in the specified order
-	// Actual benchmarks:
-	// fillseq -- write N values in sequential key order in async mode
-	// fillrandom -- write N values in random key order in async mode
-	// overwrite -- overwrite N values in random key order in async mode
-	// fillsync -- write N/100 values in random key order in sync mode
-	// fill100K -- write N/1000 100K values in random order in async mode
-	// deleteseq -- delete N keys in sequential order
-	// deleterandom -- delete N keys in random order
-	// readseq -- read N times sequentially
-	// readreverse -- read N times in reverse order
-	// readrandom -- read N times in random order
-	// readmissing -- read N missing keys in random order
-	// readhot -- read N times in random order from 1% section of DB
-	// seekrandom -- N random seeks
-	// open -- cost of opening a DB
-	// crc32c -- repeated crc32c of 4K of data
-	// acquireload -- load N*1000 times
-	// Meta operations:
-	// compact -- Compact the entire DB
-	// stats -- Print DB stats
-	// sstables -- Print sstable info
-	// heapprofile -- Dump a heap profile (if supported by this port)
+
 
 	// Number of key/values to place in database
 	static int FLAGS_num = 1000000;
@@ -161,7 +139,7 @@ public class DBBench {
 				assert (len < data.size());
 			}
 			pos += len;
-			return new UnpooledSlice(data.data(), data.offset() + pos - len, len);
+			return SliceFactory.newUnpooled(data.data(), data.offset() + pos - len, len);
 		}
 	}
 
@@ -183,7 +161,7 @@ public class DBBench {
 			else
 				break;
 		}
-		return new UnpooledSlice(data, offset + start, limit - start);
+		return SliceFactory.newUnpooled(data, offset + start, limit - start);
 	}
 
 	static void appendWithSpace(ByteBuf str, Slice msg) {
@@ -728,7 +706,7 @@ public class DBBench {
 				}
 
 				if (method != null) {
-					runBenchmark(num_threads, new UnpooledSlice(benchmark), method);
+					runBenchmark(num_threads, SliceFactory.newUnpooled(benchmark), method);
 				}
 			}
 
@@ -803,7 +781,7 @@ public class DBBench {
 			System.err.printf("... crc=0x%x\r", crc);
 
 			thread.stats.addBytes(bytes);
-			thread.stats.addMessage(new UnpooledSlice(label));
+			thread.stats.addMessage(SliceFactory.newUnpooled(label));
 		}
 
 		void acquireLoad(ThreadState thread) {
@@ -864,7 +842,7 @@ public class DBBench {
 
 		void doWrite(ThreadState thread, boolean seq) {
 			if (num != FLAGS_num) {
-				thread.stats.addMessage(new UnpooledSlice(String.format("(%d ops)", num)));
+				thread.stats.addMessage(SliceFactory.newUnpooled(String.format("(%d ops)", num)));
 			}
 
 			RandomGenerator gen = new RandomGenerator();
@@ -876,7 +854,7 @@ public class DBBench {
 				for (int j = 0; j < entries_per_batch; j++) {
 					int k = (int) (seq ? i + j : (thread.rand.next() % FLAGS_num));
 					String key = String.format("%016d", k);
-					batch.put(new UnpooledSlice(key), gen.generate(value_size));
+					batch.put(SliceFactory.newUnpooled(key), gen.generate(value_size));
 					bytes += (value_size + key.length());
 					thread.stats.finishedSingleOp();
 				}
@@ -930,7 +908,7 @@ public class DBBench {
 				int k = (int) (thread.rand.next() % FLAGS_num);
 				String key = String.format("%016d", k);
 				try {
-					if (db.get(options, new UnpooledSlice(key), value).ok()) {
+					if (db.get(options, SliceFactory.newUnpooled(key), value).ok()) {
 						found++;
 					}
 				} catch (Exception e) {
@@ -941,7 +919,7 @@ public class DBBench {
 			}
 
 			String msg = String.format("(%d of %d found)", found, num);
-			thread.stats.addMessage(new UnpooledSlice(msg));
+			thread.stats.addMessage(SliceFactory.newUnpooled(msg));
 		}
 
 		void readMissing(ThreadState thread) {
@@ -951,7 +929,7 @@ public class DBBench {
 				int k = (int) (thread.rand.next() % FLAGS_num);
 				String key = String.format("%016d.", k);
 				try {
-					db.get(options, new UnpooledSlice(key), value);
+					db.get(options, SliceFactory.newUnpooled(key), value);
 				} catch (Exception e) {
 					e.printStackTrace();
 					System.exit(1);
@@ -968,7 +946,7 @@ public class DBBench {
 				int k = (int) (thread.rand.next() % range);
 				String key = String.format("%016d", k);
 				try {
-					db.get(options, new UnpooledSlice(key), value);
+					db.get(options, SliceFactory.newUnpooled(key), value);
 				} catch (Exception e) {
 					e.printStackTrace();
 					System.exit(1);
@@ -985,18 +963,18 @@ public class DBBench {
 
 				int k = (int) (thread.rand.next() % FLAGS_num);
 				String key = String.format("%016d", k);
-				iter.seek(new UnpooledSlice(key));
-				if (iter.valid() && iter.key().equals(new UnpooledSlice(key)))
+				iter.seek(SliceFactory.newUnpooled(key));
+				if (iter.valid() && iter.key().equals(SliceFactory.newUnpooled(key)))
 					found++;
 				iter.delete();
 				thread.stats.finishedSingleOp();
 			}
 			String msg = String.format("(%d of %d found)", found, num);
-			thread.stats.addMessage(new UnpooledSlice(msg));
+			thread.stats.addMessage(SliceFactory.newUnpooled(msg));
 		}
 
 		void doDelete(ThreadState thread, boolean seq) {
-			RandomGenerator gen = new RandomGenerator();
+			//RandomGenerator gen = new RandomGenerator();
 			WriteBatch batch = new WriteBatch();
 			Status s = Status.ok0();
 			for (int i = 0; i < num; i += entries_per_batch) {
@@ -1004,7 +982,7 @@ public class DBBench {
 				for (int j = 0; j < entries_per_batch; j++) {
 					int k = (int) (seq ? i + j : (thread.rand.next() % FLAGS_num));
 					String key = String.format("%016d", k);
-					batch.delete(new UnpooledSlice(key));
+					batch.delete(SliceFactory.newUnpooled(key));
 					thread.stats.finishedSingleOp();
 				}
 				try {
@@ -1049,7 +1027,7 @@ public class DBBench {
 					String key = String.format("%016d", k);
 					Status s = Status.ok0();
 					try {
-						s = db.put(write_options, new UnpooledSlice(key), gen.generate(value_size));
+						s = db.put(write_options, SliceFactory.newUnpooled(key), gen.generate(value_size));
 					} catch (Exception e) {
 						e.printStackTrace();
 						System.exit(1);
@@ -1083,7 +1061,7 @@ public class DBBench {
 		}
 
 		void writeToFile(Object arg, byte[] buf, int offset, int n) {
-			((WritableFile) arg).append(new UnpooledSlice(buf, offset, n));
+			((WritableFile) arg).append(SliceFactory.newUnpooled(buf, offset, n));
 		}
 
 		//TODO
@@ -1105,6 +1083,30 @@ public class DBBench {
 		}
 	}
 
+	// Comma-separated list of operations to run in the specified order
+	// Actual benchmarks:
+	// fillseq -- write N values in sequential key order in async mode
+	// fillrandom -- write N values in random key order in async mode
+	// overwrite -- overwrite N values in random key order in async mode
+	// fillsync -- write N/100 values in random key order in sync mode
+	// fill100K -- write N/1000 100K values in random order in async mode
+	// deleteseq -- delete N keys in sequential order
+	// deleterandom -- delete N keys in random order
+	// readseq -- read N times sequentially
+	// readreverse -- read N times in reverse order
+	// readrandom -- read N times in random order
+	// readmissing -- read N missing keys in random order
+	// readhot -- read N times in random order from 1% section of DB
+	// seekrandom -- N random seeks
+	// open -- cost of opening a DB
+	// crc32c -- repeated crc32c of 4K of data
+	// acquireload -- load N*1000 times
+	// Meta operations:
+	// compact -- Compact the entire DB
+	// stats -- Print DB stats
+	// sstables -- Print sstable info
+	// heapprofile -- Dump a heap profile (if supported by this port)
+	
 	public static void main(String args[]) throws Exception {
 		FLAGS_write_buffer_size = (new Options()).writeBufferSize;
 		FLAGS_max_file_size = (new Options()).maxFileSize;
@@ -1114,12 +1116,35 @@ public class DBBench {
 
 		CommandLineParser parser = new BasicParser();
 		org.apache.commons.cli.Options options = new org.apache.commons.cli.Options();
-		options.addOption(null, "benchmarks", true, "Benchmark type list, seperated by comma");
+		options.addOption(null, "benchmarks", true, "Comma-separated list of operations to run in the specified order\n"+
+													"Actual benchmarks:\n"+
+													"fillseq -- write N values in sequential key order in async mode\n"+
+													"fillrandom -- write N values in random key order in async mode\n"+
+													"overwrite -- overwrite N values in random key order in async mode\n"+
+													"fillsync -- write N/100 values in random key order in sync mode\n"+
+													"fill100K -- write N/1000 100K values in random order in async mode\n"+
+													"deleteseq -- delete N keys in sequential order\n"+
+													"deleterandom -- delete N keys in random order\n"+
+													"readseq -- read N times sequentially\n"+
+													"readreverse -- read N times in reverse order\n"+
+													"readrandom -- read N times in random order\n"+
+													"readmissing -- read N missing keys in random order\n"+
+													"readhot -- read N times in random order from 1% section of DB\n"+
+													"seekrandom -- N random seeks\n"+
+													"open -- cost of opening a DB\n"+
+													"crc32c -- repeated crc32c of 4K of data\n"+
+													"acquireload -- load N*1000 times\n"+
+													"Meta operations:\n"+
+													"compact -- Compact the entire DB\n"+
+													"stats -- Print DB stats\n"+
+													"sstables -- Print sstable info\n"+
+													"heapprofile -- Dump a heap profile (if supported by this port)\n");
+		
 		options.addOption(null, "compression_ratio", true, "");
 		options.addOption(null, "histogram", true, "boolean value (true/false)");
 		options.addOption(null, "use_existing_db", true, "boolean value (true/false)");
 		options.addOption(null, "reuse_logs", true, "boolean value (true/false)");
-		options.addOption(null, "num", true, "");
+		options.addOption("N", "num", true, "");
 		options.addOption(null, "reads", true, "");
 		options.addOption(null, "threads", true, "");
 		options.addOption(null, "value_size", true, "");
@@ -1138,6 +1163,7 @@ public class DBBench {
 		
 		if (commandLine.hasOption("help")) {
 			HelpFormatter hf = new HelpFormatter();
+			hf.setWidth(200);
 			hf.printHelp(formatstr, "", options, "");
 			System.exit(0);
 		}

@@ -19,10 +19,10 @@ import com.tchaicatkovsky.jleveldb.db.LogWriter;
 import com.tchaicatkovsky.jleveldb.db.WriteBatchInternal;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
 import static org.junit.Assert.assertNotNull;
@@ -111,11 +111,11 @@ public class TestRecovery {
 		}
 		
 		public Status put(String k, String v) throws Exception {
-		    return db.put(WriteOptions.defaultOne(), new UnpooledSlice(k), new UnpooledSlice(v));
+		    return db.put(WriteOptions.defaultOne(), SliceFactory.newUnpooled(k), SliceFactory.newUnpooled(v));
 		}
 		
 		public Status put(ByteBuf k, ByteBuf v) throws Exception {
-		    return db.put(WriteOptions.defaultOne(), new UnpooledSlice(k), new UnpooledSlice(v));
+		    return db.put(WriteOptions.defaultOne(), SliceFactory.newUnpooled(k), SliceFactory.newUnpooled(v));
 		}
 		
 		public ByteBuf get(Slice k, Snapshot snapshot) throws Exception {
@@ -134,7 +134,7 @@ public class TestRecovery {
 		}
 		
 		public ByteBuf get(String s) throws Exception {
-			return get(new UnpooledSlice(s), null);
+			return get(SliceFactory.newUnpooled(s), null);
 		}
 		
 		String manifestFileName() {
@@ -294,7 +294,7 @@ public class TestRecovery {
 				zeroes.addByte((byte)0);
 			}
 			    
-			assertTrue(file0.getValue().append(new UnpooledSlice(zeroes)).ok());
+			assertTrue(file0.getValue().append(SliceFactory.newUnpooled(zeroes)).ok());
 			assertTrue(file0.getValue().flush().ok());
 			file0.getValue().delete();
 		}
@@ -406,9 +406,9 @@ public class TestRecovery {
 		
 		// Make a bunch of uncompacted log files.
 		long oldLog = r.firstLogFile();
-		r.makeLogFile(oldLog+1, 1000, new UnpooledSlice("hello"), new UnpooledSlice("world"));
-		r.makeLogFile(oldLog+2, 1001, new UnpooledSlice("hi"), new UnpooledSlice("there"));
-		r.makeLogFile(oldLog+3, 1002, new UnpooledSlice("foo"), new UnpooledSlice("bar2"));
+		r.makeLogFile(oldLog+1, 1000, SliceFactory.newUnpooled("hello"), SliceFactory.newUnpooled("world"));
+		r.makeLogFile(oldLog+2, 1001, SliceFactory.newUnpooled("hi"), SliceFactory.newUnpooled("there"));
+		r.makeLogFile(oldLog+3, 1002, SliceFactory.newUnpooled("foo"), SliceFactory.newUnpooled("bar2"));
 
 		
 		// Recover and check that all log files were processed.
@@ -436,7 +436,7 @@ public class TestRecovery {
 
 		// Check that introducing an older log file does not cause it to be re-read.
 		r.close();
-		r.makeLogFile(oldLog+1, 2000, new UnpooledSlice("hello"), new UnpooledSlice("stale write"));
+		r.makeLogFile(oldLog+1, 2000, SliceFactory.newUnpooled("hello"), SliceFactory.newUnpooled("stale write"));
 		r.open();
 		assertTrue(1 <= r.numTables());
 		assertEquals(1, r.numLogs());

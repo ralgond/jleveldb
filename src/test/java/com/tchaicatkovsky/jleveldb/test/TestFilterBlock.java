@@ -13,9 +13,9 @@ import com.tchaicatkovsky.jleveldb.table.FilterBlockBuilder;
 import com.tchaicatkovsky.jleveldb.table.FilterBlockReader;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Hash;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class TestFilterBlock {
@@ -29,21 +29,16 @@ public class TestFilterBlock {
 		@Override
 		public void createFilter(List<Slice> keys, ByteBuf dst) {
 		    for (int i = 0; i < keys.size(); i++) {
-		    	Slice s = keys.get(i);
-		    	
+		    	Slice s = keys.get(i);	    	
 		    	long h = Hash.hash0(s.data(), s.offset(), s.size(), 1L);
-//		    	System.out.printf("createFilter, [%d], s={offset=%d,size=%d}, s0=%s, h=%d\n", 
-//		    			i, s.offset, s.size(), s.encodeToString(), h);
-		      	dst.writeFixedNat32Long(h);
+		      	dst.addFixedNat32Long(h);
 		    }
 		}
 		
 		public boolean keyMayMatch(Slice key, Slice filter) {
 		    long h = Hash.hash0(key.data(), key.offset(), key.size(), 1L);
-//		    System.out.println("keyMayMatch, target="+h);
 		    for (int i = 0; i + 4 <= filter.size(); i += 4) {
 		    	long hash = Coding.decodeFixedNat32Long(filter.data(), filter.offset() + i);
-//		    	System.out.printf("keyMayMatch, [%d] hash=%d\n", i, hash);
 		    	if (h == hash) {
 		    		return true;
 		    	}
@@ -62,11 +57,10 @@ public class TestFilterBlock {
 		TestHashFilter policy = new TestHashFilter();
 		FilterBlockBuilder builder = new FilterBlockBuilder(policy);
 		Slice block = builder.finish();
-//		System.out.println("==="+Strings.escapeString(block)+"===");
 		assertEquals("\\x00\\x00\\x00\\x00\\x0b", Strings.escapeString(block));
 		FilterBlockReader reader = new FilterBlockReader(policy, block);
-		assertTrue(reader.keyMayMatch(0, new UnpooledSlice("foo")));
-		assertTrue(reader.keyMayMatch(100000, new UnpooledSlice("foo")));
+		assertTrue(reader.keyMayMatch(0, SliceFactory.newUnpooled("foo")));
+		assertTrue(reader.keyMayMatch(100000, SliceFactory.newUnpooled("foo")));
 	}
 	
 	@Test
@@ -74,22 +68,22 @@ public class TestFilterBlock {
 		TestHashFilter policy = new TestHashFilter();
 		FilterBlockBuilder builder = new FilterBlockBuilder(policy);
 		builder.startBlock(100);
-		builder.addKey(new UnpooledSlice("foo"));
-		builder.addKey(new UnpooledSlice("bar"));
-		builder.addKey(new UnpooledSlice("box"));
+		builder.addKey(SliceFactory.newUnpooled("foo"));
+		builder.addKey(SliceFactory.newUnpooled("bar"));
+		builder.addKey(SliceFactory.newUnpooled("box"));
 		builder.startBlock(200);
-		builder.addKey(new UnpooledSlice("box"));
+		builder.addKey(SliceFactory.newUnpooled("box"));
 		builder.startBlock(300);
-		builder.addKey(new UnpooledSlice("hello"));
+		builder.addKey(SliceFactory.newUnpooled("hello"));
 		Slice block = builder.finish();
 		FilterBlockReader reader = new FilterBlockReader(policy, block);
-		assertTrue(reader.keyMayMatch(100, new UnpooledSlice("foo")));
-		assertTrue(reader.keyMayMatch(100, new UnpooledSlice("bar")));
-		assertTrue(reader.keyMayMatch(100, new UnpooledSlice("box")));
-		assertTrue(reader.keyMayMatch(100, new UnpooledSlice("hello")));
-		assertTrue(reader.keyMayMatch(100, new UnpooledSlice("foo")));
-		assertFalse(reader.keyMayMatch(100, new UnpooledSlice("missing")));
-		assertFalse(reader.keyMayMatch(100, new UnpooledSlice("other")));
+		assertTrue(reader.keyMayMatch(100, SliceFactory.newUnpooled("foo")));
+		assertTrue(reader.keyMayMatch(100, SliceFactory.newUnpooled("bar")));
+		assertTrue(reader.keyMayMatch(100, SliceFactory.newUnpooled("box")));
+		assertTrue(reader.keyMayMatch(100, SliceFactory.newUnpooled("hello")));
+		assertTrue(reader.keyMayMatch(100, SliceFactory.newUnpooled("foo")));
+		assertFalse(reader.keyMayMatch(100, SliceFactory.newUnpooled("missing")));
+		assertFalse(reader.keyMayMatch(100, SliceFactory.newUnpooled("other")));
 	}
 	
 	@Test
@@ -99,46 +93,46 @@ public class TestFilterBlock {
 
 		  // First filter
 		  builder.startBlock(0);
-		  builder.addKey(new UnpooledSlice("foo"));
+		  builder.addKey(SliceFactory.newUnpooled("foo"));
 		  builder.startBlock(2000);
-		  builder.addKey(new UnpooledSlice("bar"));
+		  builder.addKey(SliceFactory.newUnpooled("bar"));
 
 		  // Second filter
 		  builder.startBlock(3100);
-		  builder.addKey(new UnpooledSlice("box"));
+		  builder.addKey(SliceFactory.newUnpooled("box"));
 
 		  // Third filter is empty
 
 		  // Last filter
 		  builder.startBlock(9000);
-		  builder.addKey(new UnpooledSlice("box"));
-		  builder.addKey(new UnpooledSlice("hello"));
+		  builder.addKey(SliceFactory.newUnpooled("box"));
+		  builder.addKey(SliceFactory.newUnpooled("hello"));
 
 		  Slice block = builder.finish();
 		  FilterBlockReader reader = new FilterBlockReader(policy, block);
 
 		  // Check first filter
-		  assertTrue(reader.keyMayMatch(0, new UnpooledSlice("foo")));
-		  assertTrue(reader.keyMayMatch(2000, new UnpooledSlice("bar")));
-		  assertTrue(! reader.keyMayMatch(0, new UnpooledSlice("box")));
-		  assertTrue(! reader.keyMayMatch(0, new UnpooledSlice("hello")));
+		  assertTrue(reader.keyMayMatch(0, SliceFactory.newUnpooled("foo")));
+		  assertTrue(reader.keyMayMatch(2000, SliceFactory.newUnpooled("bar")));
+		  assertTrue(! reader.keyMayMatch(0, SliceFactory.newUnpooled("box")));
+		  assertTrue(! reader.keyMayMatch(0, SliceFactory.newUnpooled("hello")));
 
 		  // Check second filter
-		  assertTrue(reader.keyMayMatch(3100, new UnpooledSlice("box")));
-		  assertTrue(! reader.keyMayMatch(3100, new UnpooledSlice("foo")));
-		  assertTrue(! reader.keyMayMatch(3100, new UnpooledSlice("bar")));
-		  assertTrue(! reader.keyMayMatch(3100, new UnpooledSlice("hello")));
+		  assertTrue(reader.keyMayMatch(3100, SliceFactory.newUnpooled("box")));
+		  assertTrue(! reader.keyMayMatch(3100, SliceFactory.newUnpooled("foo")));
+		  assertTrue(! reader.keyMayMatch(3100, SliceFactory.newUnpooled("bar")));
+		  assertTrue(! reader.keyMayMatch(3100, SliceFactory.newUnpooled("hello")));
 
 		  // Check third filter (empty)
-		  assertTrue(! reader.keyMayMatch(4100, new UnpooledSlice("foo")));
-		  assertTrue(! reader.keyMayMatch(4100, new UnpooledSlice("bar")));
-		  assertTrue(! reader.keyMayMatch(4100, new UnpooledSlice("box")));
-		  assertTrue(! reader.keyMayMatch(4100, new UnpooledSlice("hello")));
+		  assertTrue(! reader.keyMayMatch(4100, SliceFactory.newUnpooled("foo")));
+		  assertTrue(! reader.keyMayMatch(4100, SliceFactory.newUnpooled("bar")));
+		  assertTrue(! reader.keyMayMatch(4100, SliceFactory.newUnpooled("box")));
+		  assertTrue(! reader.keyMayMatch(4100, SliceFactory.newUnpooled("hello")));
 
 		  // Check last filter
-		  assertTrue(reader.keyMayMatch(9000, new UnpooledSlice("box")));
-		  assertTrue(reader.keyMayMatch(9000, new UnpooledSlice("hello")));
-		  assertTrue(! reader.keyMayMatch(9000, new UnpooledSlice("foo")));
-		  assertTrue(! reader.keyMayMatch(9000, new UnpooledSlice("bar")));
+		  assertTrue(reader.keyMayMatch(9000, SliceFactory.newUnpooled("box")));
+		  assertTrue(reader.keyMayMatch(9000, SliceFactory.newUnpooled("hello")));
+		  assertTrue(! reader.keyMayMatch(9000, SliceFactory.newUnpooled("foo")));
+		  assertTrue(! reader.keyMayMatch(9000, SliceFactory.newUnpooled("bar")));
 	}
 }

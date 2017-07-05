@@ -26,9 +26,9 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.table.Table;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class TableCache {
 
@@ -39,11 +39,11 @@ public class TableCache {
 		public void delete() {
 			if (table != null) {
 				table.delete();
-				table = null; // delete tf->table;
+				table = null;
 			}
 			if (file != null) {
 				file.delete();
-				file = null;// delete tf->file; env_poxis.cc
+				file = null;
 			}
 		}
 	};
@@ -55,7 +55,7 @@ public class TableCache {
 				return;
 
 			tf.delete();
-			tf = null; // delete tf;
+			tf = null;
 		}
 	};
 
@@ -77,6 +77,13 @@ public class TableCache {
 		}
 	}
 
+	final static int kUint64Size = 8;
+	
+	Env env;
+	String dbname;
+	Options options;
+	Cache cache;
+
 	public TableCache(String dbname, Options options, int entries) {
 		env = options.env;
 		this.dbname = dbname;
@@ -90,10 +97,10 @@ public class TableCache {
 
 	/**
 	 * Return an iterator for the specified file number (the corresponding file
-	 * length must be exactly "file_size" bytes). If "tableptr" is non-NULL, also
-	 * sets "*tableptr" to point to the Table object underlying the returned
-	 * iterator, or NULL if no Table object underlies the returned iterator. The
-	 * returned "*tableptr" object is owned by the cache and should not be deleted,
+	 * length must be exactly "file_size" bytes). If "table0" is non-null, also
+	 * sets "table0" be the Table object underlying the returned
+	 * iterator, or null if no Table object underlies the returned iterator. The
+	 * returned "table0" object is owned by the cache and should not be deleted,
 	 * and is valid for as long as the returned iterator is live.
 	 * 
 	 * @param options
@@ -152,29 +159,23 @@ public class TableCache {
 		return s;
 	}
 
-	final static int kUint64Size = 8;
 
-	// Evict any entry for the specified file number
+	/**
+	 *  Evict any entry for the specified file number
+	 * @param fileNumber
+	 */
 	public void evict(long fileNumber) {
 		byte buf[] = new byte[kUint64Size];
 		Coding.encodeFixedNat64(buf, 0, fileNumber);
-		cache.erase(new UnpooledSlice(buf, 0, kUint64Size));
+		cache.erase(SliceFactory.newUnpooled(buf, 0, kUint64Size));
 	}
 
-	Env env;
-	String dbname;
-	Options options;
-	Cache cache;
 
 	Status findTable(long fileNumber, long fileSize, Object0<Cache.Handle> handle) {
-		// System.out.printf("[DEBUG] TableCache.findTable, fileNumber=%d,
-		// fileSize=%d\n",
-		// fileNumber, fileSize);
-
 		Status s = Status.ok0();
 		byte buf[] = new byte[kUint64Size];
 		Coding.encodeFixedNat64(buf, 0, fileNumber);
-		Slice key = new UnpooledSlice(buf, 0, kUint64Size);
+		Slice key = SliceFactory.newUnpooled(buf, 0, kUint64Size);
 		handle.setValue(cache.lookup(key)); // Find the TableAndFile from cache
 
 		if (handle.getValue() == null) {

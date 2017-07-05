@@ -22,8 +22,6 @@ public class TestCrc32C {
 		
 		crc.update(data, 0, data.length);
 		long ret1 = crc.getValue();
-		//System.out.println(ret1);
-		
 		
 		Crc32C crc2 = new Crc32C();
 		crc2.update(data, 0, 50);
@@ -33,7 +31,6 @@ public class TestCrc32C {
 		crc3.setValue(ret2_1);
 		crc3.update(data, 50, data.length - 50);
 		long ret2 = crc3.getValue();
-		//System.out.println(ret2);
 		
 		assertEquals(ret1, ret2);
 	}

@@ -8,8 +8,8 @@ import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 import static org.junit.Assert.assertEquals;
 
@@ -19,63 +19,63 @@ public class TestInternalKeyComparator {
 		InternalKeyComparator ikcmp = new InternalKeyComparator(BytewiseComparatorImpl.getInstance());
 		int ret = 0;
 		
-		Slice auk = new UnpooledSlice("abc");
+		Slice auk = SliceFactory.newUnpooled("abc");
 		ByteBuf abuf = ByteBufFactory.newUnpooled(); 
 		abuf.append(auk.data(), auk.offset(), auk.size());
-		abuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
+		abuf.addFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 
 
-		Slice buk = new UnpooledSlice("abc");
+		Slice buk = SliceFactory.newUnpooled("abc");
 		ByteBuf bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
-		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
+		bbuf.addFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 	
-		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
-		//System.out.println(ret);
+		ret = ikcmp.compare(SliceFactory.newUnpooled(abuf), SliceFactory.newUnpooled(bbuf));
+
 		assertEquals(ret, 1);
 		
-		auk = new UnpooledSlice("123");
+		auk = SliceFactory.newUnpooled("123");
 		abuf = ByteBufFactory.newUnpooled(); 
 		abuf.append(auk.data(), auk.offset(), auk.size());
-		abuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
+		abuf.addFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 
 
-		buk = new UnpooledSlice("234");
+		buk = SliceFactory.newUnpooled("234");
 		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
-		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
+		bbuf.addFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 		
-		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
-		//System.out.println(ret);
+		ret = ikcmp.compare(SliceFactory.newUnpooled(abuf), SliceFactory.newUnpooled(bbuf));
+
 		assertEquals(ret, -1);
 		
 
-		buk = new UnpooledSlice("12");
+		buk = SliceFactory.newUnpooled("12");
 		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
-		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
+		bbuf.addFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 		
-		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
-		//System.out.println(ret);
+		ret = ikcmp.compare(SliceFactory.newUnpooled(abuf), SliceFactory.newUnpooled(bbuf));
+
 		assertEquals(ret, 1);
 		
-		buk = new UnpooledSlice("123");
+		buk = SliceFactory.newUnpooled("123");
 		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
-		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(2, ValueType.Value));
+		bbuf.addFixedNat64(InternalKeyComparator.packSequenceAndType(2, ValueType.Value));
 		
-		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
-		//System.out.println(ret);
+		ret = ikcmp.compare(SliceFactory.newUnpooled(abuf), SliceFactory.newUnpooled(bbuf));
+
 		assertEquals(ret, 1);
 		
 
-		buk = new UnpooledSlice("123");
+		buk = SliceFactory.newUnpooled("123");
 		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
-		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Deletion));
+		bbuf.addFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Deletion));
 		
-		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
-		//System.out.println(ret);
+		ret = ikcmp.compare(SliceFactory.newUnpooled(abuf), SliceFactory.newUnpooled(bbuf));
+
 		assertEquals(ret, -1);
 	}
 }

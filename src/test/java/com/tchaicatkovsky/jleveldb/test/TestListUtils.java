@@ -40,21 +40,6 @@ public class TestListUtils {
 		assertEquals(ListUtils.upperBound(l, 18, cmp), 6);
 		assertEquals(ListUtils.upperBound(l, 19, cmp), 6);
 		assertEquals(ListUtils.upperBound(l, 20, cmp), 6);
-		
-//		System.out.println(ListUtils.upperBound(l, 0, cmp));
-//		System.out.println(ListUtils.upperBound(l, 3, cmp));
-//		System.out.println(ListUtils.upperBound(l, 4, cmp));
-//		System.out.println(ListUtils.upperBound(l, 6, cmp));
-//		System.out.println(ListUtils.upperBound(l, 7, cmp));
-//		System.out.println(ListUtils.upperBound(l, 9, cmp));
-//		System.out.println(ListUtils.upperBound(l, 10, cmp));
-//		System.out.println(ListUtils.upperBound(l, 12, cmp));
-//		System.out.println(ListUtils.upperBound(l, 13, cmp));
-//		System.out.println(ListUtils.upperBound(l, 15, cmp));
-//		System.out.println(ListUtils.upperBound(l, 16, cmp));
-//		System.out.println(ListUtils.upperBound(l, 18, cmp));
-//		System.out.println(ListUtils.upperBound(l, 19, cmp));
-//		System.out.println(ListUtils.upperBound(l, 20, cmp));
 	}
 	
 	@Test
@@ -87,21 +72,6 @@ public class TestListUtils {
 		assertEquals(ListUtils.lowerBound(l, 18, cmp), 5);
 		assertEquals(ListUtils.lowerBound(l, 19, cmp), 6);
 		assertEquals(ListUtils.lowerBound(l, 20, cmp), 6);
-		
-//		System.out.println(ListUtils.lowerBound(l, 0, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 3, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 4, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 6, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 7, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 9, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 10, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 12, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 13, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 15, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 16, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 18, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 19, cmp));
-//		System.out.println(ListUtils.lowerBound(l, 20, cmp));
 	}
 	
 	@Test

@@ -45,15 +45,15 @@ public class Builder {
 	 * @return
 	 */
 	public static Status buildTable(String dbname, Env env, Options options, 
-			TableCache tcache, Iterator0 iter, FileMetaData meta) {
+			TableCache tcache, Iterator0 memiter, FileMetaData meta) {
 		
 		
 		Status s = Status.ok0();
 		meta.fileSize = 0;
-		iter.seekToFirst();
+		memiter.seekToFirst();
 		
 		String fname = FileName.getTableFileName(dbname, meta.number);
-		if (iter.valid()) {
+		if (memiter.valid()) {
 			Object0<WritableFile> fileFuncOut = new Object0<>();
 			s = env.newWritableFile(fname, fileFuncOut);
 			if (!s.ok())
@@ -62,11 +62,11 @@ public class Builder {
 		
 			WritableFile file = fileFuncOut.getValue();
 			TableBuilder builder = new TableBuilder(options, file);
-			meta.smallest.decodeFrom(iter.key());
-			for (; iter.valid(); iter.next()) {
-				Slice key = iter.key();
+			meta.smallest.decodeFrom(memiter.key());
+			for (; memiter.valid(); memiter.next()) {
+				Slice key = memiter.key();
 				meta.largest.decodeFrom(key);
-				builder.add(key, iter.value());
+				builder.add(key, memiter.value());
 				meta.numEntries++;
 			}
 			
@@ -83,12 +83,11 @@ public class Builder {
 			
 			
 			// Finish and check for file errors
-			if (s.ok()) {
+			if (s.ok())
 				s = file.sync();
-			}
-			if (s.ok()) {
+			
+			if (s.ok())
 				s = file.close();
-			}
 			
 			file.delete();
 			file = null;
@@ -100,15 +99,13 @@ public class Builder {
 				Iterator0 it = tcache.newIterator(new ReadOptions(), meta.number, meta.fileSize);
 				s = it.status();
 				it.delete();
-				it = null;
 			}
 			
 		}
 		
 		// Check for input iterator errors
-		if (!iter.status().ok()) {
-			s = iter.status();
-		}
+		if (!memiter.status().ok())
+			s = memiter.status();
 		
 		if (s.ok() && meta.fileSize > 0) {
 			//Keep it

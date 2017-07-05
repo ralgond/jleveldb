@@ -22,7 +22,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import com.tchaicatkovsky.jleveldb.Iterator0;
-import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.ReadOptions;
 import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.db.format.DBFormat;
@@ -37,15 +36,12 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.ReferenceCounted;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
-import com.tchaicatkovsky.jleveldb.util.Strings;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 /**
  * Each Version keeps track of a set of Table files per level. The entire set of
  * versions is maintained in a VersionSet.
- * 
- * @author Teng Huang ht201509@163.com
  */
 public class Version implements ReferenceCounted {
 
@@ -72,7 +68,7 @@ public class Version implements ReferenceCounted {
 	/**
 	 * Level that should be compacted next and its compaction score. Score < 1 means
 	 * compaction is not strictly needed. These fields are initialized by
-	 * Finalize().
+	 * finalize().
 	 */
 	double compactionScore;
 	int compactionLevel;
@@ -146,7 +142,11 @@ public class Version implements ReferenceCounted {
 	}
 
 	public Iterator0 newConcatenatingIterator(ReadOptions options, int level) {
-		return TwoLevelIterator.newTwoLevelIterator(new LevelFileNumIterator(vset.icmp, level, levelFiles(level)), VersionSetGlobal.getFileIterator, vset.tableCache, options);
+		return TwoLevelIterator.newTwoLevelIterator(
+				new LevelFileNumIterator(vset.icmp, level, levelFiles(level)), 
+				VersionSetGlobal.getFileIterator, 
+				vset.tableCache, 
+				options);
 	}
 
 	static Comparator<FileMetaData> newestFirst = new Comparator<FileMetaData>() {
@@ -167,17 +167,17 @@ public class Version implements ReferenceCounted {
 	 * 
 	 * <b>REQUIRES: lock is not held</b>
 	 * 
-	 * @param options
-	 * @param k
+	 * @param options ReadOptions
+	 * @param lkey LookupKey
 	 * @param value
 	 *            [OUTPUT]
 	 * @param stats
 	 *            [OUTPUT]
 	 * @return OK if found, else non-OK.
 	 */
-	public Status get(ReadOptions options, LookupKey k, ByteBuf value, GetStats stats) {
-		Slice ikey = k.internalKey();
-		Slice userKey = k.userKey();
+	public Status get(ReadOptions options, LookupKey lkey, ByteBuf value, GetStats stats) {
+		Slice ikey = lkey.internalKey();
+		Slice userKey = lkey.userKey();
 		Comparator0 ucmp = vset.icmp.userComparator();
 		Status s = Status.ok0();
 
@@ -260,7 +260,7 @@ public class Version implements ReferenceCounted {
 				case kFound:
 					return s;
 				case kDeleted:
-					s = Status.notFound(); // May throws null pointer exception, Use empty error message for speed
+					s = Status.notFound();
 					return s;
 				case kCorrupt:
 					s = Status.corruption("corrupted key for " + userKey.encodeToString());
@@ -393,8 +393,8 @@ public class Version implements ReferenceCounted {
 		assert (level >= 0);
 		assert (level < DBFormat.kNumLevels);
 		inputs.clear();
-		Slice userBegin = new UnpooledSlice();
-		Slice userEnd = new UnpooledSlice();
+		Slice userBegin = SliceFactory.newUnpooled();
+		Slice userEnd = SliceFactory.newUnpooled();
 		if (begin != null) {
 			userBegin = begin.userKey();
 		}
@@ -454,8 +454,6 @@ public class Version implements ReferenceCounted {
 	public int pickLevelForMemTableOutput(Slice smallestUserKey, Slice largestUserKey) {
 		int level = 0;
 		if (!overlapInLevel(0, smallestUserKey, largestUserKey)) {
-			//System.out.println("[DEBUG] pickLevelForMemTableOutput 1");
-
 			// Push to next level if there is no overlap in next level,
 			// and the #bytes overlapping in the level after that are limited.
 			InternalKey start = new InternalKey(smallestUserKey, DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek);
@@ -490,8 +488,7 @@ public class Version implements ReferenceCounted {
 		Comparator0 ucmp = vset.icmp.userComparator();
 
 		// Search level-0 in order from newest to oldest.
-		ArrayList<FileMetaData> tmp = new ArrayList<FileMetaData>();
-		// tmp.reserve(files[0].size());
+		ArrayList<FileMetaData> tmp = new ArrayList<FileMetaData>(levelFiles(0).size());
 		for (int i = 0; i < levelFiles(0).size(); i++) {
 			FileMetaData f = levelFiles(0).get(i);
 			if (ucmp.compare(userKey, f.smallest.userKey()) >= 0 && ucmp.compare(userKey, f.largest.userKey()) <= 0) {
@@ -499,7 +496,7 @@ public class Version implements ReferenceCounted {
 			}
 		}
 		if (!tmp.isEmpty()) {
-			Collections.sort(tmp, newestFirst); // std::sort(tmp.begin(), tmp.end(), NewestFirst);
+			Collections.sort(tmp, newestFirst);
 			for (int i = 0; i < tmp.size(); i++) {
 				if (!func.run(arg, 0, tmp.get(i))) {
 					return;
@@ -540,7 +537,7 @@ public class Version implements ReferenceCounted {
 		final int level;
 		// Backing store for value(). Holds the file number and size.
 		byte[] valueBuf = new byte[16];
-		Slice value0 = new UnpooledSlice(valueBuf, 0, valueBuf.length);
+		Slice value0 = SliceFactory.newUnpooled(valueBuf, 0, valueBuf.length);
 
 		public LevelFileNumIterator(InternalKeyComparator icmp, int level, ArrayList<FileMetaData> flist) {
 			this.icmp = icmp;
@@ -574,23 +571,10 @@ public class Version implements ReferenceCounted {
 			return value0;
 		}
 
-		void debug() {
-			String fmdString = "{null}";
-			if (index >= 0 && index < flist.size()) {
-				FileMetaData fmd = flist.get(index);
-				fmdString = fmd.debugString();
-			}
-			Logger0.debug("LevelFileNumIterator.seek, level=%d, index=%d, fmd=%s\n", level, index, fmdString);
-		}
-
 		@Override
 		public void next() {
 			assert (valid());
 			index++;
-			Logger0.debug("LevelFileNumIterator.next, level=%d, index=%d\n", level, index);
-			debug();
-			if (Logger0.getDebug())
-				Thread.dumpStack();
 		}
 
 		@Override
@@ -601,7 +585,6 @@ public class Version implements ReferenceCounted {
 			} else {
 				index--;
 			}
-			debug();
 		}
 
 		@Override
@@ -612,11 +595,6 @@ public class Version implements ReferenceCounted {
 		@Override
 		public void seek(Slice target) {
 			index = VersionSetGlobal.findFile(icmp, flist, target);
-
-			Logger0.debug("LevelFileNumIterator.seek, level=%d, target=%s, index=%d\n", level, Strings.escapeString(target), index);
-			debug();
-			if (Logger0.getDebug())
-				Thread.dumpStack();
 		}
 
 		@Override

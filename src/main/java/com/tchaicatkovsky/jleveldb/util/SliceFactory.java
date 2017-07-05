@@ -18,13 +18,23 @@ package com.tchaicatkovsky.jleveldb.util;
 
 public class SliceFactory {
 	
-	public Slice newUnpooled() {
+	public static Slice newUnpooled() {
 		return new UnpooledSlice();
 	}
 	
-	public Slice newUnpooled(byte[] data, int offset, int size) {
+	public static Slice newUnpooled(byte[] data, int offset, int size) {
 		UnpooledSlice s = new UnpooledSlice();
 		s.init(data, offset, size);
 		return s;
+	}
+	
+	public static Slice newUnpooled(String s) {
+		return new UnpooledSlice(s);
+	}
+	
+	public static Slice newUnpooled(Slice s) {
+		UnpooledSlice ret = new UnpooledSlice();
+		ret.init(s.data(), s.offset(), s.size());
+		return ret;
 	}
 }

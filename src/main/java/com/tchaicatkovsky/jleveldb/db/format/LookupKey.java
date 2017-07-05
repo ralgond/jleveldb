@@ -18,8 +18,8 @@ package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 /**
  * A helper class useful for DBImpl.get()
@@ -40,18 +40,18 @@ public class LookupKey {
     long sequence;
     
 	public LookupKey(Slice userKey, long sequence) {
-		ByteBuf buf = ByteBufFactory.newUnpooled(); //TODO(optimize): reduce the frequency of memory allocation.
+		ByteBuf buf = ByteBufFactory.newUnpooled();
 		buf.require(1);
 		
 		start = 0;
 		int usize = userKey.size();
 		
-		buf.writeVarNat32(usize + 8);
+		buf.addVarNat32(usize + 8);
 		
 		kstart = buf.limit();
 		
 		buf.append(userKey.data(), usize);
-		buf.writeFixedNat64(DBFormat.packSequenceAndType(sequence, DBFormat.kValueTypeForSeek));
+		buf.addFixedNat64(DBFormat.packSequenceAndType(sequence, DBFormat.kValueTypeForSeek));
 		
 		end = buf.limit();
 		
@@ -65,7 +65,7 @@ public class LookupKey {
 	 * @return
 	 */
 	public Slice internalKey() { 
-		return new UnpooledSlice(data, kstart, end - kstart); 
+		return SliceFactory.newUnpooled(data, kstart, end - kstart); 
 	}
 	
 	/**
@@ -73,7 +73,7 @@ public class LookupKey {
 	 * @return
 	 */
 	public Slice userKey() { 
-		return new UnpooledSlice(data, kstart, end - kstart - 8); 
+		return SliceFactory.newUnpooled(data, kstart, end - kstart - 8); 
 	}
 	
 	

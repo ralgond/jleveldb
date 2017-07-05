@@ -21,8 +21,8 @@ import com.tchaicatkovsky.jleveldb.WritableFile;
 import com.tchaicatkovsky.jleveldb.db.LogFormat.RecordType;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Crc32C;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class LogWriter {
 	
@@ -94,7 +94,7 @@ public class LogWriter {
 		    	// Switch to a new block
 		    	if (leftover > 0) {
 		    		// Fill the trailer (literal below relies on kHeaderSize being 7)
-		    		dest.append(new UnpooledSlice(fillzero, 0, leftover));
+		    		dest.append(SliceFactory.newUnpooled(fillzero, 0, leftover));
 		    	}
 		    	blockOffset = 0;
 		    }
@@ -141,9 +141,9 @@ public class LogWriter {
 		Coding.encodeFixedNat32Long(buf, 0, crc);
 
 		// Write the header and the payload
-		Status s = dest.append(new UnpooledSlice(buf, 0, LogFormat.kHeaderSize));
+		Status s = dest.append(SliceFactory.newUnpooled(buf, 0, LogFormat.kHeaderSize));
 		if (s.ok()) {
-			s = dest.append(new UnpooledSlice(ptr, offset, n));
+			s = dest.append(SliceFactory.newUnpooled(ptr, offset, n));
 			if (s.ok()) {
 				s = dest.flush();
 			}

@@ -6,7 +6,7 @@ public class TestUtil {
 		for (int i = 0; i < len; i++) {
 			dst.setByte(i, (byte)(0x20+rnd.uniform(95)));  // ' ' .. '~'
 		}
-		return new UnpooledSlice(dst);
+		return SliceFactory.newUnpooled(dst);
 	}
 
 	public static ByteBuf randomKey(Random0 rnd, int len) {
@@ -40,7 +40,7 @@ public class TestUtil {
 			dst.append(raw_data);
 		}
 		dst.resize(len);
-		return new UnpooledSlice(dst);
+		return SliceFactory.newUnpooled(dst);
 	}
 	
 	public static String tmpDir() {

@@ -286,9 +286,6 @@ public class EnvImpl implements Env {
 			try {
 				tmpBuf = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
 				tmpBuf.position((int) offset);
-				if (buffer.remaining() < n)
-					System.out.printf("[DEBUG] MmapReadableFile.read, remaining=%d, n=%d\n", buffer.remaining(), n);
-
 				tmpBuf.get(scratch, 0, n);
 				result.init(scratch, 0, n);
 				return Status.ok0();
@@ -341,7 +338,6 @@ public class EnvImpl implements Env {
 					fos = null;
 					dos.close();
 					dos = null;
-					// System.out.println("[DEBUG] WritableFileImpl.close: "+filename);
 				}
 				return Status.ok0();
 			} catch (IOException e) {
@@ -670,8 +666,6 @@ public class EnvImpl implements Env {
 
 	static int getPid() {
 		String name = ManagementFactory.getRuntimeMXBean().getName();  
-		System.out.println(name);  
-		// get pid  
 		String pid = name.split("@")[0];
 		return Integer.parseInt(pid);
 	}

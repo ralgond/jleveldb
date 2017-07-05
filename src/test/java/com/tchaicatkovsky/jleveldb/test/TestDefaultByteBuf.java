@@ -5,9 +5,9 @@ import org.junit.Test;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.UnpooledByteBuf;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.ReflectionUtil;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -66,9 +66,9 @@ public class TestDefaultByteBuf {
 	@Test
 	public void testFixedCoding01() throws Exception {
 		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
-		buf.writeFixedNat32(0);
-		buf.writeFixedNat32(Short.MAX_VALUE);
-		buf.writeFixedNat32(Integer.MAX_VALUE);
+		buf.addFixedNat32(0);
+		buf.addFixedNat32(Short.MAX_VALUE);
+		buf.addFixedNat32(Integer.MAX_VALUE);
 		
 		assertTrue(buf.readFixedNat32() == 0);
 		assertTrue(buf.readFixedNat32() == Short.MAX_VALUE);
@@ -76,10 +76,10 @@ public class TestDefaultByteBuf {
 		
 		buf.clear();
 		
-		buf.writeFixedNat64(0);
-		buf.writeFixedNat64(Short.MAX_VALUE);
-		buf.writeFixedNat64(Integer.MAX_VALUE);
-		buf.writeFixedNat64(Long.MAX_VALUE);
+		buf.addFixedNat64(0);
+		buf.addFixedNat64(Short.MAX_VALUE);
+		buf.addFixedNat64(Integer.MAX_VALUE);
+		buf.addFixedNat64(Long.MAX_VALUE);
 
 		assertTrue(buf.readFixedNat64() == 0);
 		assertTrue(buf.readFixedNat64() == Short.MAX_VALUE);
@@ -88,13 +88,13 @@ public class TestDefaultByteBuf {
 		
 		buf.clear();
 		
-		buf.writeFixedNat64(Long.MAX_VALUE);
-		buf.writeFixedNat32(0);
-		buf.writeFixedNat64(Integer.MAX_VALUE);
-		buf.writeFixedNat32(Short.MAX_VALUE);
-		buf.writeFixedNat64(Short.MAX_VALUE);
-		buf.writeFixedNat32(Integer.MAX_VALUE);
-		buf.writeFixedNat64(0);
+		buf.addFixedNat64(Long.MAX_VALUE);
+		buf.addFixedNat32(0);
+		buf.addFixedNat64(Integer.MAX_VALUE);
+		buf.addFixedNat32(Short.MAX_VALUE);
+		buf.addFixedNat64(Short.MAX_VALUE);
+		buf.addFixedNat32(Integer.MAX_VALUE);
+		buf.addFixedNat64(0);
 		
 		assertTrue(buf.readFixedNat64() == Long.MAX_VALUE);
 		assertTrue(buf.readFixedNat32() == 0);
@@ -108,9 +108,9 @@ public class TestDefaultByteBuf {
 	@Test
 	public void testVarCoding01() throws Exception {
 		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
-		buf.writeVarNat32(0);
-		buf.writeVarNat32(Short.MAX_VALUE);
-		buf.writeVarNat32(Integer.MAX_VALUE);
+		buf.addVarNat32(0);
+		buf.addVarNat32(Short.MAX_VALUE);
+		buf.addVarNat32(Integer.MAX_VALUE);
 		
 		assertTrue(buf.readVarNat32() == 0);
 		assertTrue(buf.readVarNat32() == Short.MAX_VALUE);
@@ -118,10 +118,10 @@ public class TestDefaultByteBuf {
 		
 		buf.clear();
 		
-		buf.writeVarNat64(0);
-		buf.writeVarNat64(Short.MAX_VALUE);
-		buf.writeVarNat64(Integer.MAX_VALUE);
-		buf.writeVarNat64(Long.MAX_VALUE);
+		buf.addVarNat64(0);
+		buf.addVarNat64(Short.MAX_VALUE);
+		buf.addVarNat64(Integer.MAX_VALUE);
+		buf.addVarNat64(Long.MAX_VALUE);
 
 		assertTrue(buf.readVarNat64() == 0);
 		assertTrue(buf.readVarNat64() == Short.MAX_VALUE);
@@ -130,13 +130,13 @@ public class TestDefaultByteBuf {
 		
 		buf.clear();
 		
-		buf.writeVarNat64(Long.MAX_VALUE);
-		buf.writeVarNat32(0);
-		buf.writeVarNat64(Integer.MAX_VALUE);
-		buf.writeVarNat32(Short.MAX_VALUE);
-		buf.writeVarNat64(Short.MAX_VALUE);
-		buf.writeVarNat32(Integer.MAX_VALUE);
-		buf.writeVarNat64(0);
+		buf.addVarNat64(Long.MAX_VALUE);
+		buf.addVarNat32(0);
+		buf.addVarNat64(Integer.MAX_VALUE);
+		buf.addVarNat32(Short.MAX_VALUE);
+		buf.addVarNat64(Short.MAX_VALUE);
+		buf.addVarNat32(Integer.MAX_VALUE);
+		buf.addVarNat64(0);
 		
 		assertTrue(buf.readVarNat64() == Long.MAX_VALUE);
 		assertTrue(buf.readVarNat32() == 0);
@@ -150,15 +150,13 @@ public class TestDefaultByteBuf {
 	@Test
 	public void testResize() {
 		ByteBuf buf = ByteBufFactory.newUnpooled();
-		Slice s = new UnpooledSlice("123456");
+		Slice s = SliceFactory.newUnpooled("123456");
 		buf.append(s.data(), s.offset(), s.size());
 		
 		buf.resize(3);
-		//System.out.println(buf.encodeToString());
 		assertEquals("123", buf.encodeToString());
 		
 		buf.resize(5, (byte)0x30);
-		//System.out.println(buf.encodeToString());
 		assertEquals("12300", buf.encodeToString());
 	}
 }

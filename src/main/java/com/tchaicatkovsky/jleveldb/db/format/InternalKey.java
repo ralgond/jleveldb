@@ -18,8 +18,8 @@ package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
 /**
@@ -40,7 +40,7 @@ public class InternalKey {
 	
 	protected static void appendInternalKey(ByteBuf result, ParsedInternalKey key) {
 		result.append(key.userKey.data(), key.userKey.size());
-		result.writeFixedNat64(DBFormat.packSequenceAndType(key.sequence, key.type));
+		result.addFixedNat64(DBFormat.packSequenceAndType(key.sequence, key.type));
 	}
 	
 	public InternalKey(Slice userKey, long s, ValueType t) {
@@ -57,11 +57,11 @@ public class InternalKey {
 	}
 	
 	public Slice encode() {
-		return new UnpooledSlice(rep);
+		return SliceFactory.newUnpooled(rep);
 	}
 	
 	public Slice userKey() {
-		return DBFormat.extractUserKey(new UnpooledSlice(rep));
+		return DBFormat.extractUserKey(SliceFactory.newUnpooled(rep));
 	}
 	
 	public void setFrom(ParsedInternalKey p) {
@@ -85,7 +85,7 @@ public class InternalKey {
 	public String debugString() {
 		String result;
 		ParsedInternalKey parsed = new ParsedInternalKey();
-		if (parsed.parse(new UnpooledSlice(rep))) {
+		if (parsed.parse(SliceFactory.newUnpooled(rep))) {
 			result = parsed.debugString();
 		} else {
 		    result = "(bad)";

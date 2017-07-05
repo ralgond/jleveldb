@@ -12,9 +12,9 @@ import com.tchaicatkovsky.jleveldb.ReadOptions;
 import com.tchaicatkovsky.jleveldb.WriteOptions;
 import com.tchaicatkovsky.jleveldb.db.DBImpl;
 import com.tchaicatkovsky.jleveldb.util.Cache;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
 import static org.junit.Assert.assertTrue;
@@ -66,7 +66,7 @@ public class TestAutoCompact {
 		}
 		
 		public long size(String start, String limit) {
-			return size(new UnpooledSlice(start), new UnpooledSlice(limit));
+			return size(SliceFactory.newUnpooled(start), SliceFactory.newUnpooled(limit));
 		}
 		
 
@@ -78,13 +78,13 @@ public class TestAutoCompact {
 
 			// Fill database
 			for (int i = 0; i < kCount; i++) {
-			    assertTrue(db.put(WriteOptions.defaultOne(), new UnpooledSlice(key(i)), new UnpooledSlice(value)).ok());
+			    assertTrue(db.put(WriteOptions.defaultOne(), SliceFactory.newUnpooled(key(i)), SliceFactory.newUnpooled(value)).ok());
 			}
 			assertTrue(dbi.TEST_CompactMemTable().ok());
 
 			  // Delete everything
 			for (int i = 0; i < kCount; i++) {
-				assertTrue(db.delete(WriteOptions.defaultOne(), new UnpooledSlice(key(i))).ok());
+				assertTrue(db.delete(WriteOptions.defaultOne(), SliceFactory.newUnpooled(key(i))).ok());
 			}
 			assertTrue(dbi.TEST_CompactMemTable().ok());
 

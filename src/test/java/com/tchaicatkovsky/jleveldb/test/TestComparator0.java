@@ -1,21 +1,23 @@
 package com.tchaicatkovsky.jleveldb.test;
 
+import static org.junit.Assert.assertTrue;
+
 import org.junit.Test;
 
 import com.tchaicatkovsky.jleveldb.db.format.InternalKeyComparator;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class TestComparator0 {
 	@Test
 	public void testBytewiseComparatorImpl() {
-		Slice a = new UnpooledSlice("abc");
-		Slice b = new UnpooledSlice("9999");
+		Slice a = SliceFactory.newUnpooled("abc");
+		Slice b = SliceFactory.newUnpooled("9999");
 		int ret = BytewiseComparatorImpl.getInstance().compare(a, b);
-		System.out.println(ret);
+		assertTrue(ret > 0);
 	}
 	
 	@Test
@@ -30,8 +32,7 @@ public class TestComparator0 {
 		ByteBuf b = ByteBufFactory.newUnpooled(bbuf, bbuf.length);
 		
 		InternalKeyComparator icmp = new InternalKeyComparator(BytewiseComparatorImpl.getInstance());
-		//int ret = BytewiseComparatorImpl.getInstance().compare(a, b);
 		int ret = icmp.compare(a, b);
-		System.out.println(ret);
+		assertTrue(ret > 0);
 	}
 }

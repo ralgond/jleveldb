@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.tchaicatkovsky.jleveldb.util.Slice;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class MemTableArena {
 	
@@ -61,7 +61,7 @@ public class MemTableArena {
 		    int oldAllocPtrOffset = allocPtrOffset;
 		    allocPtrOffset += bytes;
 		    allocBytesRemaining -= bytes;
-		    return new UnpooledSlice(result, oldAllocPtrOffset, bytes);
+		    return SliceFactory.newUnpooled(result, oldAllocPtrOffset, bytes);
 		}
 		
 		return allocateFallback(bytes);
@@ -79,7 +79,7 @@ public class MemTableArena {
 		    // Object is more than a quarter of our block size.  Allocate it separately
 		    // to avoid wasting too much space in leftover bytes.
 		    byte[] result = allocateNewBlock(bytes);
-		    return new UnpooledSlice(result, 0, bytes);
+		    return SliceFactory.newUnpooled(result, 0, bytes);
 		}
 
 		// We waste the remaining space in the current block.
@@ -91,7 +91,7 @@ public class MemTableArena {
 		allocPtrOffset += bytes;
 		allocBytesRemaining -= bytes;
 		
-		return new UnpooledSlice(allocPtr, oldAllocPtrOffset, allocBytesRemaining);
+		return SliceFactory.newUnpooled(allocPtr, oldAllocPtrOffset, allocBytesRemaining);
 	}
 	
 	byte[] allocateNewBlock(int blockBytes) {

@@ -21,8 +21,8 @@ import java.util.ArrayList;
 import com.tchaicatkovsky.jleveldb.Options;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class BlockBuilder {
 	Options options;
@@ -61,16 +61,16 @@ public class BlockBuilder {
 	public Slice finish() {
 		// Append restart array
 		for (int i = 0; i < restarts.size(); i++) {
-			buffer.writeFixedNat32(restarts.get(i));
+			buffer.addFixedNat32(restarts.get(i));
 		}
-		buffer.writeFixedNat32(restarts.size());
+		buffer.addFixedNat32(restarts.size());
 
 		finished = true;
-		return new UnpooledSlice(buffer);
+		return SliceFactory.newUnpooled(buffer);
 	}
 
 	public void add(Slice key, Slice value) {
-		Slice lastKeyPiece = new UnpooledSlice(lastKey);
+		Slice lastKeyPiece = SliceFactory.newUnpooled(lastKey);
 		assert (!finished);
 		assert (counter <= options.blockRestartInterval);
 		assert (buffer.empty() // No values yet?
@@ -91,9 +91,9 @@ public class BlockBuilder {
 		int nonShared = key.size() - shared;
 
 		// Add "<shared><non_shared><value_size>" to buffer_
-		buffer.writeVarNat32(shared);
-		buffer.writeVarNat32(nonShared);
-		buffer.writeVarNat32(value.size());
+		buffer.addVarNat32(shared);
+		buffer.addVarNat32(nonShared);
+		buffer.addVarNat32(value.size());
 
 		// Add string delta to buffer_ followed by value
 		buffer.append(key.data(), key.offset() + shared, nonShared);

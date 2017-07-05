@@ -8,7 +8,7 @@ import com.tchaicatkovsky.jleveldb.db.format.InternalKey;
 import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 import static org.junit.Assert.assertTrue;
 
@@ -18,7 +18,7 @@ public class TestVersionEdit {
 		  ByteBuf encoded2 =  ByteBufFactory.newUnpooled();
 		  edit.encodeTo(encoded);
 		  VersionEdit parsed = new VersionEdit();
-		  Status s = parsed.decodeFrom(new UnpooledSlice(encoded));
+		  Status s = parsed.decodeFrom(SliceFactory.newUnpooled(encoded));
 		  assertTrue(s.ok());
 		  parsed.encodeTo(encoded2);
 		  assertTrue(encoded.equals(encoded2));
@@ -32,11 +32,11 @@ public class TestVersionEdit {
 		for (int i = 0; i < 4; i++) {
 		    testEncodeDecode(edit);
 		    edit.addFile(3, kBig + 300 + i, kBig + 400 + i,
-		                 new InternalKey(new UnpooledSlice("foo"), kBig + 500 + i, ValueType.Value),
-		                 new InternalKey(new UnpooledSlice("zoo"), kBig + 600 + i, ValueType.Deletion),
+		                 new InternalKey(SliceFactory.newUnpooled("foo"), kBig + 500 + i, ValueType.Value),
+		                 new InternalKey(SliceFactory.newUnpooled("zoo"), kBig + 600 + i, ValueType.Deletion),
 		                 10);
 		    edit.deleteFile(4, kBig + 700 + i);
-		    edit.setCompactPointer(i, new InternalKey(new UnpooledSlice("x"), kBig + 900 + i, ValueType.Value));
+		    edit.setCompactPointer(i, new InternalKey(SliceFactory.newUnpooled("x"), kBig + 900 + i, ValueType.Value));
 		}
 
 		edit.setComparatorName("foo");

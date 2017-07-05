@@ -35,12 +35,12 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.ListUtils;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 import com.tchaicatkovsky.jleveldb.util.TestUtil;
@@ -56,7 +56,7 @@ public class TestTable {
 		for (int i = 0; i < b.length; i++) {
 			b[i] = key.getByte(b.length-1-i);
 		}
-		return new UnpooledSlice(b, 0, b.length);
+		return SliceFactory.newUnpooled(b, 0, b.length);
 	}
 	
 	static class ReverseKeyComparator extends Comparator0 {
@@ -89,21 +89,21 @@ public class TestTable {
 		}
 
 		public void findShortestSeparator(ByteBuf start, Slice limit) {
-			Slice s = reverse(new UnpooledSlice(start));
+			Slice s = reverse(SliceFactory.newUnpooled(start));
 		    Slice l = reverse(limit);
 		    ByteBuf s0 = ByteBufFactory.newUnpooled();
 		    s0.assign(s.data(), s.offset(), s.size());
 		    BytewiseComparatorImpl.getInstance().findShortestSeparator(s0, l);
-		    Slice s1 = reverse(new UnpooledSlice(s0));
+		    Slice s1 = reverse(SliceFactory.newUnpooled(s0));
 		    start.assign(s1.data(), s1.offset(), s1.size());
 		}
 
 		public void findShortSuccessor(ByteBuf key) {
-		    Slice s = reverse(new UnpooledSlice(key));
+		    Slice s = reverse(SliceFactory.newUnpooled(key));
 		    ByteBuf s0 = ByteBufFactory.newUnpooled();
 		    s0.assign(s.data(), s.offset(), s.size());
 		    BytewiseComparatorImpl.getInstance().findShortSuccessor(s0);
-		    Slice s1 = reverse(new UnpooledSlice(s0));
+		    Slice s1 = reverse(SliceFactory.newUnpooled(s0));
 		    key.assign(s1.data(), s1.offset(), s1.size());
 		}
 	};
@@ -115,13 +115,13 @@ public class TestTable {
 			key.addByte((byte)0);
 		} else {
 			assert(cmp == reverse_key_comparator);
-			Slice rev0 = reverse(new UnpooledSlice(key));
+			Slice rev0 = reverse(SliceFactory.newUnpooled(key));
 			ByteBuf rev = ByteBufFactory.newUnpooled();
 			rev.assign(rev0.data(), rev0.offset(), rev0.size());
 			
 			rev.addByte((byte)0);
 			
-			Slice s = reverse(new UnpooledSlice(rev));
+			Slice s = reverse(SliceFactory.newUnpooled(rev));
 			key.assign(s.data(), s.offset(), s.size());
 		}
 	}
@@ -258,8 +258,6 @@ public class TestTable {
 	    	kvmap.setValue(dataMap);
 	    	keys.clear();
 	    	for (ByteBuf key : dataMap.keySet()) {
-//	    		System.out.printf("[DEBUG] finish add: dataMap.size=%d, key=%s\n", 
-//	    				dataMap.size(), Strings.escapeString(key));
 	    		keys.add(key);
 	    	}
 	    	
@@ -304,16 +302,14 @@ public class TestTable {
 		    BlockBuilder builder = new BlockBuilder(options);
 
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
-//		    	System.out.printf("[DEBUG] BlockConstructor.finish k=%s, v=%s\n",
-//		    			Strings.escapeString(e.getKey()), Strings.escapeString(e.getValue()));
-		    	builder.add(new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
+		    	builder.add(SliceFactory.newUnpooled(e.getKey()), SliceFactory.newUnpooled(e.getValue()));
 		    }
 		    
 		    // Open the block
 		    Slice s = builder.finish();
 		    data.assign(s.data(), s.offset(), s.size());
 		    BlockContents contents = new BlockContents();
-		    contents.data = new UnpooledSlice(data);
+		    contents.data = SliceFactory.newUnpooled(data);
 		    contents.cachable = false;
 		    contents.heapAllocated = false;
 		    block = new Block(contents);
@@ -321,7 +317,6 @@ public class TestTable {
 		}
 		
 		public Iterator0 newIterator() {
-			//System.out.println("[[DEBUG] BlockConstructor.newIterator");
 		    return block.newIterator(comparator);
 		}
 		
@@ -355,7 +350,7 @@ public class TestTable {
 		    TableBuilder builder = new TableBuilder(options, sink);
 
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
-		    	builder.add(new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
+		    	builder.add(SliceFactory.newUnpooled(e.getKey()), SliceFactory.newUnpooled(e.getValue()));
 		    	assertTrue(builder.status().ok());
 		    }
 		    Status s = builder.finish();
@@ -364,7 +359,7 @@ public class TestTable {
 		    assertEquals(sink.contents().size(), builder.fileSize());
 
 		    // Open the table
-		    source = new StringSource(new UnpooledSlice(sink.contents()));
+		    source = new StringSource(SliceFactory.newUnpooled(sink.contents()));
 		    Options tableOptions = new Options();
 		    tableOptions.comparator = options.comparator;
 		    Object0<Table> table0 = new Object0<Table>();
@@ -374,7 +369,6 @@ public class TestTable {
 		  }
 
 		public  Iterator0 newIterator() {
-			//System.out.println("[[DEBUG] TableConstructor.newIterator");
 		    return table.newIterator(new ReadOptions());
 		}
 
@@ -425,7 +419,7 @@ public class TestTable {
 			ParsedInternalKey ikey = new ParsedInternalKey(target, DBFormat.kMaxSequenceNumber, ValueType.Value);
 			ByteBuf encoded = ByteBufFactory.newUnpooled();
 			DBFormat.appendInternalKey(encoded, ikey);
-			iter.seek(new UnpooledSlice(encoded));
+			iter.seek(SliceFactory.newUnpooled(encoded));
 		}
 		
 	  	public void seekToFirst() { 
@@ -449,7 +443,7 @@ public class TestTable {
 	  		ParsedInternalKey key = new ParsedInternalKey();
 	  		if (!key.parse(iter.key())) {
 	  			status = Status.corruption("malformed internal key");
-	  			return new UnpooledSlice("corrupted key");
+	  			return SliceFactory.newUnpooled("corrupted key");
 	  		}
 	  		return key.userKey;
 	  	}
@@ -487,14 +481,13 @@ public class TestTable {
 		    memtable.ref();
 		    int seq = 1;
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
-		    	memtable.add(seq, ValueType.Value, new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
+		    	memtable.add(seq, ValueType.Value, SliceFactory.newUnpooled(e.getKey()), SliceFactory.newUnpooled(e.getValue()));
 		    	seq++;
 		    }
 		    return Status.ok0();
 		}
 		
 		public Iterator0 newIterator() {
-			//System.out.println("[[DEBUG] MemTableConstructor.newIterator");
 		    return new KeyConvertingIterator(memtable.newIterator());
 		}
 		
@@ -529,11 +522,9 @@ public class TestTable {
 		    newDB();
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
 		    	WriteBatch batch = new WriteBatch();
-		    	batch.put(new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
+		    	batch.put(SliceFactory.newUnpooled(e.getKey()), SliceFactory.newUnpooled(e.getValue()));
 		    	try {
 		    		Status s = db.write(new WriteOptions(), batch);
-		    		//System.out.println("DBConstructor.finishImpl, s="+s+", key="+
-		    		//		Strings.escapeString(e.getKey())+", value="+Strings.escapeString(e.getValue()));
 		    		assertTrue(s.ok());
 		    	} catch (Exception ex) {
 		    		ex.printStackTrace();
@@ -544,7 +535,6 @@ public class TestTable {
 		}
 		
 		public Iterator0 newIterator() {
-			//System.out.println("[[DEBUG] DBConstructor.newIterator");
 		    return db.newIterator(new ReadOptions());
 		}
 
@@ -708,7 +698,7 @@ public class TestTable {
 			Logger0.setDebug(false);
 			
 			Iterator0 iter = constructor.newIterator();
-			//System.out.println("[DEBUG] iter.class="+iter.getClass().getName());
+			
 			int readCnt = 1;
 			assertTrue(!iter.valid());
 			iter.seekToFirst();
@@ -726,7 +716,7 @@ public class TestTable {
 					
 					{
 						Iterator0 iter0 = constructor.newIterator();
-						iter0.seek(new UnpooledSlice(e.getKey()));
+						iter0.seek(SliceFactory.newUnpooled(e.getKey()));
 						if (iter0.valid()) {
 							System.out.printf("[DEBUG] testForwardScan NOT-EQUALS, check, key0=%s, value0=%s\n", 
 								Strings.escapeString(e.getKey()), null);
@@ -739,13 +729,9 @@ public class TestTable {
 						iter0 = null;
 					}
 				}
-				//System.out.printf("[DEBUG] testForwardScan it:%s  -  iter:%s\n", itStr, iterStr);
+				
 				assertEquals(itStr, iterStr);
-//				if (2899-1 == readCnt)
-//					Logger0.setDebug(true);
-//				else
-//					Logger0.setDebug(false);
-//				Logger0.debug("testForwardScan.next\n");
+
 				iter.next();
 				readCnt++;
 			}
@@ -772,14 +758,8 @@ public class TestTable {
 				if (!itStr.equals(iterStr)) {
 					System.out.printf("[DEBUG] testBackwardScan NOT-EQUALS, [%d] it:%s  -  iter:%s\n", 
 							readCnt, itStr, iterStr);
-					//constructor.dumpDataRange();
 				}
 				
-//				assertEquals(itStr, iterStr);
-//				if (2230-1 == readCnt)
-//					Logger0.setDebug(true);
-//				else
-//					Logger0.setDebug(false);
 				iter.prev();
 				
 				readCnt++;
@@ -897,7 +877,7 @@ public class TestTable {
 									Strings.escapeString(key), entryList.size(), modelPos.getValue());
 						}
 						
-						iter.seek(new UnpooledSlice(key));
+						iter.seek(SliceFactory.newUnpooled(key));
 						assertEquals(toString(entryList, modelPos.getValue()), toString(iter));
 						break;
 					}
@@ -914,8 +894,6 @@ public class TestTable {
 							
 							String s1 = toString(entryList, modelPos.getValue());
 							String s2 = toString(iter);
-							//System.out.printf("Prev: [2] toString(l, modelPos)=%s, toString(iter)=%s, l.size=%d, modelPos=%d\n",
-							//		s1, s2, entryList.size(), modelPos.getValue());
 							
 							assertEquals(s1, s2);
 						}
@@ -987,7 +965,6 @@ public class TestTable {
 	public void testEmpty() {
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
-			System.out.println("[DEBUG] idx="+i);
 			h.init(kTestArgList[i]);
 			Random0 rnd = new Random0(TestUtil.randomSeed() + 1);
 			h.test(rnd);
@@ -1002,7 +979,7 @@ public class TestTable {
 	public void testZeroRestartPointsInBlock() {
 		byte[] data = new byte[4];
 		BlockContents contents = new BlockContents();
-		contents.data = new UnpooledSlice(data, 0, data.length);
+		contents.data = SliceFactory.newUnpooled(data, 0, data.length);
 		contents.cachable = false;
 		contents.heapAllocated = false;
 		Block block = new Block(contents);
@@ -1011,7 +988,7 @@ public class TestTable {
 		assertTrue(!iter.valid());
 		iter.seekToLast();
 		assertTrue(!iter.valid());
-		iter.seek(new UnpooledSlice("foo"));
+		iter.seek(SliceFactory.newUnpooled("foo"));
 		assertTrue(!iter.valid());
 		iter.delete();
 	}
@@ -1028,7 +1005,7 @@ public class TestTable {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 1);
 		   
-		    h.add(str2ByteBuf(""), new UnpooledSlice("v"));
+		    h.add(str2ByteBuf(""), SliceFactory.newUnpooled("v"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1041,7 +1018,7 @@ public class TestTable {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 2);
 		    
-		    h.add(str2ByteBuf("abc"), new UnpooledSlice("v"));
+		    h.add(str2ByteBuf("abc"), SliceFactory.newUnpooled("v"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1054,9 +1031,9 @@ public class TestTable {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 3);
 		    
-		    h.add(str2ByteBuf("abc"), new UnpooledSlice("v"));
-		    h.add(str2ByteBuf("abcd"), new UnpooledSlice("v"));
-		    h.add(str2ByteBuf("ac"), new UnpooledSlice("v2"));
+		    h.add(str2ByteBuf("abc"), SliceFactory.newUnpooled("v"));
+		    h.add(str2ByteBuf("abcd"), SliceFactory.newUnpooled("v"));
+		    h.add(str2ByteBuf("ac"), SliceFactory.newUnpooled("v2"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1070,7 +1047,7 @@ public class TestTable {
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 4);
-		    h.add(ByteBufFactory.newUnpooled(b, b.length), new UnpooledSlice("v3"));
+		    h.add(ByteBufFactory.newUnpooled(b, b.length), SliceFactory.newUnpooled("v3"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1133,10 +1110,10 @@ public class TestTable {
 		memtable.ref();
 		WriteBatch batch = new WriteBatch();
 		WriteBatchInternal.setSequence(batch, 100);
-		batch.put(new UnpooledSlice("k1"), new UnpooledSlice("v1"));
-		batch.put(new UnpooledSlice("k2"), new UnpooledSlice("v2"));
-		batch.put(new UnpooledSlice("k3"), new UnpooledSlice("v3"));
-		batch.put(new UnpooledSlice("largekey"), new UnpooledSlice("vlarge"));
+		batch.put(SliceFactory.newUnpooled("k1"), SliceFactory.newUnpooled("v1"));
+		batch.put(SliceFactory.newUnpooled("k2"), SliceFactory.newUnpooled("v2"));
+		batch.put(SliceFactory.newUnpooled("k3"), SliceFactory.newUnpooled("v3"));
+		batch.put(SliceFactory.newUnpooled("largekey"), SliceFactory.newUnpooled("vlarge"));
 		assertTrue(WriteBatchInternal.insertInto(batch, memtable).ok());
 
 		Iterator0 iter = memtable.newIterator();
@@ -1165,13 +1142,13 @@ public class TestTable {
 	public void testTableTestApproximateOffsetOfPlain() {
 		TableConstructor c = new TableConstructor(BytewiseComparatorImpl.getInstance());
 
-		c.add(str2ByteBuf("k01"), new UnpooledSlice("hello"));
-		c.add(str2ByteBuf("k02"), new UnpooledSlice("hello2"));
-		c.add(str2ByteBuf("k03"), new UnpooledSlice(TestUtil.makeString(10000, 'x')));
-		c.add(str2ByteBuf("k04"), new UnpooledSlice(TestUtil.makeString(200000, 'x')));
-		c.add(str2ByteBuf("k05"), new UnpooledSlice(TestUtil.makeString(300000, 'x')));
-		c.add(str2ByteBuf("k06"), new UnpooledSlice("hello3"));
-		c.add(str2ByteBuf("k07"), new UnpooledSlice(TestUtil.makeString(100000, 'x')));
+		c.add(str2ByteBuf("k01"), SliceFactory.newUnpooled("hello"));
+		c.add(str2ByteBuf("k02"), SliceFactory.newUnpooled("hello2"));
+		c.add(str2ByteBuf("k03"), SliceFactory.newUnpooled(TestUtil.makeString(10000, 'x')));
+		c.add(str2ByteBuf("k04"), SliceFactory.newUnpooled(TestUtil.makeString(200000, 'x')));
+		c.add(str2ByteBuf("k05"), SliceFactory.newUnpooled(TestUtil.makeString(300000, 'x')));
+		c.add(str2ByteBuf("k06"), SliceFactory.newUnpooled("hello3"));
+		c.add(str2ByteBuf("k07"), SliceFactory.newUnpooled(TestUtil.makeString(100000, 'x')));
 		
 		ArrayList<ByteBuf> keys = new ArrayList<>();
 		Object0<TreeMap<ByteBuf,ByteBuf>> kvmap0 = new Object0<>();
@@ -1180,22 +1157,22 @@ public class TestTable {
 		options.compression = CompressionType.kNoCompression;
 		c.finish(options, keys, kvmap0);
 
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("abc")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k01")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k01a")),      0,      0));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k02")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k03")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k04")),   10000,  11000));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k04a")), 210000, 211000));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k05")),  210000, 211000));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k06")),  510000, 511000));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k07")),  510000, 511000));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("xyz")),  610000, 612000));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("abc")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k01")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k01a")),      0,      0));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k02")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k03")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k04")),   10000,  11000));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k04a")), 210000, 211000));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k05")),  210000, 211000));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k06")),  510000, 511000));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k07")),  510000, 511000));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("xyz")),  610000, 612000));
 	}
 
 	static boolean SnappyCompressionSupported() {
 		ByteBuf out = ByteBufFactory.newUnpooled();
-		Slice in = new UnpooledSlice("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+		Slice in = SliceFactory.newUnpooled("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 		return Snappy.compress(in.data(), in.offset(), in.size(), out);
 	}
 	
@@ -1209,9 +1186,9 @@ public class TestTable {
 		Random0 rnd = new Random0(301);
 		TableConstructor c = new TableConstructor(BytewiseComparatorImpl.getInstance());
 		ByteBuf tmp = ByteBufFactory.newUnpooled();
-		c.add(str2ByteBuf("k01"), new UnpooledSlice("hello"));
+		c.add(str2ByteBuf("k01"), SliceFactory.newUnpooled("hello"));
 		c.add(str2ByteBuf("k02"), TestUtil.compressibleString(rnd, 0.25, 10000, tmp));
-		c.add(str2ByteBuf("k03"), new UnpooledSlice("hello3"));
+		c.add(str2ByteBuf("k03"), SliceFactory.newUnpooled("hello3"));
 		c.add(str2ByteBuf("k04"), TestUtil.compressibleString(rnd, 0.25, 10000, tmp));
 		  
 		ArrayList<ByteBuf> keys = new ArrayList<>();
@@ -1227,14 +1204,14 @@ public class TestTable {
 		int min_z = expected - kSlop;
 		int max_z = expected + kSlop;
 
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("abc")), 0, kSlop));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k01")), 0, kSlop));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k02")), 0, kSlop));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("abc")), 0, kSlop));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k01")), 0, kSlop));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k02")), 0, kSlop));
 		// Have now emitted a large compressible string, so adjust expected offset.
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k03")), min_z, max_z));
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k04")), min_z, max_z));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k03")), min_z, max_z));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("k04")), min_z, max_z));
 		// Have now emitted two large compressible strings, so adjust expected offset.
-		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("xyz")), 2 * min_z, 2 * max_z));
+		assertTrue(between(c.approximateOffsetOf(SliceFactory.newUnpooled("xyz")), 2 * min_z, 2 * max_z));
 	}
 
 	@Test

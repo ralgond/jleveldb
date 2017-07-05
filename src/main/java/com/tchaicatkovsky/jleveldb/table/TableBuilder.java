@@ -26,10 +26,9 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Crc32C;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class TableBuilder {
 
@@ -52,8 +51,7 @@ public class TableBuilder {
 		 * block. For example, consider a block boundary between the keys "the quick
 		 * brown fox" and "the who". We can use "the r" as the key for the index block
 		 * entry since it is >= all entries in the first block and < all entries in
-		 * subsequent blocks.</br>
-		 * </br>
+		 * subsequent blocks.</br></br>
 		 * 
 		 * Invariant: pendingIndexEntry is true only if dataBlockBuilder is empty.
 		 */
@@ -132,12 +130,7 @@ public class TableBuilder {
 			return;
 
 		if (r.numEntries > 0) {
-			int ret = r.options.comparator.compare(key, r.lastKey);
-			
-			if (!(ret > 0))
-				System.out.printf("[DEBUG] TableBuilder.add assert failed, ret=%d, key=%s, r.lastKey=%s\n", 
-						ret, Strings.escapeString(key), Strings.escapeString(r.lastKey));
-			
+			int ret = r.options.comparator.compare(key, r.lastKey);			
 			assert (ret > 0);
 		}
 		
@@ -146,7 +139,7 @@ public class TableBuilder {
 			r.options.comparator.findShortestSeparator(r.lastKey, key);
 			ByteBuf handleEncoding = ByteBufFactory.newUnpooled();
 			r.pendingHandle.encodeTo(handleEncoding);
-			r.indexBlockBuilder.add(new UnpooledSlice(r.lastKey), new UnpooledSlice(handleEncoding)); // TODO: new DefaultSlice(r.lastKey)->r.lastKey
+			r.indexBlockBuilder.add(SliceFactory.newUnpooled(r.lastKey), SliceFactory.newUnpooled(handleEncoding)); // TODO: new DefaultSlice(r.lastKey)->r.lastKey
 			r.pendingIndexEntry = false;
 		}
 		
@@ -215,7 +208,7 @@ public class TableBuilder {
 
 				ByteBuf handleEncoding = ByteBufFactory.newUnpooled();
 				filterBlockHandle.encodeTo(handleEncoding);
-				metaIndexBlockBuilder.add(new UnpooledSlice(key), new UnpooledSlice(handleEncoding));
+				metaIndexBlockBuilder.add(SliceFactory.newUnpooled(key), SliceFactory.newUnpooled(handleEncoding));
 			}
 
 			// TODO(postrelease): Add stats and other meta blocks
@@ -229,7 +222,7 @@ public class TableBuilder {
 				r.options.comparator.findShortSuccessor(r.lastKey);
 				ByteBuf handleEncoding = ByteBufFactory.newUnpooled();
 				r.pendingHandle.encodeTo(handleEncoding);
-				r.indexBlockBuilder.add(new UnpooledSlice(r.lastKey), new UnpooledSlice(handleEncoding)); // TODO
+				r.indexBlockBuilder.add(SliceFactory.newUnpooled(r.lastKey), SliceFactory.newUnpooled(handleEncoding)); // TODO
 				r.pendingIndexEntry = false;
 			}
 			writeBlock(r.indexBlockBuilder, indexBlockHandle);
@@ -242,7 +235,7 @@ public class TableBuilder {
 			footer.setIndexHandle(indexBlockHandle);
 			ByteBuf footerEncoding = ByteBufFactory.newUnpooled();
 			footer.encodeTo(footerEncoding);
-			r.status = r.file.append(new UnpooledSlice(footerEncoding)); // TODO
+			r.status = r.file.append(SliceFactory.newUnpooled(footerEncoding)); // TODO
 			if (r.status.ok()) {
 				r.offset += footerEncoding.size();
 			}
@@ -281,30 +274,26 @@ public class TableBuilder {
 		Rep r = rep;
 		Slice raw = block.finish();
 
-		Slice blockContents = new UnpooledSlice();
+		Slice blockContents = SliceFactory.newUnpooled();
 		CompressionType type = r.options.compression;
 
 		// TODO(postrelease): Support more compression options: zlib?
 		switch (type) {
-		case kNoCompression:
-			blockContents = raw.clone();
-			break;
-
-		case kSnappyCompression: {
-			if (Snappy.compress(raw.data(), 0, raw.size(), r.compressedOutput) && r.compressedOutput.size() < raw.size() - (raw.size() / 8)) {
-				blockContents.init(r.compressedOutput);
-			} else {
-				// Snappy not supported, or compressed less than 12.5%, so just
-				// store uncompressed form
+			case kNoCompression:
 				blockContents = raw.clone();
-				type = CompressionType.kNoCompression;
+				break;
+	
+			case kSnappyCompression: {
+				if (Snappy.compress(raw.data(), 0, raw.size(), r.compressedOutput) && r.compressedOutput.size() < raw.size() - (raw.size() / 8)) {
+					blockContents.init(r.compressedOutput);
+				} else {
+					// Snappy not supported, or compressed less than 12.5%, so just
+					// store uncompressed form
+					blockContents = raw.clone();
+					type = CompressionType.kNoCompression;
+				}
+				break;
 			}
-			break;
-		}
-		default:
-			System.out.println("[DEBUG] writeBlock, unknown compression type=" + type);
-			System.exit(-1);
-			break;
 		}
 
 		writeRawBlock(blockContents, type, handle);
@@ -325,7 +314,7 @@ public class TableBuilder {
 			chksum.update(trailer, 0, 1);
 			long crc = chksum.getValue();
 			Coding.encodeFixedNat32Long(trailer, 1, 5, Crc32C.mask(crc));
-			r.status = r.file.append(new UnpooledSlice(trailer, 0, Format.kBlockTrailerSize));
+			r.status = r.file.append(SliceFactory.newUnpooled(trailer, 0, Format.kBlockTrailerSize));
 			if (r.status.ok()) {
 				r.offset += blockContents.size() + Format.kBlockTrailerSize;
 			}

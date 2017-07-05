@@ -36,8 +36,6 @@ public class Compaction {
 	Version inputVersion;
 	VersionEdit edit;
 	
-	
-	//ArrayList<FileMetaData> inputs[]; //size=2
 	/**
 	 * Each compaction reads inputs from "level" and "level+1"
 	 */
@@ -49,9 +47,20 @@ public class Compaction {
 	 */
 	ArrayList<FileMetaData> grandparents;
 	
-	int grandparentIndex;  // Index in grandparent_starts_
-	boolean seenKey;       // Some output key has been seen
-	long overlappedBytes;  // Bytes of overlap between current output and grandparent files
+	/**
+	 * Index in grandparentStarts
+	 */
+	int grandparentIndex;
+	
+	/**
+	 * Some output key has been seen
+	 */
+	boolean seenKey;
+	
+	/**
+	 * Bytes of overlap between current output and grandparent files
+	 */
+	long overlappedBytes;
 	
 	// State for implementing IsBaseLevelForKey
 
@@ -149,14 +158,13 @@ public class Compaction {
 	}
 	
 	/**
-	 *  Add all inputs to this compaction as delete operations to *edit.
+	 * Add all inputs to this compaction as delete operations to edit.
 	 */
 	public void addInputDeletions(VersionEdit edit) {
 		for (int which = 0; which < 2; which++) {
 			int size = numInputFiles(which);
-		    for (int i = 0; i < size; i++) {
+		    for (int i = 0; i < size; i++)
 		    	edit.deleteFile(level + which, input(which, i).number);
-		    }
 		}
 	}
 	
@@ -188,7 +196,7 @@ public class Compaction {
 	
 	/**
 	 * Returns true iff we should stop building the current output
-	 * before processing "internal_key".
+	 * before processing "internalKey".
 	 */
 	public boolean shouldStopBefore(Slice internalKey) {
 		final VersionSet vset = inputVersion.vset;

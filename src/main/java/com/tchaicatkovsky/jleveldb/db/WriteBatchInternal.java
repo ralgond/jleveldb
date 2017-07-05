@@ -20,8 +20,8 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.WriteBatch;
 import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 //WriteBatchInternal provides static methods for manipulating a
 //WriteBatch that we don't want in the public WriteBatch interface.
@@ -69,7 +69,7 @@ public class WriteBatchInternal {
     }
 
     public static Slice contents(WriteBatch batch) {
-        return new UnpooledSlice(batch.rep);
+        return SliceFactory.newUnpooled(batch.rep);
     }
 
     public static long byteSize(WriteBatch batch) {
@@ -91,7 +91,7 @@ public class WriteBatchInternal {
     	}
     	
     	public void delete(Slice key) {
-    		memtable.add(sequence, ValueType.Deletion, key, new UnpooledSlice());
+    		memtable.add(sequence, ValueType.Deletion, key, SliceFactory.newUnpooled());
     		sequence++;
     	}
     };

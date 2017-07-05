@@ -46,13 +46,13 @@ import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.ListUtils;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
@@ -382,14 +382,11 @@ public class TestDB {
 			Object0<DB> db0 = new Object0<>();
 			Status s = LevelDB.newDB(opts, dbname, db0);
 			db = db0.getValue();
-			System.out.println("[DEBUG] DBTestRunner.tryReopen, s=" + s);
-			if (s.ok())
-				System.out.printf("[DEBUG] tryReopen after open, dataRange=%s", db.debugDataRange());
 			return s;
 		}
 
 		public Status put(String k, Slice v) throws Exception {
-			return db.put(new WriteOptions(), new UnpooledSlice(k), v);
+			return db.put(new WriteOptions(), SliceFactory.newUnpooled(k), v);
 		}
 
 		public Status put(Slice k, Slice v) throws Exception {
@@ -397,7 +394,7 @@ public class TestDB {
 		}
 
 		public Status put(String k, String v) throws Exception {
-			return db.put(new WriteOptions(), new UnpooledSlice(k), new UnpooledSlice(v));
+			return db.put(new WriteOptions(), SliceFactory.newUnpooled(k), SliceFactory.newUnpooled(v));
 		}
 
 		public Status delete(Slice k) throws Exception {
@@ -405,7 +402,7 @@ public class TestDB {
 		}
 
 		public Status delete(String k) throws Exception {
-			return db.delete(new WriteOptions(), new UnpooledSlice(k));
+			return db.delete(new WriteOptions(), SliceFactory.newUnpooled(k));
 		}
 
 		public String get(Slice k, ReadOptions options, Snapshot snapshot) throws Exception {
@@ -425,7 +422,7 @@ public class TestDB {
 		}
 
 		public String get(String k, Snapshot snapshot) throws Exception {
-			return get(new UnpooledSlice(k), snapshot);
+			return get(SliceFactory.newUnpooled(k), snapshot);
 		}
 
 		public String get(Slice k) throws Exception {
@@ -433,11 +430,11 @@ public class TestDB {
 		}
 
 		public String get(String k) throws Exception {
-			return get(new UnpooledSlice(k), null);
+			return get(SliceFactory.newUnpooled(k), null);
 		}
 
 		public String get(String k, ReadOptions options) throws Exception {
-			return get(new UnpooledSlice(k), options, null);
+			return get(SliceFactory.newUnpooled(k), options, null);
 		}
 
 		String iterStatus(Iterator0 iter) {
@@ -552,8 +549,6 @@ public class TestDB {
 		public int countFiles() {
 			ArrayList<String> files = new ArrayList<>();
 			env.getChildren(dbname, files);
-			for (String fileName : files)
-				System.out.println("DB FILENAME: " + fileName);
 			return files.size();
 		}
 
@@ -571,15 +566,15 @@ public class TestDB {
 		}
 
 		public void compact(String start, String limit) throws Exception {
-			db.compactRange(new UnpooledSlice(start), new UnpooledSlice(limit));
+			db.compactRange(SliceFactory.newUnpooled(start), SliceFactory.newUnpooled(limit));
 		}
 
 		// Do n memtable compactions, each of which produces an sstable
 		// covering the range [small,large].
 		public void makeTables(int n, String small, String large) throws Exception {
 			for (int i = 0; i < n; i++) {
-				put(new UnpooledSlice(small), new UnpooledSlice("begin"));
-				put(new UnpooledSlice(large), new UnpooledSlice("end"));
+				put(SliceFactory.newUnpooled(small), SliceFactory.newUnpooled("begin"));
+				put(SliceFactory.newUnpooled(large), SliceFactory.newUnpooled("end"));
 				dbfull().TEST_CompactMemTable();
 			}
 		}
@@ -646,7 +641,7 @@ public class TestDB {
 		try {
 			do {
 				assertTrue(r.db != null);
-				assertEquals("NOT_FOUND", r.get(new UnpooledSlice("foo")));
+				assertEquals("NOT_FOUND", r.get(SliceFactory.newUnpooled("foo")));
 			} while (r.changeOptions());
 		} finally {
 			r.delete();
@@ -658,7 +653,6 @@ public class TestDB {
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
-				System.out.println("[DEBUG] r.option_config=" + r.optionConfig);
 				assertTrue(r.put("foo", "v1").ok());
 				assertEquals("v1", r.get("foo"));
 				assertTrue(r.put("bar", "v2").ok());
@@ -676,11 +670,11 @@ public class TestDB {
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
-				assertTrue(r.db.put(new WriteOptions(), new UnpooledSlice("foo"), new UnpooledSlice("v1")).ok());
+				assertTrue(r.db.put(new WriteOptions(), SliceFactory.newUnpooled("foo"), SliceFactory.newUnpooled("v1")).ok());
 				assertEquals("v1", r.get("foo"));
-				assertTrue(r.db.put(new WriteOptions(), new UnpooledSlice("foo"), new UnpooledSlice("v2")).ok());
+				assertTrue(r.db.put(new WriteOptions(), SliceFactory.newUnpooled("foo"), SliceFactory.newUnpooled("v2")).ok());
 				assertEquals("v2", r.get("foo"));
-				assertTrue(r.db.delete(new WriteOptions(), new UnpooledSlice("foo")).ok());
+				assertTrue(r.db.delete(new WriteOptions(), SliceFactory.newUnpooled("foo")).ok());
 				assertEquals("NOT_FOUND", r.get("foo"));
 			} while (r.changeOptions());
 		} finally {
@@ -794,7 +788,7 @@ public class TestDB {
 		try {
 			do {
 				assertTrue(r.put("foo", "v1").ok());
-				r.compact(new UnpooledSlice("a"), new UnpooledSlice("z"));
+				r.compact(SliceFactory.newUnpooled("a"), SliceFactory.newUnpooled("z"));
 				assertEquals("v1", r.get("foo"));
 				assertTrue(r.put("foo", "v2").ok());
 				assertEquals("v2", r.get("foo"));
@@ -850,8 +844,6 @@ public class TestDB {
 					r.dbfull().TEST_CompactMemTable();
 				}
 
-				System.out.printf("[DEBUG] =================== level-0.size=%d, level-1=%d, level-2.size=%d\n", r.numTableFilesAtLevel(0), r.numTableFilesAtLevel(1), r.numTableFilesAtLevel(2));
-
 				// Step 2: clear level 1 if necessary.
 				r.dbfull().TEST_CompactRange(1, null, null);
 				assertEquals(r.numTableFilesAtLevel(0), 1);
@@ -885,7 +877,7 @@ public class TestDB {
 			iter.seekToLast();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(new UnpooledSlice("foo"));
+			iter.seek(SliceFactory.newUnpooled("foo"));
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
 			iter.delete();
@@ -919,17 +911,17 @@ public class TestDB {
 			iter.prev();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(new UnpooledSlice(""));
+			iter.seek(SliceFactory.newUnpooled(""));
 			assertEquals(r.iterStatus(iter), "a->va");
 			iter.next();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(new UnpooledSlice("a"));
+			iter.seek(SliceFactory.newUnpooled("a"));
 			assertEquals(r.iterStatus(iter), "a->va");
 			iter.next();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(new UnpooledSlice("b"));
+			iter.seek(SliceFactory.newUnpooled("b"));
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
 			iter.delete();
@@ -974,15 +966,15 @@ public class TestDB {
 			iter.next();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(new UnpooledSlice(""));
+			iter.seek(SliceFactory.newUnpooled(""));
 			assertEquals(r.iterStatus(iter), "a->va");
-			iter.seek(new UnpooledSlice("a"));
+			iter.seek(SliceFactory.newUnpooled("a"));
 			assertEquals(r.iterStatus(iter), "a->va");
-			iter.seek(new UnpooledSlice("ax"));
+			iter.seek(SliceFactory.newUnpooled("ax"));
 			assertEquals(r.iterStatus(iter), "b->vb");
-			iter.seek(new UnpooledSlice("b"));
+			iter.seek(SliceFactory.newUnpooled("b"));
 			assertEquals(r.iterStatus(iter), "b->vb");
-			iter.seek(new UnpooledSlice("z"));
+			iter.seek(SliceFactory.newUnpooled("z"));
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
 			// Switch from reverse to forward
@@ -1004,7 +996,7 @@ public class TestDB {
 			assertTrue(r.put("a2", "va3").ok());
 			assertTrue(r.put("b", "vb2").ok());
 			assertTrue(r.put("c", "vc2").ok());
-			assertTrue(r.delete(new UnpooledSlice("b")).ok());
+			assertTrue(r.delete(SliceFactory.newUnpooled("b")).ok());
 			iter.seekToFirst();
 			assertEquals(r.iterStatus(iter), "a->va");
 			iter.next();
@@ -1080,11 +1072,11 @@ public class TestDB {
 				assertTrue(r.put("a", "va").ok());
 				assertTrue(r.put("b", "vb").ok());
 				assertTrue(r.put("c", "vc").ok());
-				assertTrue(r.delete(new UnpooledSlice("b")).ok());
+				assertTrue(r.delete(SliceFactory.newUnpooled("b")).ok());
 				assertEquals("NOT_FOUND", r.get("b"));
 
 				Iterator0 iter = r.db.newIterator(new ReadOptions());
-				iter.seek(new UnpooledSlice("c"));
+				iter.seek(SliceFactory.newUnpooled("c"));
 				assertEquals(r.iterStatus(iter), "c->vc");
 				iter.prev();
 				assertEquals(r.iterStatus(iter), "a->va");
@@ -1295,12 +1287,9 @@ public class TestDB {
 			Random0 rnd = new Random0(301);
 			ByteBuf value = randomString(rnd, 2 * options.writeBufferSize);
 
-			System.out.println("[DEBUG] ============= value.size=" + value.size());
-
 			for (int i = 0; i < 5 * kMaxFiles; i++) {
 				r.put("key", value.encodeToString());
 				assertTrue(r.totalTableFiles() < kMaxFiles);
-				System.err.printf("========================================\nafter %d: %d files\n========================================\n", i + 1, r.totalTableFiles());
 			}
 		} finally {
 			r.delete();
@@ -1364,7 +1353,7 @@ public class TestDB {
 	}
 
 	Slice slice(String s) {
-		return new UnpooledSlice(s);
+		return SliceFactory.newUnpooled(s);
 	}
 
 	@Test
@@ -1801,7 +1790,6 @@ public class TestDB {
 			newOptions.comparator = cmp;
 			Status s = r.tryReopen(newOptions);
 			assertTrue(!s.ok());
-			System.out.println("s=" + s);
 			assertTrue(s.toString().indexOf("comparator") >= 0);
 		} finally {
 			r.delete();
@@ -1814,16 +1802,16 @@ public class TestDB {
 		}
 
 		public int compare(byte[] a, int aoff, int asize, byte[] b, int boff, int bsize) {
-			return toNumber(new UnpooledSlice(a, aoff, asize)) - toNumber(new UnpooledSlice(b, boff, bsize));
+			return toNumber(SliceFactory.newUnpooled(a, aoff, asize)) - toNumber(SliceFactory.newUnpooled(b, boff, bsize));
 		}
 
 		public void findShortestSeparator(ByteBuf s, Slice l) {
-			toNumber(new UnpooledSlice(s)); // Check format
+			toNumber(SliceFactory.newUnpooled(s)); // Check format
 			toNumber(l); // Check format
 		}
 
 		public void findShortSuccessor(ByteBuf key) {
-			toNumber(new UnpooledSlice(key)); // Check format
+			toNumber(SliceFactory.newUnpooled(key)); // Check format
 		}
 
 		static int toNumber(Slice x) {
@@ -2051,12 +2039,12 @@ public class TestDB {
 
 			// (b) Normal write should succeed
 			WriteOptions w = new WriteOptions();
-			assertTrue(r.db.put(w, new UnpooledSlice("k1"), new UnpooledSlice("v1")).ok());
+			assertTrue(r.db.put(w, SliceFactory.newUnpooled("k1"), SliceFactory.newUnpooled("v1")).ok());
 			assertEquals("v1", r.get("k1"));
 
 			// (c) Do a sync write; should fail
 			w.sync = true;
-			assertTrue(!r.db.put(w, new UnpooledSlice("k2"), new UnpooledSlice("v2")).ok());
+			assertTrue(!r.db.put(w, SliceFactory.newUnpooled("k2"), SliceFactory.newUnpooled("v2")).ok());
 			assertEquals("v1", r.get("k1"));
 			assertEquals("NOT_FOUND", r.get("k2"));
 
@@ -2065,7 +2053,7 @@ public class TestDB {
 
 			// (e) Do a non-sync write; should fail
 			w.sync = false;
-			assertTrue(!r.db.put(w, new UnpooledSlice("k3"), new UnpooledSlice("v3")).ok());
+			assertTrue(!r.db.put(w, SliceFactory.newUnpooled("k3"), SliceFactory.newUnpooled("v3")).ok());
 			assertEquals("v1", r.get("k1"));
 			assertEquals("NOT_FOUND", r.get("k2"));
 			assertEquals("NOT_FOUND", r.get("k3"));
@@ -2186,8 +2174,6 @@ public class TestDB {
 			}
 
 			System.setOut(defaultOut);
-			//
-			// System.out.printf("DB.dataRange: %s", r.db.debugDataRange());
 
 			assertEquals(r.countFiles(), num_files);
 
@@ -2213,8 +2199,6 @@ public class TestDB {
 			final int N = 1000;
 			for (int i = 0; i < N; i++)
 				assertTrue(r.put(Key(i), Key(i)).ok());
-
-			System.out.println("\n[DEBUG] TestDB.testBloomFilter compact start");
 
 			r.compact("a", "z");
 
@@ -2347,10 +2331,10 @@ public class TestDB {
 						// Write values of the form <key, my id, counter>.
 						// We add some padding for force compactions.
 						String value1 = String.format("%d.%d.%-1000d", key, id, counter);
-						assertTrue(db.put(new WriteOptions(), new UnpooledSlice(key1), new UnpooledSlice(value1)).ok());
+						assertTrue(db.put(new WriteOptions(), SliceFactory.newUnpooled(key1), SliceFactory.newUnpooled(value1)).ok());
 					} else {
 						// Read a value and verify that it matches the pattern written above.
-						Status s = db.get(new ReadOptions(), new UnpooledSlice(key1), value);
+						Status s = db.get(new ReadOptions(), SliceFactory.newUnpooled(key1), value);
 						if (s.isNotFound()) {
 							// Key has not yet been written
 						} else {
@@ -2463,8 +2447,8 @@ public class TestDB {
 			VersionEdit vbase = new VersionEdit();
 			long fnum = 1;
 			for (int i = 0; i < num_base_files; i++) {
-				InternalKey start = new InternalKey(new UnpooledSlice(makeKey(2 * fnum)), (long) 1, ValueType.Value);
-				InternalKey limit = new InternalKey(new UnpooledSlice(makeKey(2 * fnum + 1)), (long) 1, ValueType.Deletion);
+				InternalKey start = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum)), (long) 1, ValueType.Value);
+				InternalKey limit = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum + 1)), (long) 1, ValueType.Deletion);
 				vbase.addFile(2, fnum++, 1 /* file size */, start, limit, 10);
 			}
 			assertTrue(vset.logAndApply(vbase, mutex).ok());
@@ -2474,8 +2458,8 @@ public class TestDB {
 			for (int i = 0; i < iters; i++) {
 				VersionEdit vedit = new VersionEdit();
 				vedit.deleteFile(2, fnum);
-				InternalKey start = new InternalKey(new UnpooledSlice(makeKey(2 * fnum)), 1, ValueType.Value);
-				InternalKey limit = new InternalKey(new UnpooledSlice(makeKey(2 * fnum + 1)), 1, ValueType.Deletion);
+				InternalKey start = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum)), 1, ValueType.Value);
+				InternalKey limit = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum + 1)), 1, ValueType.Deletion);
 				vedit.addFile(2, fnum++, 1 /* file size */, start, limit, 10);
 				vset.logAndApply(vedit, mutex);
 			}

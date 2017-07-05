@@ -18,8 +18,8 @@ package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class DBFormat {
 
@@ -75,7 +75,7 @@ public class DBFormat {
 	 */
 	final public static Slice extractUserKey(Slice internalKey) {
 		assert(internalKey.size() >= 8);
-		return new UnpooledSlice(internalKey.data(), internalKey.offset(), internalKey.size() - 8);
+		return SliceFactory.newUnpooled(internalKey.data(), internalKey.offset(), internalKey.size() - 8);
 	}
 	
 	final public static ValueType extractValueType(Slice internalKey) {
@@ -94,6 +94,6 @@ public class DBFormat {
 
 	public static void appendInternalKey(ByteBuf result, ParsedInternalKey key) {
 		result.append(key.userKey.data(), key.userKey.size());
-		result.writeFixedNat64(packSequenceAndType(key.sequence, key.type));
+		result.addFixedNat64(packSequenceAndType(key.sequence, key.type));
 	}
 }

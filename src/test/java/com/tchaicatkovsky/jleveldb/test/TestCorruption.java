@@ -13,11 +13,11 @@ import com.tchaicatkovsky.jleveldb.WriteOptions;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Cache;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
 import static org.junit.Assert.assertTrue;
@@ -78,7 +78,7 @@ public class TestCorruption {
 		Slice Key(int i, ByteBuf storage) {
 		    String s = String.format("%016d", i);
 		    storage.assign(s);
-		    return new UnpooledSlice(storage);
+		    return SliceFactory.newUnpooled(storage);
 		}
 
 		  // Return the value to associate with the specified key

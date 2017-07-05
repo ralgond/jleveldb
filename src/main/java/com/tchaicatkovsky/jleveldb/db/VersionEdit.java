@@ -26,11 +26,11 @@ import com.tchaicatkovsky.jleveldb.db.format.DBFormat;
 import com.tchaicatkovsky.jleveldb.db.format.InternalKey;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.IntLongPair;
 import com.tchaicatkovsky.jleveldb.util.IntObjectPair;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class VersionEdit {
 	Set<IntLongPair> deletedFileSet = new TreeSet<IntLongPair>();
@@ -52,8 +52,6 @@ public class VersionEdit {
 	/**
 	 * Tag numbers for serialized VersionEdit.  These numbers are written to 
 	 * disk and should not be changed.
-	 * @author thuang
-	 *
 	 */
 	enum Tag {
 		kComparator(1),
@@ -155,50 +153,50 @@ public class VersionEdit {
 	
 	public void encodeTo(ByteBuf dst) {
 		if (hasComparator) {
-			dst.writeVarNat32(Tag.kComparator.getValue());
-		    dst.writeLengthPrefixedSlice(new UnpooledSlice(comparator));
+			dst.addVarNat32(Tag.kComparator.getValue());
+		    dst.addLengthPrefixedSlice(SliceFactory.newUnpooled(comparator));
 		}
 		
 		if (hasLogNumber) {
-			dst.writeVarNat32(Tag.kLogNumber.getValue());
-			dst.writeVarNat64(logNumber);
+			dst.addVarNat32(Tag.kLogNumber.getValue());
+			dst.addVarNat64(logNumber);
 		}
 		
 		if (hasPrevLogNumber) {
-		    dst.writeVarNat32(Tag.kPrevLogNumber.getValue());
-		    dst.writeVarNat64(prevLogNumber);
+		    dst.addVarNat32(Tag.kPrevLogNumber.getValue());
+		    dst.addVarNat64(prevLogNumber);
 		}
 		
 		if (hasNextFileNumber) {
-			dst.writeVarNat32(Tag.kNextFileNumber.getValue());
-			dst.writeVarNat64(nextFileNumber);
+			dst.addVarNat32(Tag.kNextFileNumber.getValue());
+			dst.addVarNat64(nextFileNumber);
 		}
 		
 		if (hasLastSequence) {
-			dst.writeVarNat32(Tag.kLastSequence.getValue());
-			dst.writeVarNat64(lastSequence);
+			dst.addVarNat32(Tag.kLastSequence.getValue());
+			dst.addVarNat64(lastSequence);
 		}
 
 		for (int i = 0; i < compactPointers.size(); i++) {
-			dst.writeVarNat32(Tag.kCompactPointer.getValue());
-			dst.writeVarNat32(compactPointers.get(i).i);  // level
-		    dst.writeLengthPrefixedSlice(compactPointers.get(i).obj.encode());
+			dst.addVarNat32(Tag.kCompactPointer.getValue());
+			dst.addVarNat32(compactPointers.get(i).i);  // level
+		    dst.addLengthPrefixedSlice(compactPointers.get(i).obj.encode());
 		}
 
 		for (IntLongPair pair : deletedFiles) {
-			dst.writeVarNat32(Tag.kDeletedFile.getValue());
-			dst.writeVarNat32(pair.i);   // level
-			dst.writeVarNat32((int)(pair.l & 0xffffffffL));  // file number
+			dst.addVarNat32(Tag.kDeletedFile.getValue());
+			dst.addVarNat32(pair.i);   // level
+			dst.addVarNat32((int)(pair.l & 0xffffffffL));  // file number
 		}
 
 		for (int i = 0; i < newFiles.size(); i++) {
 			FileMetaData f = newFiles.get(i).obj;
-			dst.writeVarNat32(Tag.kNewFile.getValue());
-			dst.writeVarNat32(newFiles.get(i).i);  // level
-			dst.writeVarNat64(f.number);
-		    dst.writeVarNat64(f.fileSize);
-		    dst.writeLengthPrefixedSlice(f.smallest.encode());
-		    dst.writeLengthPrefixedSlice(f.largest.encode());
+			dst.addVarNat32(Tag.kNewFile.getValue());
+			dst.addVarNat32(newFiles.get(i).i);  // level
+			dst.addVarNat64(f.number);
+		    dst.addVarNat64(f.fileSize);
+		    dst.addLengthPrefixedSlice(f.smallest.encode());
+		    dst.addLengthPrefixedSlice(f.largest.encode());
 		}
 	}
 	
@@ -212,7 +210,7 @@ public class VersionEdit {
 		int level;
 		long number;
 		
-		Slice str = new UnpooledSlice();
+		Slice str = SliceFactory.newUnpooled();
 		
 		Integer0 result0 = new Integer0();
 		
@@ -370,7 +368,7 @@ public class VersionEdit {
 	}
 	
 	static boolean getInternalKey(Slice input, InternalKey dst) {
-		Slice str = new UnpooledSlice();
+		Slice str = SliceFactory.newUnpooled();
 		if (Coding.popLengthPrefixedSlice(input, str)) {
 		    dst.decodeFrom(str);
 		    return true;

@@ -123,7 +123,7 @@ public class UnpooledSlice implements Slice {
 	
 	@Override
 	public Slice clone() {
-		return new UnpooledSlice(this);
+		return SliceFactory.newUnpooled(this);
 	}
 	
 	@Override

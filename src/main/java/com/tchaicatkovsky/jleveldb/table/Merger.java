@@ -116,8 +116,6 @@ public class Merger {
 			    }
 			    direction = Direction.kForward;
 			}
-			
-			//Logger0.debug("MergingIterator.next\n");
 
 			current.next();
 			findSmallest();

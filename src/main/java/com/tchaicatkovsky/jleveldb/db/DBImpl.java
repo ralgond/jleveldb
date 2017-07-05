@@ -58,12 +58,12 @@ import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.CondVar;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class DBImpl implements DB {
@@ -413,7 +413,6 @@ public class DBImpl implements DB {
 				return w.status;
 
 			Status status = makeRoomForWrite(batch == null);
-			// System.out.println("DBImpl.write, 1, status="+status);
 
 			long lastSequence = versions.lastSequence();
 			Object0<Writer> lastWriter = new Object0<Writer>();
@@ -432,16 +431,12 @@ public class DBImpl implements DB {
 					mutex.unlock();
 					status = logWriter.addRecord(WriteBatchInternal.contents(updates));
 
-					// System.out.println("DBImpl.write, 2, status="+status);
-
 					boolean syncError = false;
 					if (status.ok() && options.sync) {
 						status = logFile.sync();
 						if (!status.ok())
 							syncError = true;
 					}
-
-					// System.out.println("DBImpl.write, 3, status="+status);
 
 					if (status.ok())
 						status = WriteBatchInternal.insertInto(updates, memtable);
@@ -476,8 +471,6 @@ public class DBImpl implements DB {
 			if (!writers.isEmpty()) {
 				writers.peekFirst().cv.signal();
 			}
-
-			// System.out.println("DBImpl.write, 10");
 			return status;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -528,7 +521,6 @@ public class DBImpl implements DB {
 			}
 
 			if (haveStatUpdate && current.updateStats(stats)) {
-				System.out.printf("[DEBUG] DBImpl.get Call maybeScheduleCompaction\n");
 				maybeScheduleCompaction();
 			}
 
@@ -601,7 +593,7 @@ public class DBImpl implements DB {
 			LogWriter logWriter = new LogWriter(file.getValue());
 			ByteBuf record = ByteBufFactory.newUnpooled();
 			ndb.encodeTo(record);
-			s = logWriter.addRecord(new UnpooledSlice(record)); // TODO: new DefaultSlice(record) -> record
+			s = logWriter.addRecord(SliceFactory.newUnpooled(record)); // TODO: new DefaultSlice(record) -> record
 			if (s.ok()) {
 				s = file.getValue().close();
 			}
@@ -885,7 +877,7 @@ public class DBImpl implements DB {
 
 		// Read all the records and add to a memtable
 		ByteBuf scratch = ByteBufFactory.newUnpooled(); // std::string scratch
-		Slice record = new UnpooledSlice();
+		Slice record = SliceFactory.newUnpooled();
 		WriteBatch batch = new WriteBatch();
 		int compactions = 0;
 		MemTable mem = null;
@@ -1163,27 +1155,16 @@ public class DBImpl implements DB {
 	 * EXCLUSIVE_LOCKS_REQUIRED(mutex)
 	 */
 	void maybeScheduleCompaction() {
-		// System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction start,
-		// manualCompaction="+manualCompaction);
 		mutex.assertHeld();
 		if (bgCompactionScheduled) {
 			// Already scheduled
-			System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: Already scheduled");
 		} else if (shuttingDown.get() != null) { // shutting_down_.Acquire_Load()
 			// DB is being deleted; no more background compactions
-			// System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: DB is being
-			// deleted; no more background compactions");
 		} else if (!bgError.ok()) {
 			// Already got an error; no more changes
-			// System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: Already got an
-			// error; no more changes, bgError="+bgError);
 		} else if (immtable == null && manualCompaction == null && !versions.needsCompaction()) {
 			// No work to be done
-			// System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: No work to be
-			// done");
 		} else {
-			// System.out.println("[DEBUG] DBImpl.maybeScheduleCompaction: env.schedule(new
-			// BgWorkRunnable())");
 			bgCompactionScheduled = true;
 			env.schedule(new BgWorkRunnable());
 		}
@@ -1201,10 +1182,8 @@ public class DBImpl implements DB {
 			assert (bgCompactionScheduled);
 			if (shuttingDown.get() != null) { // shutting_down_.Acquire_Load()
 				// No more background work when shutting down.
-				System.out.println("[DEBUG] DBImpl.backgroundCall: No more background work when shutting down.");
 			} else if (!bgError.ok()) {
 				// No more background work after a background error.
-				System.out.println("[DEBUG] DBImpl.backgroundCall: No more background work after a background error. bgError=" + bgError);
 			} else {
 				backgroundCompaction();
 			}
@@ -1359,14 +1338,10 @@ public class DBImpl implements DB {
 		if (s.ok())
 			compact.builder = new TableBuilder(options, compact.outFile);
 
-		System.out.printf("[DEBUG] openCompactionOutputFile, fname=%s\n", fname);
-
 		return s;
 	}
 
 	Status finishCompactionOutputFile(CompactionState compact, Iterator0 input) {
-		System.out.println("[DEBUG] finishCompactionOutputFile");
-
 		assert (compact != null);
 		assert (compact.outFile != null);
 		assert (compact.builder != null);
@@ -1479,7 +1454,6 @@ public class DBImpl implements DB {
 			Slice key = input.key();
 			if (compact.compaction.shouldStopBefore(key) && compact.builder != null) {
 				status = finishCompactionOutputFile(compact, input);
-				System.out.println("[DEBUG] doCompactionWork 1, status" + status);
 				if (!status.ok())
 					break;
 			}
@@ -1522,7 +1496,6 @@ public class DBImpl implements DB {
 					status = this.openCompactionOutputFile(compact);
 					if (!status.ok())
 						break;
-					System.out.printf("[DEBUG] doCompactionWork 1.1, status=%s, compact.builder=%s, compact.outputs.size=%d\n", status, compact.builder, compact.outputs.size());
 				}
 
 				if (compact.builder.numEntries() == 0) {
@@ -1531,19 +1504,13 @@ public class DBImpl implements DB {
 				}
 				compact.currentOutput().largest.decodeFrom(key);
 
-				// System.out.printf("[DEBUG] doCompactionWork 1.2\n");
-
 				compact.builder.add(key, input.value());
-
-				// System.out.printf("[DEBUG] doCompactionWork 1.3\n");
 
 				compact.currentOutput().numEntries++;
 
 				// Close output file if it is big enough
 				if (compact.builder.fileSize() >= compact.compaction.maxOutputFileSize()) {
-					System.out.printf("[DEBUG] doCompactionWork 1.4\n");
 					status = finishCompactionOutputFile(compact, input);
-
 					if (!status.ok())
 						break;
 				}
@@ -1551,8 +1518,6 @@ public class DBImpl implements DB {
 
 			input.next();
 		}
-
-		System.out.println("[DEBUG] doCompactionWork 2");
 
 		if (status.ok() && shuttingDown.get() != null) {
 			status = new Status(Status.Code.IOError, "Deleting DB during compaction");

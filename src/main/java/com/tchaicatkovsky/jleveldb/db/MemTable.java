@@ -27,10 +27,10 @@ import com.tchaicatkovsky.jleveldb.db.format.LookupKey;
 import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.ReferenceCounted;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class MemTable implements ReferenceCounted {
 	
@@ -50,11 +50,11 @@ public class MemTable implements ReferenceCounted {
 		}
 		
 		final public Slice internalKeySlice() {
-			return new UnpooledSlice(data, keyOffset, internalKeySize);
+			return SliceFactory.newUnpooled(data, keyOffset, internalKeySize);
 		}
 		
 		final public Slice value() {
-			return new UnpooledSlice(data, valueOffset, valueSize);
+			return SliceFactory.newUnpooled(data, valueOffset, valueSize);
 		}
 	}
 	
@@ -66,9 +66,6 @@ public class MemTable implements ReferenceCounted {
 		}
 		
 	    public int compare(Slice a, Slice b) {
-	    	// Internal keys are encoded as length-prefixed strings.
-	    	// Slice a = getLengthPrefixedSlice(adata, 0);
-	    	// Slice b = getLengthPrefixedSlice(bdata, 0);
 	    	return comparator.compare(a, b);
 	    }
 	}
@@ -224,7 +221,7 @@ public class MemTable implements ReferenceCounted {
 		
 		
 		KeyValueSlice kvs = new KeyValueSlice(data, keyOffset, internalKeySize, valueOffset, valueSize);
-		Slice keySlice = new UnpooledSlice(data, keyOffset, internalKeySize);
+		Slice keySlice = SliceFactory.newUnpooled(data, keyOffset, internalKeySize);
 	
 		table.put(keySlice, kvs);
 	}
@@ -247,9 +244,8 @@ public class MemTable implements ReferenceCounted {
 		iter.seek(memkey);
 		if (iter.valid()) {
 			Slice ikey = iter.key();
-		    //System.out.println("seek result: "+ikey);
 		    if (comparator.comparator.userComparator().compare(
-		    		new UnpooledSlice(ikey.data(), ikey.offset(), ikey.size()-8), 
+		    		SliceFactory.newUnpooled(ikey.data(), ikey.offset(), ikey.size()-8), 
 		    		key.userKey()) == 0) {
 		    	// Correct user key
 		    	ValueType vtype = DBFormat.extractValueType(ikey);
@@ -280,13 +276,13 @@ public class MemTable implements ReferenceCounted {
 	 */
 	static void EncodeKey(ByteBuf scratch, Slice target) {
 		scratch.clear();
-		scratch.writeVarNat32(target.size());
+		scratch.addVarNat32(target.size());
 		scratch.append(target.data(), target.size());
 	}
 	
 	
 	static Slice getLengthPrefixedSlice(byte[] data, int offset) {
-		Slice tmp = new UnpooledSlice(data, offset, 5);
+		Slice tmp = SliceFactory.newUnpooled(data, offset, 5);
 		int len = Coding.popVarNat32(tmp);  // +5: we assume "p" is not corrupted
 		offset = tmp.offset();
 		tmp.init(data, offset, len);

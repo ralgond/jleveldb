@@ -20,8 +20,8 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 /**
  * A comparator for internal keys that uses a specified comparator for the user
@@ -68,7 +68,7 @@ public class InternalKeyComparator extends Comparator0 {
 	 */
 	public void findShortestSeparator(ByteBuf start, Slice limit) {
 		// Attempt to shorten the user portion of the key
-		Slice userStart = DBFormat.extractUserKey(new UnpooledSlice(start));
+		Slice userStart = DBFormat.extractUserKey(SliceFactory.newUnpooled(start));
 		Slice userLimit = DBFormat.extractUserKey(limit);
 		ByteBuf tmp = ByteBufFactory.newUnpooled();
 		tmp.assign(userStart.data(), userStart.size());
@@ -76,7 +76,7 @@ public class InternalKeyComparator extends Comparator0 {
 		if (tmp.size() < userStart.size() && userComparator.compare(userStart, tmp) < 0) {
 			// User key has become shorter physically, but larger logically.
 			// Tack on the earliest possible number to the shortened user key.
-			tmp.writeFixedNat64(packSequenceAndType(DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek));
+			tmp.addFixedNat64(packSequenceAndType(DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek));
 			assert (this.compare(start, tmp) < 0);
 			assert (this.compare(tmp, limit) < 0);
 			start.swap(tmp);
@@ -87,14 +87,14 @@ public class InternalKeyComparator extends Comparator0 {
 	 * @param key [INPUT][OUTPUT]
 	 */
 	public void findShortSuccessor(ByteBuf key) {
-		Slice userKey = DBFormat.extractUserKey(new UnpooledSlice(key));
+		Slice userKey = DBFormat.extractUserKey(SliceFactory.newUnpooled(key));
 		ByteBuf tmp = ByteBufFactory.newUnpooled();
 		tmp.assign(userKey.data(), userKey.size());
 		userComparator.findShortSuccessor(tmp);
 		if (tmp.size() < userKey.size() && userComparator.compare(userKey, tmp) < 0) {
 			// User key has become shorter physically, but larger logically.
 			// Tack on the earliest possible number to the shortened user key.
-			tmp.writeFixedNat64(packSequenceAndType(DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek));
+			tmp.addFixedNat64(packSequenceAndType(DBFormat.kMaxSequenceNumber, DBFormat.kValueTypeForSeek));
 			assert (this.compare(key, tmp) < 0);
 			key.swap(tmp);
 		}

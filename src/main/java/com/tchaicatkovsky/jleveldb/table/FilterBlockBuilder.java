@@ -21,8 +21,8 @@ import java.util.ArrayList;
 import com.tchaicatkovsky.jleveldb.FilterPolicy;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class FilterBlockBuilder {
 	final public static int kFilterBaseLg = 11;
@@ -70,13 +70,13 @@ public class FilterBlockBuilder {
 		// Append array of per-filter offsets
 		int arrayOffset = result.size();
 		for (int i = 0; i < filterOffsets.size(); i++)
-			result.writeFixedNat32(filterOffsets.get(i));
+			result.addFixedNat32(filterOffsets.get(i));
 
-		result.writeFixedNat32(arrayOffset);
+		result.addFixedNat32(arrayOffset);
 
 		result.addByte((byte) (kFilterBaseLg & 0xff)); // Save encoding parameter in result
 
-		return new UnpooledSlice(result);
+		return SliceFactory.newUnpooled(result);
 	}
 
 	public void generateFilter() {
@@ -94,7 +94,7 @@ public class FilterBlockBuilder {
 			byte[] base = keys.data();
 			int baseOffset = start.get(i);
 			int length = start.get(i + 1) - start.get(i); // bytes
-			tmpKeys.add(new UnpooledSlice(base, baseOffset, length));
+			tmpKeys.add(SliceFactory.newUnpooled(base, baseOffset, length));
 		}
 
 		// Generate filter for current set of keys and append to result.

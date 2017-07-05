@@ -14,69 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.tchaicatkovsky.jleveldb;
+package com.tchaicatkovsky.jleveldb.util;
 
-import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
-import com.tchaicatkovsky.jleveldb.util.Slice;
-
-public class EmptyIterator0 extends Iterator0 {
-
-	Status status;
-
-	public EmptyIterator0(Status s) {
-		status = s;
-	}
-
-	@Override
-	public void delete() {
-		super.delete();
-	}
-
-	@Override
-	public boolean valid() {
-		return false;
-	}
-
-	@Override
-	public void seekToFirst() {
-
-	}
-
-	@Override
-	public void seekToLast() {
-
-	}
-
-	@Override
-	public void seek(Slice target) {
-
-	}
-
-	@Override
-	public void next() {
-		assert (false);
-	}
-
-	@Override
-	public void prev() {
-		assert (false);
-	}
-
-	@Override
-	public Slice key() {
-		assert (false);
+public class SliceFactory {
+	
+	public Slice newUnpooled() {
 		return new UnpooledSlice();
 	}
-
-	@Override
-	public Slice value() {
-		assert (false);
-		return new UnpooledSlice();
+	
+	public Slice newUnpooled(byte[] data, int offset, int size) {
+		UnpooledSlice s = new UnpooledSlice();
+		s.init(data, offset, size);
+		return s;
 	}
-
-	@Override
-	public Status status() {
-		return status;
-	}
-
 }

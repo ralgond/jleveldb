@@ -1,11 +1,4 @@
-package com.tchaicatkovsky.jleveldb.test;
-
-
-import com.tchaicatkovsky.jleveldb.util.ByteBuf;
-import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
-import com.tchaicatkovsky.jleveldb.util.Random0;
-import com.tchaicatkovsky.jleveldb.util.Slice;
+package com.tchaicatkovsky.jleveldb.util;
 
 public class TestUtil {
 	public static Slice randomString(Random0 rnd, int len, ByteBuf dst) {
@@ -13,7 +6,7 @@ public class TestUtil {
 		for (int i = 0; i < len; i++) {
 			dst.setByte(i, (byte)(0x20+rnd.uniform(95)));  // ' ' .. '~'
 		}
-		return new DefaultSlice(dst);
+		return new UnpooledSlice(dst);
 	}
 
 	public static ByteBuf randomKey(Random0 rnd, int len) {
@@ -25,7 +18,7 @@ public class TestUtil {
 			(byte)0xfd, (byte)0xfe, (byte)0xff
 		};
 		
-		ByteBuf result = ByteBufFactory.defaultByteBuf() ;
+		ByteBuf result = ByteBufFactory.newUnpooled() ;
 		for (int i = 0; i < len; i++) {
 			result.addByte(kTestChars[(int)rnd.uniform(kTestChars.length)]);;
 		}
@@ -38,7 +31,7 @@ public class TestUtil {
 		int raw = (int)(len * compressed_fraction);
 		if (raw < 1) 
 			raw = 1;
-		ByteBuf raw_data = ByteBufFactory.defaultByteBuf();
+		ByteBuf raw_data = ByteBufFactory.newUnpooled();
 		randomString(rnd, raw, raw_data);
 
 		// Duplicate the random data until we have filled "len" bytes
@@ -47,7 +40,7 @@ public class TestUtil {
 			dst.append(raw_data);
 		}
 		dst.resize(len);
-		return new DefaultSlice(dst);
+		return new UnpooledSlice(dst);
 	}
 	
 	public static String tmpDir() {

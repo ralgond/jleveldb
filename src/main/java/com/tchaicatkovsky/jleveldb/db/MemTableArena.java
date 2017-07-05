@@ -14,12 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.tchaicatkovsky.jleveldb.util;
+package com.tchaicatkovsky.jleveldb.db;
 
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class Arena {
+import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
+
+public class MemTableArena {
 	
 	// Allocation state
 	byte[] allocPtr;
@@ -32,7 +35,7 @@ public class Arena {
 	// Total memory usage of the arena.
 	AtomicLong memoryUsage;
 	  
-	public Arena() {
+	public MemTableArena() {
 		blocks = new ArrayList<byte[]>();
 		memoryUsage = new AtomicLong(0);
 	}
@@ -58,7 +61,7 @@ public class Arena {
 		    int oldAllocPtrOffset = allocPtrOffset;
 		    allocPtrOffset += bytes;
 		    allocBytesRemaining -= bytes;
-		    return new DefaultSlice(result, oldAllocPtrOffset, bytes);
+		    return new UnpooledSlice(result, oldAllocPtrOffset, bytes);
 		}
 		
 		return allocateFallback(bytes);
@@ -76,7 +79,7 @@ public class Arena {
 		    // Object is more than a quarter of our block size.  Allocate it separately
 		    // to avoid wasting too much space in leftover bytes.
 		    byte[] result = allocateNewBlock(bytes);
-		    return new DefaultSlice(result, 0, bytes);
+		    return new UnpooledSlice(result, 0, bytes);
 		}
 
 		// We waste the remaining space in the current block.
@@ -88,7 +91,7 @@ public class Arena {
 		allocPtrOffset += bytes;
 		allocBytesRemaining -= bytes;
 		
-		return new DefaultSlice(allocPtr, oldAllocPtrOffset, allocBytesRemaining);
+		return new UnpooledSlice(allocPtr, oldAllocPtrOffset, allocBytesRemaining);
 	}
 	
 	byte[] allocateNewBlock(int blockBytes) {

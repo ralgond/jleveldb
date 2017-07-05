@@ -18,29 +18,29 @@ package com.tchaicatkovsky.jleveldb.util;
 
 import java.nio.BufferUnderflowException;
 
-public class DefaultSlice implements Slice {
+public class UnpooledSlice implements Slice {
 	public byte[] data;
 	public int offset;
 	public int limit;
 	
-	public DefaultSlice() {
+	public UnpooledSlice() {
 		
 	}
 
-	public DefaultSlice(Slice s) {
+	public UnpooledSlice(Slice s) {
 		init(s);
 	}
 	
-	public DefaultSlice(String s) {
+	public UnpooledSlice(String s) {
 		byte[] b = s.getBytes();
 		init(b, 0, b.length);
 	}
 	
-	public DefaultSlice(ByteBuf buf) {
+	public UnpooledSlice(ByteBuf buf) {
 		init(buf);
 	}
 	
-	public DefaultSlice(byte[] data, int offset, int size) {
+	public UnpooledSlice(byte[] data, int offset, int size) {
 		init(data, offset, size);
 	}
 	
@@ -55,7 +55,7 @@ public class DefaultSlice implements Slice {
 		init(s.data(), s.offset(), s.size());
 	}
 	
-	public void init(DefaultSlice s) {
+	public void init(UnpooledSlice s) {
 		init(s.data(), s.offset(), s.size());
 	}
 	
@@ -123,7 +123,7 @@ public class DefaultSlice implements Slice {
 	
 	@Override
 	public Slice clone() {
-		return new DefaultSlice(this);
+		return new UnpooledSlice(this);
 	}
 	
 	@Override

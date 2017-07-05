@@ -17,22 +17,28 @@
 package com.tchaicatkovsky.jleveldb.util;
 
 public class ByteBufFactory {
-	public static ByteBuf defaultByteBuf() {
-		return new DefaultByteBuf();
+	public static ByteBuf newUnpooled() {
+		return new UnpooledByteBuf();
 	}
 	
-	public static ByteBuf defaultByteBuf(byte[] data, int size) {
-		return defaultByteBuf(data, 0, size);
+	public static ByteBuf newUnpooled(byte[] data, int size) {
+		return newUnpooled(data, 0, size);
 	}
 	
-	public static ByteBuf defaultByteBuf(byte[] data, int offset, int size) {
-		DefaultByteBuf ret = new DefaultByteBuf();
+	public static ByteBuf newUnpooled(byte[] data, int offset, int size) {
+		UnpooledByteBuf ret = new UnpooledByteBuf();
 		ret.assign(data, offset, size);
 		return ret;
 	}
 	
-	public static ByteBuf defaultByteBuf(String s) {
+	public static ByteBuf newUnpooled(Slice s) {
+		UnpooledByteBuf ret = new UnpooledByteBuf();
+		ret.assign(s.data(), s.offset(), s.size());
+		return ret;
+	}
+	
+	public static ByteBuf newUnpooled(String s) {
 		byte[] b = s.getBytes();
-		return defaultByteBuf(b, b.length);
+		return newUnpooled(b, b.length);
 	}
 }

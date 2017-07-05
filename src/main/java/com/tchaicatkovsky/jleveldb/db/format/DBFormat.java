@@ -18,7 +18,7 @@ package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class DBFormat {
@@ -75,7 +75,7 @@ public class DBFormat {
 	 */
 	final public static Slice extractUserKey(Slice internalKey) {
 		assert(internalKey.size() >= 8);
-		return new DefaultSlice(internalKey.data(), internalKey.offset(), internalKey.size() - 8);
+		return new UnpooledSlice(internalKey.data(), internalKey.offset(), internalKey.size() - 8);
 	}
 	
 	final public static ValueType extractValueType(Slice internalKey) {

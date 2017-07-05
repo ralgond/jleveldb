@@ -13,11 +13,12 @@ import com.tchaicatkovsky.jleveldb.WriteOptions;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Cache;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
 import static org.junit.Assert.assertTrue;
 
@@ -77,7 +78,7 @@ public class TestCorruption {
 		Slice Key(int i, ByteBuf storage) {
 		    String s = String.format("%016d", i);
 		    storage.assign(s);
-		    return new DefaultSlice(storage);
+		    return new UnpooledSlice(storage);
 		}
 
 		  // Return the value to associate with the specified key
@@ -87,8 +88,8 @@ public class TestCorruption {
 		}
 		
 		public void build(int n) throws Exception {
-		    ByteBuf key_space = ByteBufFactory.defaultByteBuf();
-		    ByteBuf value_space = ByteBufFactory.defaultByteBuf();
+		    ByteBuf key_space = ByteBufFactory.newUnpooled();
+		    ByteBuf value_space = ByteBufFactory.newUnpooled();
 		    
 		    WriteBatch batch = new WriteBatch();
 		    for (int i = 0; i < n; i++) {
@@ -112,7 +113,7 @@ public class TestCorruption {
 		    int bad_keys = 0;
 		    int bad_values = 0;
 		    int correct = 0;
-		    ByteBuf value_space = ByteBufFactory.defaultByteBuf(); 
+		    ByteBuf value_space = ByteBufFactory.newUnpooled(); 
 		    Iterator0 iter = db.newIterator(new ReadOptions());
 		    for (iter.seekToFirst(); iter.valid(); iter.next()) {
 		    	String ins = iter.key().encodeToString();

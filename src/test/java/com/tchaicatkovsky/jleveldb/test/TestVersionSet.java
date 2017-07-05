@@ -10,7 +10,7 @@ import com.tchaicatkovsky.jleveldb.db.format.InternalKey;
 import com.tchaicatkovsky.jleveldb.db.format.InternalKeyComparator;
 import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 import static org.junit.Assert.assertTrue;
@@ -34,21 +34,21 @@ public class TestVersionSet {
 		           long largest_seq) {
 		    FileMetaData f = new FileMetaData();
 		    f.number = files.size() + 1;
-		    f.smallest = new InternalKey(new DefaultSlice(smallest), smallest_seq, ValueType.Value);
-		    f.largest = new InternalKey(new DefaultSlice(largest), largest_seq, ValueType.Value);
+		    f.smallest = new InternalKey(new UnpooledSlice(smallest), smallest_seq, ValueType.Value);
+		    f.largest = new InternalKey(new UnpooledSlice(largest), largest_seq, ValueType.Value);
 		    files.add(f);
 		}
 		
 		public int find(String key) {
-		    InternalKey target = new InternalKey(new DefaultSlice(key), 100, ValueType.Value);
+		    InternalKey target = new InternalKey(new UnpooledSlice(key), 100, ValueType.Value);
 		    InternalKeyComparator cmp = new InternalKeyComparator(BytewiseComparatorImpl.getInstance());
 		    return VersionSetGlobal.findFile(cmp, files, target.encode());
 		}
 		
 		public boolean overlaps(String smallest, String largest) {
 		    InternalKeyComparator cmp = new InternalKeyComparator(BytewiseComparatorImpl.getInstance());
-		    Slice s = new DefaultSlice(smallest != null ? new DefaultSlice(smallest) : new DefaultSlice(""));
-		    Slice l = new DefaultSlice(largest != null ? new DefaultSlice(largest) : new DefaultSlice(""));
+		    Slice s = new UnpooledSlice(smallest != null ? new UnpooledSlice(smallest) : new UnpooledSlice(""));
+		    Slice l = new UnpooledSlice(largest != null ? new UnpooledSlice(largest) : new UnpooledSlice(""));
 		    return VersionSetGlobal.someFileOverlapsRange(cmp, disjointSortedFiles, files,
 		                                 (smallest != null ? s : null),
 		                                 (largest != null ? l : null));

@@ -48,8 +48,8 @@ public class DBIter extends Iterator0 {
 	long sequence;
 
 	Status status = Status.ok0();
-	ByteBuf savedKey = ByteBufFactory.defaultByteBuf();      // == current key when direction_==kReverse
-	ByteBuf savedValue = ByteBufFactory.defaultByteBuf();    // == current raw value when direction_==kReverse
+	ByteBuf savedKey = ByteBufFactory.newUnpooled();      // == current key when direction_==kReverse
+	ByteBuf savedValue = ByteBufFactory.newUnpooled();    // == current raw value when direction_==kReverse
 	Direction direction;
 	boolean valid;
 
@@ -162,7 +162,7 @@ public class DBIter extends Iterator0 {
 					} else {
 						Slice rawValue = iter.value();
 						if (savedValue.capacity() > rawValue.size() + 1048576) {
-							ByteBuf empty = ByteBufFactory.defaultByteBuf();
+							ByteBuf empty = ByteBufFactory.newUnpooled();
 							empty.swap(savedValue); //swap(empty, savedValue); //TODO: logic? something trick of swap
 						}
 						saveKey(DBFormat.extractUserKey(iter.key()), savedKey);
@@ -191,7 +191,7 @@ public class DBIter extends Iterator0 {
 
 	final void clearSavedValue() {
 	    if (savedValue.capacity() > 1048576) {
-	    	ByteBuf empty = ByteBufFactory.defaultByteBuf();
+	    	ByteBuf empty = ByteBufFactory.newUnpooled();
 	    	empty.swap(savedValue); //swap(empty, savedValue); //TODO: logic? something trick of swap
 	    } else {
 	    	savedValue.clear();

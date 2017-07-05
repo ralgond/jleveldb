@@ -26,7 +26,7 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Crc32C;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
 import com.tchaicatkovsky.jleveldb.util.Strings;
@@ -60,7 +60,7 @@ public class TableBuilder {
 		boolean pendingIndexEntry;
 		BlockHandle pendingHandle = new BlockHandle(); // Handle to add to index block
 
-		ByteBuf compressedOutput = ByteBufFactory.defaultByteBuf();
+		ByteBuf compressedOutput = ByteBufFactory.newUnpooled();
 
 		public Rep(Options opt, WritableFile f) {
 			options = opt.cloneOptions();
@@ -69,7 +69,7 @@ public class TableBuilder {
 			offset = 0;
 			dataBlockBuilder = new BlockBuilder(options);
 			indexBlockBuilder = new BlockBuilder(indexBlockBuilderOptions);
-			lastKey = ByteBufFactory.defaultByteBuf();
+			lastKey = ByteBufFactory.newUnpooled();
 			numEntries = 0;
 			closed = false;
 			filterBlockBuilder = opt.filterPolicy == null ? null : new FilterBlockBuilder(opt.filterPolicy);
@@ -144,9 +144,9 @@ public class TableBuilder {
 		if (r.pendingIndexEntry) {
 			assert (r.dataBlockBuilder.empty());
 			r.options.comparator.findShortestSeparator(r.lastKey, key);
-			ByteBuf handleEncoding = ByteBufFactory.defaultByteBuf();
+			ByteBuf handleEncoding = ByteBufFactory.newUnpooled();
 			r.pendingHandle.encodeTo(handleEncoding);
-			r.indexBlockBuilder.add(new DefaultSlice(r.lastKey), new DefaultSlice(handleEncoding)); // TODO: new DefaultSlice(r.lastKey)->r.lastKey
+			r.indexBlockBuilder.add(new UnpooledSlice(r.lastKey), new UnpooledSlice(handleEncoding)); // TODO: new DefaultSlice(r.lastKey)->r.lastKey
 			r.pendingIndexEntry = false;
 		}
 		
@@ -213,9 +213,9 @@ public class TableBuilder {
 				// Add mapping from "filter.Name" to location of filter data
 				String key = "filter." + r.options.filterPolicy.name();
 
-				ByteBuf handleEncoding = ByteBufFactory.defaultByteBuf();
+				ByteBuf handleEncoding = ByteBufFactory.newUnpooled();
 				filterBlockHandle.encodeTo(handleEncoding);
-				metaIndexBlockBuilder.add(new DefaultSlice(key), new DefaultSlice(handleEncoding));
+				metaIndexBlockBuilder.add(new UnpooledSlice(key), new UnpooledSlice(handleEncoding));
 			}
 
 			// TODO(postrelease): Add stats and other meta blocks
@@ -227,9 +227,9 @@ public class TableBuilder {
 			if (r.pendingIndexEntry) {
 				assert (r.dataBlockBuilder.empty());
 				r.options.comparator.findShortSuccessor(r.lastKey);
-				ByteBuf handleEncoding = ByteBufFactory.defaultByteBuf();
+				ByteBuf handleEncoding = ByteBufFactory.newUnpooled();
 				r.pendingHandle.encodeTo(handleEncoding);
-				r.indexBlockBuilder.add(new DefaultSlice(r.lastKey), new DefaultSlice(handleEncoding)); // TODO
+				r.indexBlockBuilder.add(new UnpooledSlice(r.lastKey), new UnpooledSlice(handleEncoding)); // TODO
 				r.pendingIndexEntry = false;
 			}
 			writeBlock(r.indexBlockBuilder, indexBlockHandle);
@@ -240,9 +240,9 @@ public class TableBuilder {
 			Footer footer = new Footer();
 			footer.setMetaindexHandle(metaindexBlockHandle);
 			footer.setIndexHandle(indexBlockHandle);
-			ByteBuf footerEncoding = ByteBufFactory.defaultByteBuf();
+			ByteBuf footerEncoding = ByteBufFactory.newUnpooled();
 			footer.encodeTo(footerEncoding);
-			r.status = r.file.append(new DefaultSlice(footerEncoding)); // TODO
+			r.status = r.file.append(new UnpooledSlice(footerEncoding)); // TODO
 			if (r.status.ok()) {
 				r.offset += footerEncoding.size();
 			}
@@ -281,7 +281,7 @@ public class TableBuilder {
 		Rep r = rep;
 		Slice raw = block.finish();
 
-		Slice blockContents = new DefaultSlice();
+		Slice blockContents = new UnpooledSlice();
 		CompressionType type = r.options.compression;
 
 		// TODO(postrelease): Support more compression options: zlib?
@@ -325,7 +325,7 @@ public class TableBuilder {
 			chksum.update(trailer, 0, 1);
 			long crc = chksum.getValue();
 			Coding.encodeFixedNat32Long(trailer, 1, 5, Crc32C.mask(crc));
-			r.status = r.file.append(new DefaultSlice(trailer, 0, Format.kBlockTrailerSize));
+			r.status = r.file.append(new UnpooledSlice(trailer, 0, Format.kBlockTrailerSize));
 			if (r.status.ok()) {
 				r.offset += blockContents.size() + Format.kBlockTrailerSize;
 			}

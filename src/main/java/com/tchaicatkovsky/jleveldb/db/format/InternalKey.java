@@ -18,7 +18,7 @@ package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
@@ -31,7 +31,7 @@ public class InternalKey {
 	ByteBuf rep;
 	
 	public InternalKey() {
-		rep = ByteBufFactory.defaultByteBuf();
+		rep = ByteBufFactory.newUnpooled();
 	}
 	
 	public ByteBuf rep() {
@@ -57,11 +57,11 @@ public class InternalKey {
 	}
 	
 	public Slice encode() {
-		return new DefaultSlice(rep);
+		return new UnpooledSlice(rep);
 	}
 	
 	public Slice userKey() {
-		return DBFormat.extractUserKey(new DefaultSlice(rep));
+		return DBFormat.extractUserKey(new UnpooledSlice(rep));
 	}
 	
 	public void setFrom(ParsedInternalKey p) {
@@ -85,7 +85,7 @@ public class InternalKey {
 	public String debugString() {
 		String result;
 		ParsedInternalKey parsed = new ParsedInternalKey();
-		if (parsed.parse(new DefaultSlice(rep))) {
+		if (parsed.parse(new UnpooledSlice(rep))) {
 			result = parsed.debugString();
 		} else {
 		    result = "(bad)";

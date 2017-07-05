@@ -16,7 +16,7 @@
  */
 package com.tchaicatkovsky.jleveldb;
 
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 
@@ -182,7 +182,7 @@ public class FileName {
 		assert (manifest.startsWith(dbname + "/"));
 		String contents = manifest.substring(dbname.length() + 1);
 		String tmp = getTempFileName(dbname, descriptorNumber);
-		Status s = env.writeStringToFileSync(new DefaultSlice(contents + "\n"), tmp);
+		Status s = env.writeStringToFileSync(new UnpooledSlice(contents + "\n"), tmp);
 		if (s.ok()) {
 			s = env.renameFile(tmp, getCurrentFileName(dbname));
 		}

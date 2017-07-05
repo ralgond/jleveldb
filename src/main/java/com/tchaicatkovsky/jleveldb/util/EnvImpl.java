@@ -25,6 +25,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.SyncFailedException;
+import java.lang.management.ManagementFactory;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -664,6 +665,21 @@ public class EnvImpl implements Env {
 	@Override
 	public Status newLogger(String fname, Object0<Logger0> logger) {
 		logger.setValue(new Logger0Impl());
+		return Status.ok0();
+	}
+
+	static int getPid() {
+		String name = ManagementFactory.getRuntimeMXBean().getName();  
+		System.out.println(name);  
+		// get pid  
+		String pid = name.split("@")[0];
+		return Integer.parseInt(pid);
+	}
+	
+	@Override
+	public Status getTestDirectory(Object0<String> path) {
+		path.setValue(String.format("./testdir/leveldbtest-%d", getPid()));
+		createDir(path.getValue());
 		return Status.ok0();
 	}
 

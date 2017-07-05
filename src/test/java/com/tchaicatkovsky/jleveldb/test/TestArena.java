@@ -6,7 +6,7 @@ import java.util.ArrayList;
 
 import org.junit.Test;
 
-import com.tchaicatkovsky.jleveldb.util.Arena;
+import com.tchaicatkovsky.jleveldb.db.MemTableArena;
 import com.tchaicatkovsky.jleveldb.util.IntObjectPair;
 import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
@@ -14,14 +14,14 @@ import com.tchaicatkovsky.jleveldb.util.Slice;
 public class TestArena {
 	@Test
 	public void testEmpty() {
-		Arena a = new Arena();
+		MemTableArena a = new MemTableArena();
 		a.delete();
 	}
 	
 	@Test
 	public void testSimple() {
 		ArrayList<IntObjectPair<Slice>> allocated = new ArrayList<>();
-		Arena arena = new Arena();
+		MemTableArena arena = new MemTableArena();
 		final int N = 100000;
 		int bytes = 0;
 		Random0 rnd = new Random0(301);

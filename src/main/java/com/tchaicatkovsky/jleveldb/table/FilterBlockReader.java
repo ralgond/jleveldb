@@ -18,7 +18,7 @@ package com.tchaicatkovsky.jleveldb.table;
 
 import com.tchaicatkovsky.jleveldb.FilterPolicy;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class FilterBlockReader {
@@ -85,7 +85,7 @@ public class FilterBlockReader {
 		    int limit = Coding.decodeFixedNat32(data, (int)(end + index * 4 + 4));
 		    		    
 		    if (start <= limit && limit <= (end - begin)) {
-		    	Slice filter = new DefaultSlice(data, begin + start, limit - start);
+		    	Slice filter = new UnpooledSlice(data, begin + start, limit - start);
 		    	
 		    	return policy.keyMayMatch(key, filter);
 		    } else if (start == limit) {

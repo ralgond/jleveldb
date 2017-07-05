@@ -18,7 +18,7 @@ package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 /**
@@ -40,7 +40,7 @@ public class LookupKey {
     long sequence;
     
 	public LookupKey(Slice userKey, long sequence) {
-		ByteBuf buf = ByteBufFactory.defaultByteBuf(); //TODO(optimize): reduce the frequency of memory allocation.
+		ByteBuf buf = ByteBufFactory.newUnpooled(); //TODO(optimize): reduce the frequency of memory allocation.
 		buf.require(1);
 		
 		start = 0;
@@ -65,7 +65,7 @@ public class LookupKey {
 	 * @return
 	 */
 	public Slice internalKey() { 
-		return new DefaultSlice(data, kstart, end - kstart); 
+		return new UnpooledSlice(data, kstart, end - kstart); 
 	}
 	
 	/**
@@ -73,7 +73,7 @@ public class LookupKey {
 	 * @return
 	 */
 	public Slice userKey() { 
-		return new DefaultSlice(data, kstart, end - kstart - 8); 
+		return new UnpooledSlice(data, kstart, end - kstart - 8); 
 	}
 	
 	

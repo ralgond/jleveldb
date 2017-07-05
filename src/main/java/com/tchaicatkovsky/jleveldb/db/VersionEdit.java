@@ -26,7 +26,7 @@ import com.tchaicatkovsky.jleveldb.db.format.DBFormat;
 import com.tchaicatkovsky.jleveldb.db.format.InternalKey;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.IntLongPair;
 import com.tchaicatkovsky.jleveldb.util.IntObjectPair;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
@@ -156,7 +156,7 @@ public class VersionEdit {
 	public void encodeTo(ByteBuf dst) {
 		if (hasComparator) {
 			dst.writeVarNat32(Tag.kComparator.getValue());
-		    dst.writeLengthPrefixedSlice(new DefaultSlice(comparator));
+		    dst.writeLengthPrefixedSlice(new UnpooledSlice(comparator));
 		}
 		
 		if (hasLogNumber) {
@@ -212,7 +212,7 @@ public class VersionEdit {
 		int level;
 		long number;
 		
-		Slice str = new DefaultSlice();
+		Slice str = new UnpooledSlice();
 		
 		Integer0 result0 = new Integer0();
 		
@@ -370,7 +370,7 @@ public class VersionEdit {
 	}
 	
 	static boolean getInternalKey(Slice input, InternalKey dst) {
-		Slice str = new DefaultSlice();
+		Slice str = new UnpooledSlice();
 		if (Coding.popLengthPrefixedSlice(input, str)) {
 		    dst.decodeFrom(str);
 		    return true;

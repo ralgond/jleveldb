@@ -19,10 +19,11 @@ import com.tchaicatkovsky.jleveldb.db.LogWriter;
 import com.tchaicatkovsky.jleveldb.db.WriteBatchInternal;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -110,15 +111,15 @@ public class TestRecovery {
 		}
 		
 		public Status put(String k, String v) throws Exception {
-		    return db.put(WriteOptions.defaultOne(), new DefaultSlice(k), new DefaultSlice(v));
+		    return db.put(WriteOptions.defaultOne(), new UnpooledSlice(k), new UnpooledSlice(v));
 		}
 		
 		public Status put(ByteBuf k, ByteBuf v) throws Exception {
-		    return db.put(WriteOptions.defaultOne(), new DefaultSlice(k), new DefaultSlice(v));
+		    return db.put(WriteOptions.defaultOne(), new UnpooledSlice(k), new UnpooledSlice(v));
 		}
 		
 		public ByteBuf get(Slice k, Snapshot snapshot) throws Exception {
-		    ByteBuf result = ByteBufFactory.defaultByteBuf();
+		    ByteBuf result = ByteBufFactory.newUnpooled();
 		    Status s = db.get(new ReadOptions(), k, result);
 		    if (s.isNotFound()) {
 		    	result.assign("NOT_FOUND");
@@ -133,11 +134,11 @@ public class TestRecovery {
 		}
 		
 		public ByteBuf get(String s) throws Exception {
-			return get(new DefaultSlice(s), null);
+			return get(new UnpooledSlice(s), null);
 		}
 		
 		String manifestFileName() {
-			ByteBuf current = ByteBufFactory.defaultByteBuf();
+			ByteBuf current = ByteBufFactory.newUnpooled();
 			Status s = env.readFileToString(FileName.getCurrentFileName(dbname), current);
 			assertTrue(s.ok());
 			int len = current.size();
@@ -287,13 +288,13 @@ public class TestRecovery {
 			long len = r.fileSize(old_manifest);
 			Object0<WritableFile> file0 = new Object0<>();
 			assertTrue(r.env.newAppendableFile(old_manifest, file0).ok());
-			ByteBuf zeroes = ByteBufFactory.defaultByteBuf();
+			ByteBuf zeroes = ByteBufFactory.newUnpooled();
 			    
 			for (int i = 0; i < (long)(3*1048576) - len; i++) {
 				zeroes.addByte((byte)0);
 			}
 			    
-			assertTrue(file0.getValue().append(new DefaultSlice(zeroes)).ok());
+			assertTrue(file0.getValue().append(new UnpooledSlice(zeroes)).ok());
 			assertTrue(file0.getValue().flush().ok());
 			file0.getValue().delete();
 		}
@@ -405,9 +406,9 @@ public class TestRecovery {
 		
 		// Make a bunch of uncompacted log files.
 		long oldLog = r.firstLogFile();
-		r.makeLogFile(oldLog+1, 1000, new DefaultSlice("hello"), new DefaultSlice("world"));
-		r.makeLogFile(oldLog+2, 1001, new DefaultSlice("hi"), new DefaultSlice("there"));
-		r.makeLogFile(oldLog+3, 1002, new DefaultSlice("foo"), new DefaultSlice("bar2"));
+		r.makeLogFile(oldLog+1, 1000, new UnpooledSlice("hello"), new UnpooledSlice("world"));
+		r.makeLogFile(oldLog+2, 1001, new UnpooledSlice("hi"), new UnpooledSlice("there"));
+		r.makeLogFile(oldLog+3, 1002, new UnpooledSlice("foo"), new UnpooledSlice("bar2"));
 
 		
 		// Recover and check that all log files were processed.
@@ -435,7 +436,7 @@ public class TestRecovery {
 
 		// Check that introducing an older log file does not cause it to be re-read.
 		r.close();
-		r.makeLogFile(oldLog+1, 2000, new DefaultSlice("hello"), new DefaultSlice("stale write"));
+		r.makeLogFile(oldLog+1, 2000, new UnpooledSlice("hello"), new UnpooledSlice("stale write"));
 		r.open();
 		assertTrue(1 <= r.numTables());
 		assertEquals(1, r.numLogs());

@@ -26,7 +26,7 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.table.Table;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
@@ -158,7 +158,7 @@ public class TableCache {
 	public void evict(long fileNumber) {
 		byte buf[] = new byte[kUint64Size];
 		Coding.encodeFixedNat64(buf, 0, fileNumber);
-		cache.erase(new DefaultSlice(buf, 0, kUint64Size));
+		cache.erase(new UnpooledSlice(buf, 0, kUint64Size));
 	}
 
 	Env env;
@@ -174,7 +174,7 @@ public class TableCache {
 		Status s = Status.ok0();
 		byte buf[] = new byte[kUint64Size];
 		Coding.encodeFixedNat64(buf, 0, fileNumber);
-		Slice key = new DefaultSlice(buf, 0, kUint64Size);
+		Slice key = new UnpooledSlice(buf, 0, kUint64Size);
 		handle.setValue(cache.lookup(key)); // Find the TableAndFile from cache
 
 		if (handle.getValue() == null) {

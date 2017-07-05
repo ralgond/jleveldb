@@ -58,7 +58,7 @@ import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.CondVar;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Mutex;
@@ -599,9 +599,9 @@ public class DBImpl implements DB {
 
 		{
 			LogWriter logWriter = new LogWriter(file.getValue());
-			ByteBuf record = ByteBufFactory.defaultByteBuf();
+			ByteBuf record = ByteBufFactory.newUnpooled();
 			ndb.encodeTo(record);
-			s = logWriter.addRecord(new DefaultSlice(record)); // TODO: new DefaultSlice(record) -> record
+			s = logWriter.addRecord(new UnpooledSlice(record)); // TODO: new DefaultSlice(record) -> record
 			if (s.ok()) {
 				s = file.getValue().close();
 			}
@@ -884,8 +884,8 @@ public class DBImpl implements DB {
 		Logger0.log0(options.infoLog, "Recovering log #{}", logNumber);
 
 		// Read all the records and add to a memtable
-		ByteBuf scratch = ByteBufFactory.defaultByteBuf(); // std::string scratch
-		Slice record = new DefaultSlice();
+		ByteBuf scratch = ByteBufFactory.newUnpooled(); // std::string scratch
+		Slice record = new UnpooledSlice();
 		WriteBatch batch = new WriteBatch();
 		int compactions = 0;
 		MemTable mem = null;
@@ -1456,7 +1456,7 @@ public class DBImpl implements DB {
 
 		Status status = Status.ok0();
 		ParsedInternalKey ikey = new ParsedInternalKey();
-		ByteBuf currentUserKey = ByteBufFactory.defaultByteBuf();
+		ByteBuf currentUserKey = ByteBufFactory.newUnpooled();
 		boolean hasCurrentUserKey = false;
 		long lastSequenceForKey = DBFormat.kMaxSequenceNumber;
 

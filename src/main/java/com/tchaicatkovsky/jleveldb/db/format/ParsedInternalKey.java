@@ -17,7 +17,7 @@
 package com.tchaicatkovsky.jleveldb.db.format;
 
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
@@ -69,7 +69,7 @@ public class ParsedInternalKey {
 		} else {
 			return false;
 		}
-	    userKey = new DefaultSlice(internalKey.data(), internalKey.offset(), n - 8);
+	    userKey = new UnpooledSlice(internalKey.data(), internalKey.offset(), n - 8);
 	    
 	    return true;
 	}

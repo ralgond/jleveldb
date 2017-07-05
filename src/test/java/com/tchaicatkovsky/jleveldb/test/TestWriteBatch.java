@@ -12,7 +12,7 @@ import com.tchaicatkovsky.jleveldb.db.WriteBatchInternal;
 import com.tchaicatkovsky.jleveldb.db.format.InternalKeyComparator;
 import com.tchaicatkovsky.jleveldb.db.format.ParsedInternalKey;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class TestWriteBatch {
@@ -71,9 +71,9 @@ public class TestWriteBatch {
 	@Test
 	public void testMultiple() {
 		WriteBatch batch = new WriteBatch();
-		batch.put(new DefaultSlice("foo"), new DefaultSlice("bar"));
-		batch.delete(new DefaultSlice("box"));
-		batch.put(new DefaultSlice("baz"), new DefaultSlice("boo"));
+		batch.put(new UnpooledSlice("foo"), new UnpooledSlice("bar"));
+		batch.delete(new UnpooledSlice("box"));
+		batch.put(new UnpooledSlice("baz"), new UnpooledSlice("boo"));
 		WriteBatchInternal.setSequence(batch, 100);
 		assertEquals(100, WriteBatchInternal.sequence(batch));
 		assertEquals(3, WriteBatchInternal.count(batch));
@@ -84,11 +84,11 @@ public class TestWriteBatch {
 	@Test
 	public void testCorruption() {
 		WriteBatch batch = new WriteBatch();
-		batch.put(new DefaultSlice("foo"), new DefaultSlice("bar"));
-		batch.delete(new DefaultSlice("box"));
+		batch.put(new UnpooledSlice("foo"), new UnpooledSlice("bar"));
+		batch.delete(new UnpooledSlice("box"));
 		WriteBatchInternal.setSequence(batch, 200);
 		Slice contents = WriteBatchInternal.contents(batch);
-		WriteBatchInternal.setContents(batch, new DefaultSlice(contents.data(), contents.offset(), contents.size() - 1));
+		WriteBatchInternal.setContents(batch, new UnpooledSlice(contents.data(), contents.offset(), contents.size() - 1));
 		assertEquals("Put(foo, bar)@200ParseError()", printContents(batch));
 	}
 
@@ -101,14 +101,14 @@ public class TestWriteBatch {
 		WriteBatchInternal.setSequence(b2, 300);
 		WriteBatchInternal.append(b1, b2);
 		assertEquals("", printContents(b1));
-		b2.put(new DefaultSlice("a"), new DefaultSlice("va"));
+		b2.put(new UnpooledSlice("a"), new UnpooledSlice("va"));
 		WriteBatchInternal.append(b1, b2);
 		assertEquals("Put(a, va)@200", printContents(b1));
 		b2.clear();
-		b2.put(new DefaultSlice("b"), new DefaultSlice("vb"));
+		b2.put(new UnpooledSlice("b"), new UnpooledSlice("vb"));
 		WriteBatchInternal.append(b1, b2);
 		assertEquals("Put(a, va)@200Put(b, vb)@201", printContents(b1));
-		b2.delete(new DefaultSlice("foo"));
+		b2.delete(new UnpooledSlice("foo"));
 		WriteBatchInternal.append(b1, b2);
 		assertEquals("Put(a, va)@200" + "Put(b, vb)@202" + "Put(b, vb)@201" + "Delete(foo)@203", printContents(b1));
 	}

@@ -21,7 +21,7 @@ import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class WriteBatch {
@@ -70,7 +70,7 @@ public class WriteBatch {
 	}
 	
 	public Status iterate(Handler handler) {
-		Slice input = new DefaultSlice(rep);
+		Slice input = new UnpooledSlice(rep);
 		if (input.size() < WriteBatchInternal.kHEADER) {
 			return Status.corruption("malformed WriteBatch (too small)");
 		}
@@ -78,8 +78,8 @@ public class WriteBatch {
 		input.removePrefix(WriteBatchInternal.kHEADER);
 		
 		
-		Slice key = new DefaultSlice();
-		Slice value = new DefaultSlice();
+		Slice key = new UnpooledSlice();
+		Slice value = new UnpooledSlice();
 		int found = 0;
 		while (!input.empty()) {
 			found++;
@@ -113,5 +113,5 @@ public class WriteBatch {
 		}
 	}
 
-	public ByteBuf rep = ByteBufFactory.defaultByteBuf();
+	public ByteBuf rep = ByteBufFactory.newUnpooled();
 }

@@ -120,6 +120,11 @@ public class EnvWrapper implements Env {
 	}
 
 	@Override
+	public Status getTestDirectory(Object0<String> path) {
+		return target.getTestDirectory(path);
+	}
+	
+	@Override
 	public long nowMillis() {
 		return target.nowMillis();
 	}

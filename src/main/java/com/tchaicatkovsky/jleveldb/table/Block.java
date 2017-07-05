@@ -24,7 +24,7 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Strings;
@@ -111,8 +111,8 @@ public class Block {
 			
 			this.current = restartsOffset;
 			this.restartIndex = numRestarts;
-			key = ByteBufFactory.defaultByteBuf();
-			value = new DefaultSlice(data, dataOffset, 0);
+			key = ByteBufFactory.newUnpooled();
+			value = new UnpooledSlice(data, dataOffset, 0);
 			assert(this.numRestarts > 0);
 			this.status = Status.ok0();
 		}
@@ -155,7 +155,7 @@ public class Block {
 
 		    // parseNextKey() starts at the end of value, so set value accordingly
 		    int offset = getRestartPoint(index);
-		    value = new DefaultSlice(data, offset, 0);
+		    value = new UnpooledSlice(data, offset, 0);
 		}
 		
 		public boolean valid() {
@@ -206,8 +206,8 @@ public class Block {
 		    Integer0 shared = new Integer0();
 		    Integer0 nonShared = new Integer0();
 		    Integer0 valueLength = new Integer0();
-		    Slice slice = new DefaultSlice();
-		    Slice midKey = new DefaultSlice();
+		    Slice slice = new UnpooledSlice();
+		    Slice midKey = new UnpooledSlice();
 		    while (left < right) {
 		    	int mid = (left + right + 1) / 2;
 		    	int regionOffset = getRestartPoint(mid);
@@ -276,7 +276,7 @@ public class Block {
 		
 		public Slice key() {
 			assert(valid());
-		    return new DefaultSlice(key);
+		    return new UnpooledSlice(key);
 		}
 		
 		public Slice value() {
@@ -306,7 +306,7 @@ public class Block {
 		    	return false;
 		    }
 		    
-		    Slice slice = new DefaultSlice(data, current, restartsOffset - current);
+		    Slice slice = new UnpooledSlice(data, current, restartsOffset - current);
 		    
 		    // Decode next entry
 		    Integer0 shared = new Integer0();
@@ -321,7 +321,7 @@ public class Block {
 		    } else {
 		    	key.resize(shared.getValue());
 		    	key.append(slice.data(), slice.offset(), nonShared.getValue());
-		    	value = new DefaultSlice(slice.data(), slice.offset()+nonShared.getValue(), valueLength.getValue());
+		    	value = new UnpooledSlice(slice.data(), slice.offset()+nonShared.getValue(), valueLength.getValue());
 
 		    	while (restartIndex + 1 < numRestarts &&
 		                getRestartPoint(restartIndex + 1) < current) {

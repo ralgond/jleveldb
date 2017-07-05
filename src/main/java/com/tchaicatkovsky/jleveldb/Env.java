@@ -155,18 +155,36 @@ public interface Env {
 	 */
 	Status unlockFile(FileLock0 lock);
 
-	// Arrange to run "(*function)(arg)" once in a background thread.
-	//
-	// "function" may run in an unspecified thread. Multiple functions
-	// added to the same Env may run concurrently in different threads.
-	// I.e., the caller may not assume that background work items are
-	// serialized.
+	/**
+	 * Arrange to run r once in a background thread.</br></br>
+	 * 
+	 * r may run in an unspecified thread. Multiple functions
+	 * added to the same Env may run concurrently in different threads.
+	 * I.e., the caller may not assume that background work items are
+	 * serialized.
+	 * 
+	 * @param r
+	 */
 	void schedule(Runnable r);
 
-	// Start a new thread, invoking "function(arg)" within the new thread.
-	// When "function(arg)" returns, the thread will be destroyed.
+	/**
+	 * Start a new thread.
+	 * 
+	 * @param runnable
+	 */
 	void startThread(Runnable runnable);
 
+	/**
+	 * path is set to a temporary directory that can be used for testing. It may
+	 * or many not have just been created. The directory may or may not differ
+	 * between runs of the same process, but subsequent calls will return the
+	 * same directory.
+	 * 
+	 * @param path [OUTPUT]
+	 * @return
+	 */
+	Status getTestDirectory(Object0<String> path);
+	
 	/**
 	 * Create and return a log file for storing informational messages.
 	 * 
@@ -210,4 +228,6 @@ public interface Env {
 	 * @return
 	 */
 	Status readFileToString(String fname, ByteBuf data);
+	
+	
 }

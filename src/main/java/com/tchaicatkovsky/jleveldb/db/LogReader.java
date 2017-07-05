@@ -21,7 +21,7 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Crc32C;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class LogReader {
@@ -110,7 +110,7 @@ public class LogReader {
 		this.checksum = checksum;
 		
 		backingStore = new byte[LogFormat.kBlockSize];
-		buffer = new DefaultSlice();
+		buffer = new UnpooledSlice();
 		eof = false;
 		lastRecordOffset = 0;
 		endOfBufferOffset = 0;
@@ -144,7 +144,7 @@ public class LogReader {
 		// 0 is a dummy value to make compilers happy
 		long prospectiveRecordOffset = 0;
 
-		Slice fragment = new DefaultSlice();
+		Slice fragment = new UnpooledSlice();
 		while (true) {
 			int recordType = readPhysicalRecord(fragment);
 			

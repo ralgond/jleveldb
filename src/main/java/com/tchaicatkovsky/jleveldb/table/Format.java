@@ -23,7 +23,7 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Crc32C;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
@@ -177,7 +177,7 @@ public class Format {
             ReadOptions options,
             BlockHandle handle,
             BlockContents result) {
-		result.data = new DefaultSlice();
+		result.data = new UnpooledSlice();
 		result.cachable = false;
 		result.heapAllocated = false;
 		
@@ -185,7 +185,7 @@ public class Format {
 		// See table_builder.cc for the code that built this structure.
 		int n = (int)handle.size();
 		byte[] buf = new byte[n + kBlockTrailerSize];
-		Slice contents = new DefaultSlice();
+		Slice contents = new UnpooledSlice();
 		Status s = file.read(handle.offset(), n + kBlockTrailerSize, contents, buf);
 		if (!s.ok()) {
 		    buf = null;
@@ -215,11 +215,11 @@ public class Format {
     			// Use it directly under the assumption that it will be live
     			// while the file is open.
     			buf = null;
-    			result.data = new DefaultSlice(data, offset, n);
+    			result.data = new UnpooledSlice(data, offset, n);
     			result.heapAllocated = false;
     			result.cachable = false;  // Do not double-cache
     		} else {
-    			result.data = new DefaultSlice(buf, 0, n);
+    			result.data = new UnpooledSlice(buf, 0, n);
     			result.heapAllocated = true;
     			result.cachable = true;
     		}
@@ -237,7 +237,7 @@ public class Format {
 	    		return Status.corruption("corrupted compressed block contents");
 	    	}
 	    	buf = null;
-	    	result.data = new DefaultSlice(ubuf, 0, ulength);
+	    	result.data = new UnpooledSlice(ubuf, 0, ulength);
 	    	result.heapAllocated = true;
 	    	result.cachable = true;
 		} else {

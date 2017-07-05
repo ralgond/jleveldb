@@ -36,7 +36,8 @@ import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.ReferenceCounted;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Strings;
 
@@ -46,7 +47,7 @@ import com.tchaicatkovsky.jleveldb.util.Strings;
  * 
  * @author Teng Huang ht201509@163.com
  */
-public class Version {
+public class Version implements ReferenceCounted {
 
 	public interface CallBack {
 		public boolean run(Object arg, int level, FileMetaData meta);
@@ -392,8 +393,8 @@ public class Version {
 		assert (level >= 0);
 		assert (level < DBFormat.kNumLevels);
 		inputs.clear();
-		Slice userBegin = new DefaultSlice();
-		Slice userEnd = new DefaultSlice();
+		Slice userBegin = new UnpooledSlice();
+		Slice userEnd = new UnpooledSlice();
 		if (begin != null) {
 			userBegin = begin.userKey();
 		}
@@ -539,7 +540,7 @@ public class Version {
 		final int level;
 		// Backing store for value(). Holds the file number and size.
 		byte[] valueBuf = new byte[16];
-		Slice value0 = new DefaultSlice(valueBuf, 0, valueBuf.length);
+		Slice value0 = new UnpooledSlice(valueBuf, 0, valueBuf.length);
 
 		public LevelFileNumIterator(InternalKeyComparator icmp, int level, ArrayList<FileMetaData> flist) {
 			this.icmp = icmp;

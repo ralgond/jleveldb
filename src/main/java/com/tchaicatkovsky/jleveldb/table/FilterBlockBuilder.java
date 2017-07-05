@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import com.tchaicatkovsky.jleveldb.FilterPolicy;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class FilterBlockBuilder {
@@ -30,11 +30,11 @@ public class FilterBlockBuilder {
 
 	FilterPolicy policy;
 	
-	ByteBuf keys = ByteBufFactory.defaultByteBuf(); // Flattened key contents
+	ByteBuf keys = ByteBufFactory.newUnpooled(); // Flattened key contents
 	
 	ArrayList<Integer> start = new ArrayList<>(); // Starting index in keys_of each key
 	
-	ByteBuf result = ByteBufFactory.defaultByteBuf(); // Filter data computed so far
+	ByteBuf result = ByteBufFactory.newUnpooled(); // Filter data computed so far
 	
 	ArrayList<Slice> tmpKeys = new ArrayList<>(); // policy.createFilter() argument
 	
@@ -76,7 +76,7 @@ public class FilterBlockBuilder {
 
 		result.addByte((byte) (kFilterBaseLg & 0xff)); // Save encoding parameter in result
 
-		return new DefaultSlice(result);
+		return new UnpooledSlice(result);
 	}
 
 	public void generateFilter() {
@@ -94,7 +94,7 @@ public class FilterBlockBuilder {
 			byte[] base = keys.data();
 			int baseOffset = start.get(i);
 			int length = start.get(i + 1) - start.get(i); // bytes
-			tmpKeys.add(new DefaultSlice(base, baseOffset, length));
+			tmpKeys.add(new UnpooledSlice(base, baseOffset, length));
 		}
 
 		// Generate filter for current set of keys and append to result.

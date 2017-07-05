@@ -22,7 +22,7 @@ import com.tchaicatkovsky.jleveldb.ReadOptions;
 import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class TwoLevelIterator extends Iterator0 {
@@ -60,7 +60,7 @@ public class TwoLevelIterator extends Iterator0 {
 	Iterator0Wrapper dataIter = new Iterator0Wrapper(); // May be NULL
 	// If dataIter is non-null, then "dataBlockHandle" holds the
 	// "indexValue" passed to blockFunction to create the dataIter.
-	ByteBuf dataBlockHandle = ByteBufFactory.defaultByteBuf();
+	ByteBuf dataBlockHandle = ByteBufFactory.newUnpooled();
 	
 	public TwoLevelIterator(Iterator0 indexIter0, BlockFunction blockFunction, Object arg, ReadOptions options) {
 		this.indexIter.set(indexIter0);
@@ -200,7 +200,7 @@ public class TwoLevelIterator extends Iterator0 {
 			setDataIterator(null);
 		} else {
 			Slice handle = indexIter.value();
-			if (dataIter.iter() != null && handle.compare(new DefaultSlice(dataBlockHandle)) == 0) {
+			if (dataIter.iter() != null && handle.compare(new UnpooledSlice(dataBlockHandle)) == 0) {
 				// dataIter is already constructed with this iterator, so
 			    // no need to change anything
 				Logger0.debug("TwoLevelIterator.initDataBlock 1\n");

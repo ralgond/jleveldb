@@ -28,7 +28,7 @@ import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator.BlockFunction;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
 import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
@@ -98,7 +98,7 @@ public class Table {
 				byte[] cacheKeyBuffer = new byte[16];
 				Coding.encodeFixedNat64(cacheKeyBuffer, 0, table.rep.cacheId);
 				Coding.encodeFixedNat64(cacheKeyBuffer, 8, handle.offset());
-				Slice key = new DefaultSlice(cacheKeyBuffer, 0, 16);
+				Slice key = new UnpooledSlice(cacheKeyBuffer, 0, 16);
 				cacheHandle = blockCache.lookup(key);
 				if (cacheHandle != null) {
 					block = (Block) (blockCache.value(cacheHandle));
@@ -237,7 +237,7 @@ public class Table {
 	}
 
 	Slice internalKey2UserKey(Slice ikey) {
-		return new DefaultSlice(ikey.data(), ikey.offset(), ikey.size() - 8);
+		return new UnpooledSlice(ikey.data(), ikey.offset(), ikey.size() - 8);
 	}
 
 	public Status internalGet(ReadOptions options, Slice ikey, Object arg, HandleResult handleResult) {
@@ -294,8 +294,8 @@ public class Table {
 		Iterator0 iter = meta.newIterator(BytewiseComparatorImpl.getInstance());
 		String key = "filter.";
 		key += (rep.options.filterPolicy.name());
-		iter.seek(new DefaultSlice(key));
-		if (iter.valid() && iter.key().equals(new DefaultSlice(key))) {
+		iter.seek(new UnpooledSlice(key));
+		if (iter.valid() && iter.key().equals(new UnpooledSlice(key))) {
 			readFilter(iter.value());
 		}
 		iter.delete(); // delete iter;
@@ -335,7 +335,7 @@ public class Table {
 			return Status.corruption("file is too short to be an sstable");
 
 		byte footerSpace[] = new byte[Footer.kEncodedLength];
-		Slice footerInput = new DefaultSlice();
+		Slice footerInput = new UnpooledSlice();
 		Status s = file.read(size - Footer.kEncodedLength, Footer.kEncodedLength, footerInput, footerSpace);
 		if (!s.ok())
 			return s;

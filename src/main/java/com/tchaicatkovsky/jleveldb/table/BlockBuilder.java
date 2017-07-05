@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import com.tchaicatkovsky.jleveldb.Options;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class BlockBuilder {
@@ -39,8 +39,8 @@ public class BlockBuilder {
 		finished = false;
 		restarts = new ArrayList<Integer>();
 		restarts.add(0);
-		buffer = ByteBufFactory.defaultByteBuf();
-		lastKey = ByteBufFactory.defaultByteBuf();
+		buffer = ByteBufFactory.newUnpooled();
+		lastKey = ByteBufFactory.newUnpooled();
 	}
 
 	public void reset() {
@@ -66,11 +66,11 @@ public class BlockBuilder {
 		buffer.writeFixedNat32(restarts.size());
 
 		finished = true;
-		return new DefaultSlice(buffer);
+		return new UnpooledSlice(buffer);
 	}
 
 	public void add(Slice key, Slice value) {
-		Slice lastKeyPiece = new DefaultSlice(lastKey);
+		Slice lastKeyPiece = new UnpooledSlice(lastKey);
 		assert (!finished);
 		assert (counter <= options.blockRestartInterval);
 		assert (buffer.empty() // No values yet?

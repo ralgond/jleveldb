@@ -8,7 +8,7 @@ import com.tchaicatkovsky.jleveldb.db.format.ValueType;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 import static org.junit.Assert.assertEquals;
@@ -19,62 +19,62 @@ public class TestInternalKeyComparator {
 		InternalKeyComparator ikcmp = new InternalKeyComparator(BytewiseComparatorImpl.getInstance());
 		int ret = 0;
 		
-		Slice auk = new DefaultSlice("abc");
-		ByteBuf abuf = ByteBufFactory.defaultByteBuf(); 
+		Slice auk = new UnpooledSlice("abc");
+		ByteBuf abuf = ByteBufFactory.newUnpooled(); 
 		abuf.append(auk.data(), auk.offset(), auk.size());
 		abuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 
 
-		Slice buk = new DefaultSlice("abc");
-		ByteBuf bbuf = ByteBufFactory.defaultByteBuf(); 
+		Slice buk = new UnpooledSlice("abc");
+		ByteBuf bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
 		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 	
-		ret = ikcmp.compare(new DefaultSlice(abuf), new DefaultSlice(bbuf));
+		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
 		//System.out.println(ret);
 		assertEquals(ret, 1);
 		
-		auk = new DefaultSlice("123");
-		abuf = ByteBufFactory.defaultByteBuf(); 
+		auk = new UnpooledSlice("123");
+		abuf = ByteBufFactory.newUnpooled(); 
 		abuf.append(auk.data(), auk.offset(), auk.size());
 		abuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 
 
-		buk = new DefaultSlice("234");
-		bbuf = ByteBufFactory.defaultByteBuf(); 
+		buk = new UnpooledSlice("234");
+		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
 		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 		
-		ret = ikcmp.compare(new DefaultSlice(abuf), new DefaultSlice(bbuf));
+		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
 		//System.out.println(ret);
 		assertEquals(ret, -1);
 		
 
-		buk = new DefaultSlice("12");
-		bbuf = ByteBufFactory.defaultByteBuf(); 
+		buk = new UnpooledSlice("12");
+		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
 		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Value));
 		
-		ret = ikcmp.compare(new DefaultSlice(abuf), new DefaultSlice(bbuf));
+		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
 		//System.out.println(ret);
 		assertEquals(ret, 1);
 		
-		buk = new DefaultSlice("123");
-		bbuf = ByteBufFactory.defaultByteBuf(); 
+		buk = new UnpooledSlice("123");
+		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
 		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(2, ValueType.Value));
 		
-		ret = ikcmp.compare(new DefaultSlice(abuf), new DefaultSlice(bbuf));
+		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
 		//System.out.println(ret);
 		assertEquals(ret, 1);
 		
 
-		buk = new DefaultSlice("123");
-		bbuf = ByteBufFactory.defaultByteBuf(); 
+		buk = new UnpooledSlice("123");
+		bbuf = ByteBufFactory.newUnpooled(); 
 		bbuf.append(buk.data(), buk.offset(), buk.size());
 		bbuf.writeFixedNat64(InternalKeyComparator.packSequenceAndType(1, ValueType.Deletion));
 		
-		ret = ikcmp.compare(new DefaultSlice(abuf), new DefaultSlice(bbuf));
+		ret = ikcmp.compare(new UnpooledSlice(abuf), new UnpooledSlice(bbuf));
 		//System.out.println(ret);
 		assertEquals(ret, -1);
 	}

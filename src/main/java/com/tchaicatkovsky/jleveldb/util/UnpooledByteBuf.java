@@ -18,14 +18,14 @@ package com.tchaicatkovsky.jleveldb.util;
 
 import java.nio.BufferOverflowException;
 
-public class DefaultByteBuf implements ByteBuf {
+public class UnpooledByteBuf implements ByteBuf {
 
 	byte[] data;
 	int limit;
 	int offset;
 	int capacity;
 
-	public DefaultByteBuf() {
+	public UnpooledByteBuf() {
 		data = null;
 		limit = 0;
 		offset = 0;
@@ -109,7 +109,7 @@ public class DefaultByteBuf implements ByteBuf {
 
 	@Override
 	public ByteBuf clone() {
-		ByteBuf ret = new DefaultByteBuf();
+		ByteBuf ret = new UnpooledByteBuf();
 		ret.assign(data, 0, size());
 		return ret;
 	}
@@ -135,7 +135,7 @@ public class DefaultByteBuf implements ByteBuf {
 	
 	@Override
 	public void swap(ByteBuf buf0) {
-		DefaultByteBuf b = (DefaultByteBuf)buf0;
+		UnpooledByteBuf b = (UnpooledByteBuf)buf0;
 		
 		byte[] data0 = data;
 		int limit0 = limit;
@@ -211,7 +211,7 @@ public class DefaultByteBuf implements ByteBuf {
 	
 	@Override
 	public boolean equals(Object o) {
-		DefaultByteBuf b= (DefaultByteBuf)o;
+		UnpooledByteBuf b= (UnpooledByteBuf)o;
 		
 		if (size() == 0 && size() == b.size())
 			return true;
@@ -335,7 +335,7 @@ public class DefaultByteBuf implements ByteBuf {
 	@Override
 	final public Slice readLengthPrefixedSlice() {
 		int size = readVarNat32();
-		Slice slice = new DefaultSlice();
+		Slice slice = new UnpooledSlice();
 		slice.init(new byte[size], 0, size);
 		System.arraycopy(data, offset, slice.data(), 0, size);
 		offset += size;

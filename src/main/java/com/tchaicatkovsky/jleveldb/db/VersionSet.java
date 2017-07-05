@@ -42,7 +42,7 @@ import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator;
 import com.tchaicatkovsky.jleveldb.util.Boolean0;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.IntLongPair;
 import com.tchaicatkovsky.jleveldb.util.ListUtils;
 import com.tchaicatkovsky.jleveldb.util.Long0;
@@ -105,7 +105,7 @@ public class VersionSet {
 	    
 	    compactPointer = new ByteBuf[DBFormat.kNumLevels];
 	    for (int i = 0; i < DBFormat.kNumLevels; i++) {
-	    	compactPointer[i] = ByteBufFactory.defaultByteBuf(); 
+	    	compactPointer[i] = ByteBufFactory.newUnpooled(); 
 	    }
 	    
 	    appendVersion(new Version(this));
@@ -397,9 +397,9 @@ public class VersionSet {
 
 			// Write new record to MANIFEST log
 			if (s.ok()) {
-				ByteBuf record = ByteBufFactory.defaultByteBuf();
+				ByteBuf record = ByteBufFactory.newUnpooled();
 			    edit.encodeTo(record);
-			    s = descriptorLog.addRecord(new DefaultSlice(record));
+			    s = descriptorLog.addRecord(new UnpooledSlice(record));
 			    if (s.ok()) {
 			    	s = descriptorFile.sync();
 			    }
@@ -452,7 +452,7 @@ public class VersionSet {
 	 */
 	public Status recover(Boolean0 saveManifest) {
 		// Read "CURRENT" file, which contains a pointer to the current manifest file
-		ByteBuf currentFileName = ByteBufFactory.defaultByteBuf();
+		ByteBuf currentFileName = ByteBufFactory.newUnpooled();
 		Status s = env.readFileToString(FileName.getCurrentFileName(dbname), currentFileName);
 		if (!s.ok()) {
 			return s;
@@ -460,7 +460,7 @@ public class VersionSet {
 		if (currentFileName.empty() || currentFileName.getByte(currentFileName.size()-1) != (byte)(0x0A)/*\n*/)
 			return Status.corruption("CURRENT file does not end with newline");
 		currentFileName.resize(currentFileName.size() - 1);
-		ByteBuf dataBuf = ByteBufFactory.defaultByteBuf();
+		ByteBuf dataBuf = ByteBufFactory.newUnpooled();
 		env.readFileToString(currentFileName.encodeToString(), dataBuf);
 		
 		String dscname = dbname + "/" + currentFileName.encodeToString();
@@ -486,8 +486,8 @@ public class VersionSet {
 				LogReporter reporter = new LogReporter();
 				reporter.status = s;
 				LogReader reader = new LogReader(file, reporter, true, 0);
-				Slice record = new DefaultSlice();
-				ByteBuf scratch = ByteBufFactory.defaultByteBuf();
+				Slice record = new UnpooledSlice();
+				ByteBuf scratch = ByteBufFactory.newUnpooled();
 				while (reader.readRecord(record, scratch) && s.ok()) {
 					VersionEdit edit = new VersionEdit();
 				    s = edit.decodeFrom(record);
@@ -1110,7 +1110,7 @@ public class VersionSet {
 		// We update this immediately instead of waiting for the VersionEdit
 		// to be applied so that if the compaction fails, we will try a different
 		// key range next time.
-		compactPointer[level] = ByteBufFactory.defaultByteBuf(largest.rep().data(), largest.rep().size());
+		compactPointer[level] = ByteBufFactory.newUnpooled(largest.rep().data(), largest.rep().size());
 		c.edit.setCompactPointer(level, largest);
 		
 
@@ -1143,10 +1143,10 @@ public class VersionSet {
 		   	  }
 		  }
 
-		  ByteBuf record = ByteBufFactory.defaultByteBuf();
+		  ByteBuf record = ByteBufFactory.newUnpooled();
 		  record.require(1); //TODO
 		  edit.encodeTo(record);
-		  return log.addRecord(new DefaultSlice(record)); //TODO: new DefaultSlice(record)->record
+		  return log.addRecord(new UnpooledSlice(record)); //TODO: new DefaultSlice(record)->record
 	}
 
 	

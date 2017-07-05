@@ -4,8 +4,8 @@ import org.junit.Test;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultByteBuf;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledByteBuf;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.ReflectionUtil;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
@@ -15,7 +15,7 @@ import static org.junit.Assert.assertTrue;
 public class TestDefaultByteBuf {
 	@Test
 	public void testRequire() throws Exception {
-		DefaultByteBuf buf = (DefaultByteBuf)ByteBufFactory.defaultByteBuf(); 
+		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled(); 
 		
 		assertTrue(buf.capacity() == 0);
 		
@@ -45,7 +45,7 @@ public class TestDefaultByteBuf {
 			a[i] = (byte)i;
 		
 		for (int COPY_LEN = 1; COPY_LEN <= 127; COPY_LEN++) {
-			DefaultByteBuf buf1 = (DefaultByteBuf)ByteBufFactory.defaultByteBuf();
+			UnpooledByteBuf buf1 = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
 			int offset = 0;
 			int len = COPY_LEN;
 			while (offset < a.length) {
@@ -65,7 +65,7 @@ public class TestDefaultByteBuf {
 	
 	@Test
 	public void testFixedCoding01() throws Exception {
-		DefaultByteBuf buf = (DefaultByteBuf)ByteBufFactory.defaultByteBuf();
+		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
 		buf.writeFixedNat32(0);
 		buf.writeFixedNat32(Short.MAX_VALUE);
 		buf.writeFixedNat32(Integer.MAX_VALUE);
@@ -107,7 +107,7 @@ public class TestDefaultByteBuf {
 	
 	@Test
 	public void testVarCoding01() throws Exception {
-		DefaultByteBuf buf = (DefaultByteBuf)ByteBufFactory.defaultByteBuf();
+		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
 		buf.writeVarNat32(0);
 		buf.writeVarNat32(Short.MAX_VALUE);
 		buf.writeVarNat32(Integer.MAX_VALUE);
@@ -149,8 +149,8 @@ public class TestDefaultByteBuf {
 	
 	@Test
 	public void testResize() {
-		ByteBuf buf = ByteBufFactory.defaultByteBuf();
-		Slice s = new DefaultSlice("123456");
+		ByteBuf buf = ByteBufFactory.newUnpooled();
+		Slice s = new UnpooledSlice("123456");
 		buf.append(s.data(), s.offset(), s.size());
 		
 		buf.resize(3);

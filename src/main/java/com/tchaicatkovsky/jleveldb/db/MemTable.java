@@ -25,14 +25,14 @@ import com.tchaicatkovsky.jleveldb.db.format.DBFormat;
 import com.tchaicatkovsky.jleveldb.db.format.InternalKeyComparator;
 import com.tchaicatkovsky.jleveldb.db.format.LookupKey;
 import com.tchaicatkovsky.jleveldb.db.format.ValueType;
-import com.tchaicatkovsky.jleveldb.util.Arena;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Object0;
+import com.tchaicatkovsky.jleveldb.util.ReferenceCounted;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
-public class MemTable {
+public class MemTable implements ReferenceCounted {
 	
 	static class KeyValueSlice {
 		public byte[] data;
@@ -50,11 +50,11 @@ public class MemTable {
 		}
 		
 		final public Slice internalKeySlice() {
-			return new DefaultSlice(data, keyOffset, internalKeySize);
+			return new UnpooledSlice(data, keyOffset, internalKeySize);
 		}
 		
 		final public Slice value() {
-			return new DefaultSlice(data, valueOffset, valueSize);
+			return new UnpooledSlice(data, valueOffset, valueSize);
 		}
 	}
 	
@@ -127,13 +127,13 @@ public class MemTable {
 	int refs;
 	SkipListMap<Slice,KeyValueSlice> table;
 	AtomicLong approximateMemory = new AtomicLong(0);
-	Arena arena;
+	MemTableArena arena;
 	
 	public MemTable(InternalKeyComparator c) {
 		comparator = new TableKeyComparator(c);
 		refs = 0;
 		table = new SkipListMap<Slice,KeyValueSlice>(12, 4, comparator);
-		arena = new Arena();
+		arena = new MemTableArena();
 	}
 	
 	public void delete() {
@@ -224,7 +224,7 @@ public class MemTable {
 		
 		
 		KeyValueSlice kvs = new KeyValueSlice(data, keyOffset, internalKeySize, valueOffset, valueSize);
-		Slice keySlice = new DefaultSlice(data, keyOffset, internalKeySize);
+		Slice keySlice = new UnpooledSlice(data, keyOffset, internalKeySize);
 	
 		table.put(keySlice, kvs);
 	}
@@ -249,7 +249,7 @@ public class MemTable {
 			Slice ikey = iter.key();
 		    //System.out.println("seek result: "+ikey);
 		    if (comparator.comparator.userComparator().compare(
-		    		new DefaultSlice(ikey.data(), ikey.offset(), ikey.size()-8), 
+		    		new UnpooledSlice(ikey.data(), ikey.offset(), ikey.size()-8), 
 		    		key.userKey()) == 0) {
 		    	// Correct user key
 		    	ValueType vtype = DBFormat.extractValueType(ikey);
@@ -286,7 +286,7 @@ public class MemTable {
 	
 	
 	static Slice getLengthPrefixedSlice(byte[] data, int offset) {
-		Slice tmp = new DefaultSlice(data, offset, 5);
+		Slice tmp = new UnpooledSlice(data, offset, 5);
 		int len = Coding.popVarNat32(tmp);  // +5: we assume "p" is not corrupted
 		offset = tmp.offset();
 		tmp.init(data, offset, len);

@@ -12,7 +12,7 @@ import com.tchaicatkovsky.jleveldb.util.BloomFilterPolicy;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 public class TestBloom {
@@ -21,12 +21,12 @@ public class TestBloom {
 
 	static Slice key(int i, byte[] buffer, int offset) {
 	  Coding.encodeFixedNat32(buffer, offset, i);
-	  return new DefaultSlice(buffer, offset, 4);
+	  return new UnpooledSlice(buffer, offset, 4);
 	}
 	
 	public static class BloomRun {
 		FilterPolicy policy;
-		ByteBuf filter = ByteBufFactory.defaultByteBuf();
+		ByteBuf filter = ByteBufFactory.newUnpooled();
 		ArrayList<ByteBuf> keys = new ArrayList<>();
 		
 		public BloomRun() {
@@ -39,7 +39,7 @@ public class TestBloom {
 		}
 		
 		public void add(Slice s) {
-			ByteBuf buf = ByteBufFactory.defaultByteBuf();
+			ByteBuf buf = ByteBufFactory.newUnpooled();
 		    buf.assign(s.data(), s.offset(), s.size());
 		    keys.add(buf);
 		}
@@ -47,7 +47,7 @@ public class TestBloom {
 		public void build() {
 		    ArrayList<Slice> keySlices = new ArrayList<>();
 		    for (int i = 0; i < keys.size(); i++) {
-		    	keySlices.add(new DefaultSlice(keys.get(i)));
+		    	keySlices.add(new UnpooledSlice(keys.get(i)));
 		    }
 		    filter.clear();
 		    
@@ -78,7 +78,7 @@ public class TestBloom {
 			if (!keys.isEmpty()) {
 		    	build();
 		    }
-		    return policy.keyMayMatch(s, new DefaultSlice(filter));
+		    return policy.keyMayMatch(s, new UnpooledSlice(filter));
 		}
 		
 		public double falsePositiveRate() {
@@ -96,19 +96,19 @@ public class TestBloom {
 	@Test
 	public void testEmptyFilter() {
 		BloomRun r = new BloomRun();
-		assertFalse(r.matches(new DefaultSlice("hello")));
-		assertFalse(r.matches(new DefaultSlice("world")));
+		assertFalse(r.matches(new UnpooledSlice("hello")));
+		assertFalse(r.matches(new UnpooledSlice("world")));
 	}
 	
 	@Test
 	public void testSmall() {
 		BloomRun r = new BloomRun();
-		r.add(new DefaultSlice("hello"));
-		r.add(new DefaultSlice("world"));
-		assertTrue(r.matches(new DefaultSlice("hello")));
-		assertTrue(r.matches(new DefaultSlice("world")));
-		assertFalse(r.matches(new DefaultSlice("x")));
-		assertFalse(r.matches(new DefaultSlice("foo")));
+		r.add(new UnpooledSlice("hello"));
+		r.add(new UnpooledSlice("world"));
+		assertTrue(r.matches(new UnpooledSlice("hello")));
+		assertTrue(r.matches(new UnpooledSlice("world")));
+		assertFalse(r.matches(new UnpooledSlice("x")));
+		assertFalse(r.matches(new UnpooledSlice("foo")));
 	}
 	
 	static int nextLength(int length) {

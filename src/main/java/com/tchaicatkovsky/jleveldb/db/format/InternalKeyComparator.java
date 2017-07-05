@@ -20,7 +20,7 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 
 /**
@@ -68,9 +68,9 @@ public class InternalKeyComparator extends Comparator0 {
 	 */
 	public void findShortestSeparator(ByteBuf start, Slice limit) {
 		// Attempt to shorten the user portion of the key
-		Slice userStart = DBFormat.extractUserKey(new DefaultSlice(start));
+		Slice userStart = DBFormat.extractUserKey(new UnpooledSlice(start));
 		Slice userLimit = DBFormat.extractUserKey(limit);
-		ByteBuf tmp = ByteBufFactory.defaultByteBuf();
+		ByteBuf tmp = ByteBufFactory.newUnpooled();
 		tmp.assign(userStart.data(), userStart.size());
 		userComparator.findShortestSeparator(tmp, userLimit);
 		if (tmp.size() < userStart.size() && userComparator.compare(userStart, tmp) < 0) {
@@ -87,8 +87,8 @@ public class InternalKeyComparator extends Comparator0 {
 	 * @param key [INPUT][OUTPUT]
 	 */
 	public void findShortSuccessor(ByteBuf key) {
-		Slice userKey = DBFormat.extractUserKey(new DefaultSlice(key));
-		ByteBuf tmp = ByteBufFactory.defaultByteBuf();
+		Slice userKey = DBFormat.extractUserKey(new UnpooledSlice(key));
+		ByteBuf tmp = ByteBufFactory.newUnpooled();
 		tmp.assign(userKey.data(), userKey.size());
 		userComparator.findShortSuccessor(tmp);
 		if (tmp.size() < userKey.size() && userComparator.compare(userKey, tmp) < 0) {

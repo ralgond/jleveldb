@@ -8,7 +8,7 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.WritableFile;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.EnvImpl;
 import com.tchaicatkovsky.jleveldb.util.FileUtils;
 import com.tchaicatkovsky.jleveldb.util.Long0;
@@ -36,7 +36,7 @@ public class TestEnvImpl {
 		Object0<WritableFile> file0 = new Object0<WritableFile>();
 		env.newWritableFile(fileName1, file0);
 		String content = "123456";
-		Slice s1 = new DefaultSlice(content);
+		Slice s1 = new UnpooledSlice(content);
 		s = file0.getValue().append(s1);
 		assertTrue(s.ok());
 		file0.getValue().close();
@@ -47,29 +47,29 @@ public class TestEnvImpl {
 		env.getFileSize(fileName1, fileSize);
 		assertTrue(fileSize.getValue() == s1.size());
 		
-		ByteBuf buf = ByteBufFactory.defaultByteBuf();
+		ByteBuf buf = ByteBufFactory.newUnpooled();
 		env.readFileToString(fileName1, buf);
-		assertTrue((new DefaultSlice(buf)).encodeToString().equals(content));
+		assertTrue((new UnpooledSlice(buf)).encodeToString().equals(content));
 		
 		
 		String fileName2 = dirname+"/testFile002";
-		env.writeStringToFile(new DefaultSlice(content), fileName2);
-		ByteBuf buf2 = ByteBufFactory.defaultByteBuf();
+		env.writeStringToFile(new UnpooledSlice(content), fileName2);
+		ByteBuf buf2 = ByteBufFactory.newUnpooled();
 		env.readFileToString(fileName2, buf2);
-		assertTrue((new DefaultSlice(buf2)).encodeToString().equals(content));
+		assertTrue((new UnpooledSlice(buf2)).encodeToString().equals(content));
 		
 
 		String fileName3 = dirname+"/testFile003";
-		env.writeStringToFileSync(new DefaultSlice(content), fileName3);
-		ByteBuf buf3 = ByteBufFactory.defaultByteBuf();
+		env.writeStringToFileSync(new UnpooledSlice(content), fileName3);
+		ByteBuf buf3 = ByteBufFactory.newUnpooled();
 		env.readFileToString(fileName3, buf3);
-		assertTrue((new DefaultSlice(buf3)).encodeToString().equals(content));
+		assertTrue((new UnpooledSlice(buf3)).encodeToString().equals(content));
 		
 		String fileName4 = dirname+"/testFile004";
 		env.renameFile(fileName3, fileName4);
-		ByteBuf buf4 = ByteBufFactory.defaultByteBuf();
+		ByteBuf buf4 = ByteBufFactory.newUnpooled();
 		env.readFileToString(fileName4, buf4);
-		assertTrue((new DefaultSlice(buf4)).encodeToString().equals(content));
+		assertTrue((new UnpooledSlice(buf4)).encodeToString().equals(content));
 		
 		assertTrue(env.fileExists(fileName2));
 		env.deleteFile(fileName2);
@@ -79,17 +79,17 @@ public class TestEnvImpl {
 		String newContent = content + appendContent;
 		file0.setValue(null);
 		env.newAppendableFile(fileName4, file0);
-		file0.getValue().append(new DefaultSlice(appendContent));
+		file0.getValue().append(new UnpooledSlice(appendContent));
 		file0.getValue().close();
 		file0.getValue().delete();
 		file0.setValue(null);
-		ByteBuf buf5 = ByteBufFactory.defaultByteBuf();
+		ByteBuf buf5 = ByteBufFactory.newUnpooled();
 		env.readFileToString(fileName4, buf5);
-		assertTrue((new DefaultSlice(buf5)).encodeToString().equals(newContent));
+		assertTrue((new UnpooledSlice(buf5)).encodeToString().equals(newContent));
 		
 		Object0<RandomAccessFile0> file1 = new Object0<RandomAccessFile0>();
 		env.newRandomAccessFile(fileName4, file1);
-		Slice res = new DefaultSlice();
+		Slice res = new UnpooledSlice();
 		s = file1.getValue().read(5, 3, res , new byte[100]);
 		System.out.println(s.message());
 		assertTrue(res.encodeToString().equals(newContent.substring(5, 5+3)));

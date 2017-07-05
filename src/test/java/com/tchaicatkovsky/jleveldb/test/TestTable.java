@@ -35,7 +35,7 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
-import com.tchaicatkovsky.jleveldb.util.DefaultSlice;
+import com.tchaicatkovsky.jleveldb.util.UnpooledSlice;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.ListUtils;
 import com.tchaicatkovsky.jleveldb.util.Object0;
@@ -43,6 +43,7 @@ import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
 import com.tchaicatkovsky.jleveldb.util.Strings;
+import com.tchaicatkovsky.jleveldb.util.TestUtil;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -55,7 +56,7 @@ public class TestTable {
 		for (int i = 0; i < b.length; i++) {
 			b[i] = key.getByte(b.length-1-i);
 		}
-		return new DefaultSlice(b, 0, b.length);
+		return new UnpooledSlice(b, 0, b.length);
 	}
 	
 	static class ReverseKeyComparator extends Comparator0 {
@@ -88,21 +89,21 @@ public class TestTable {
 		}
 
 		public void findShortestSeparator(ByteBuf start, Slice limit) {
-			Slice s = reverse(new DefaultSlice(start));
+			Slice s = reverse(new UnpooledSlice(start));
 		    Slice l = reverse(limit);
-		    ByteBuf s0 = ByteBufFactory.defaultByteBuf();
+		    ByteBuf s0 = ByteBufFactory.newUnpooled();
 		    s0.assign(s.data(), s.offset(), s.size());
 		    BytewiseComparatorImpl.getInstance().findShortestSeparator(s0, l);
-		    Slice s1 = reverse(new DefaultSlice(s0));
+		    Slice s1 = reverse(new UnpooledSlice(s0));
 		    start.assign(s1.data(), s1.offset(), s1.size());
 		}
 
 		public void findShortSuccessor(ByteBuf key) {
-		    Slice s = reverse(new DefaultSlice(key));
-		    ByteBuf s0 = ByteBufFactory.defaultByteBuf();
+		    Slice s = reverse(new UnpooledSlice(key));
+		    ByteBuf s0 = ByteBufFactory.newUnpooled();
 		    s0.assign(s.data(), s.offset(), s.size());
 		    BytewiseComparatorImpl.getInstance().findShortSuccessor(s0);
-		    Slice s1 = reverse(new DefaultSlice(s0));
+		    Slice s1 = reverse(new UnpooledSlice(s0));
 		    key.assign(s1.data(), s1.offset(), s1.size());
 		}
 	};
@@ -114,13 +115,13 @@ public class TestTable {
 			key.addByte((byte)0);
 		} else {
 			assert(cmp == reverse_key_comparator);
-			Slice rev0 = reverse(new DefaultSlice(key));
-			ByteBuf rev = ByteBufFactory.defaultByteBuf();
+			Slice rev0 = reverse(new UnpooledSlice(key));
+			ByteBuf rev = ByteBufFactory.newUnpooled();
 			rev.assign(rev0.data(), rev0.offset(), rev0.size());
 			
 			rev.addByte((byte)0);
 			
-			Slice s = reverse(new DefaultSlice(rev));
+			Slice s = reverse(new UnpooledSlice(rev));
 			key.assign(s.data(), s.offset(), s.size());
 		}
 	}
@@ -152,7 +153,7 @@ public class TestTable {
 		    return Status.ok0();
 		}
 
-		ByteBuf contents = ByteBufFactory.defaultByteBuf();
+		ByteBuf contents = ByteBufFactory.newUnpooled();
 	}
 	
 	static class StringSource implements RandomAccessFile0 {
@@ -190,7 +191,7 @@ public class TestTable {
 		    return Status.ok0();
 		  }
 
-		  ByteBuf contents = ByteBufFactory.defaultByteBuf();
+		  ByteBuf contents = ByteBufFactory.newUnpooled();
 	};
 	
 	static class ByteBufComparator implements Comparator<ByteBuf> {
@@ -244,7 +245,7 @@ public class TestTable {
 		}
 
 		public void add(ByteBuf key,Slice value) {
-			ByteBuf v = ByteBufFactory.defaultByteBuf();
+			ByteBuf v = ByteBufFactory.newUnpooled();
 			v.assign(value.data(), value.offset(), value.size());
 			dataMap.put(key, v);
 		}
@@ -288,7 +289,7 @@ public class TestTable {
 	static class BlockConstructor extends Constructor {
 
 		Comparator0 comparator;
-		ByteBuf data = ByteBufFactory.defaultByteBuf();
+		ByteBuf data = ByteBufFactory.newUnpooled();
 		Block block;
 
 		public BlockConstructor(Comparator0 cmp) {
@@ -305,14 +306,14 @@ public class TestTable {
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
 //		    	System.out.printf("[DEBUG] BlockConstructor.finish k=%s, v=%s\n",
 //		    			Strings.escapeString(e.getKey()), Strings.escapeString(e.getValue()));
-		    	builder.add(new DefaultSlice(e.getKey()), new DefaultSlice(e.getValue()));
+		    	builder.add(new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
 		    }
 		    
 		    // Open the block
 		    Slice s = builder.finish();
 		    data.assign(s.data(), s.offset(), s.size());
 		    BlockContents contents = new BlockContents();
-		    contents.data = new DefaultSlice(data);
+		    contents.data = new UnpooledSlice(data);
 		    contents.cachable = false;
 		    contents.heapAllocated = false;
 		    block = new Block(contents);
@@ -354,7 +355,7 @@ public class TestTable {
 		    TableBuilder builder = new TableBuilder(options, sink);
 
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
-		    	builder.add(new DefaultSlice(e.getKey()), new DefaultSlice(e.getValue()));
+		    	builder.add(new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
 		    	assertTrue(builder.status().ok());
 		    }
 		    Status s = builder.finish();
@@ -363,7 +364,7 @@ public class TestTable {
 		    assertEquals(sink.contents().size(), builder.fileSize());
 
 		    // Open the table
-		    source = new StringSource(new DefaultSlice(sink.contents()));
+		    source = new StringSource(new UnpooledSlice(sink.contents()));
 		    Options tableOptions = new Options();
 		    tableOptions.comparator = options.comparator;
 		    Object0<Table> table0 = new Object0<Table>();
@@ -422,9 +423,9 @@ public class TestTable {
 		
 		public void seek(Slice target) {
 			ParsedInternalKey ikey = new ParsedInternalKey(target, DBFormat.kMaxSequenceNumber, ValueType.Value);
-			ByteBuf encoded = ByteBufFactory.defaultByteBuf();
+			ByteBuf encoded = ByteBufFactory.newUnpooled();
 			DBFormat.appendInternalKey(encoded, ikey);
-			iter.seek(new DefaultSlice(encoded));
+			iter.seek(new UnpooledSlice(encoded));
 		}
 		
 	  	public void seekToFirst() { 
@@ -448,7 +449,7 @@ public class TestTable {
 	  		ParsedInternalKey key = new ParsedInternalKey();
 	  		if (!key.parse(iter.key())) {
 	  			status = Status.corruption("malformed internal key");
-	  			return new DefaultSlice("corrupted key");
+	  			return new UnpooledSlice("corrupted key");
 	  		}
 	  		return key.userKey;
 	  	}
@@ -486,7 +487,7 @@ public class TestTable {
 		    memtable.ref();
 		    int seq = 1;
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
-		    	memtable.add(seq, ValueType.Value, new DefaultSlice(e.getKey()), new DefaultSlice(e.getValue()));
+		    	memtable.add(seq, ValueType.Value, new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
 		    	seq++;
 		    }
 		    return Status.ok0();
@@ -528,7 +529,7 @@ public class TestTable {
 		    newDB();
 		    for (Map.Entry<ByteBuf, ByteBuf> e : dataMap.entrySet()) {
 		    	WriteBatch batch = new WriteBatch();
-		    	batch.put(new DefaultSlice(e.getKey()), new DefaultSlice(e.getValue()));
+		    	batch.put(new UnpooledSlice(e.getKey()), new UnpooledSlice(e.getValue()));
 		    	try {
 		    		Status s = db.write(new WriteOptions(), batch);
 		    		//System.out.println("DBConstructor.finishImpl, s="+s+", key="+
@@ -725,7 +726,7 @@ public class TestTable {
 					
 					{
 						Iterator0 iter0 = constructor.newIterator();
-						iter0.seek(new DefaultSlice(e.getKey()));
+						iter0.seek(new UnpooledSlice(e.getKey()));
 						if (iter0.valid()) {
 							System.out.printf("[DEBUG] testForwardScan NOT-EQUALS, check, key0=%s, value0=%s\n", 
 								Strings.escapeString(e.getKey()), null);
@@ -896,7 +897,7 @@ public class TestTable {
 									Strings.escapeString(key), entryList.size(), modelPos.getValue());
 						}
 						
-						iter.seek(new DefaultSlice(key));
+						iter.seek(new UnpooledSlice(key));
 						assertEquals(toString(entryList, modelPos.getValue()), toString(iter));
 						break;
 					}
@@ -946,7 +947,7 @@ public class TestTable {
 		public ByteBuf pickRandomKey(Random0 rnd, ArrayList<ByteBuf> keys) {
 		    if (keys.isEmpty()) {
 		    	byte[] b = "foo".getBytes();
-		    	ByteBuf buf = ByteBufFactory.defaultByteBuf(b, b.length);
+		    	ByteBuf buf = ByteBufFactory.newUnpooled(b, b.length);
 		    	return buf;
 		    } else {
 		    	int index = (int)rnd.uniform(keys.size());
@@ -1001,7 +1002,7 @@ public class TestTable {
 	public void testZeroRestartPointsInBlock() {
 		byte[] data = new byte[4];
 		BlockContents contents = new BlockContents();
-		contents.data = new DefaultSlice(data, 0, data.length);
+		contents.data = new UnpooledSlice(data, 0, data.length);
 		contents.cachable = false;
 		contents.heapAllocated = false;
 		Block block = new Block(contents);
@@ -1010,14 +1011,14 @@ public class TestTable {
 		assertTrue(!iter.valid());
 		iter.seekToLast();
 		assertTrue(!iter.valid());
-		iter.seek(new DefaultSlice("foo"));
+		iter.seek(new UnpooledSlice("foo"));
 		assertTrue(!iter.valid());
 		iter.delete();
 	}
 	
 	static ByteBuf str2ByteBuf(String s) {
 		byte[] b = s.getBytes();
-	    return ByteBufFactory.defaultByteBuf(b, b.length);
+	    return ByteBufFactory.newUnpooled(b, b.length);
 	}
 	
 	@Test
@@ -1027,7 +1028,7 @@ public class TestTable {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 1);
 		   
-		    h.add(str2ByteBuf(""), new DefaultSlice("v"));
+		    h.add(str2ByteBuf(""), new UnpooledSlice("v"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1040,7 +1041,7 @@ public class TestTable {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 2);
 		    
-		    h.add(str2ByteBuf("abc"), new DefaultSlice("v"));
+		    h.add(str2ByteBuf("abc"), new UnpooledSlice("v"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1053,9 +1054,9 @@ public class TestTable {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 3);
 		    
-		    h.add(str2ByteBuf("abc"), new DefaultSlice("v"));
-		    h.add(str2ByteBuf("abcd"), new DefaultSlice("v"));
-		    h.add(str2ByteBuf("ac"), new DefaultSlice("v2"));
+		    h.add(str2ByteBuf("abc"), new UnpooledSlice("v"));
+		    h.add(str2ByteBuf("abcd"), new UnpooledSlice("v"));
+		    h.add(str2ByteBuf("ac"), new UnpooledSlice("v2"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1069,7 +1070,7 @@ public class TestTable {
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
 		    Random0 rnd = new Random0(TestUtil.randomSeed() + 4);
-		    h.add(ByteBufFactory.defaultByteBuf(b, b.length), new DefaultSlice("v3"));
+		    h.add(ByteBufFactory.newUnpooled(b, b.length), new UnpooledSlice("v3"));
 		    h.test(rnd);
 		}
 		h.delete();
@@ -1088,7 +1089,7 @@ public class TestTable {
 		                (i + 1), kTestArgList.length, num_entries);
 		    	}
 		    	for (int e = 0; e < num_entries; e++) {
-		    		ByteBuf v = ByteBufFactory.defaultByteBuf();
+		    		ByteBuf v = ByteBufFactory.newUnpooled();
 		    		h.add(TestUtil.randomKey(rnd, (int)rnd.skewed(4)),
 		    				TestUtil.randomString(rnd, (int)rnd.skewed(5), v));
 		    	}
@@ -1106,7 +1107,7 @@ public class TestTable {
 		h.init(args);
 		int num_entries = 100000;
 		for (int i = 0; i < num_entries; i++) {
-		    ByteBuf v = ByteBufFactory.defaultByteBuf();
+		    ByteBuf v = ByteBufFactory.newUnpooled();
 		    h.add(TestUtil.randomKey(rnd, (int)rnd.skewed(4)),
 		    		TestUtil.randomString(rnd, (int)rnd.skewed(5), v));
 		}
@@ -1132,10 +1133,10 @@ public class TestTable {
 		memtable.ref();
 		WriteBatch batch = new WriteBatch();
 		WriteBatchInternal.setSequence(batch, 100);
-		batch.put(new DefaultSlice("k1"), new DefaultSlice("v1"));
-		batch.put(new DefaultSlice("k2"), new DefaultSlice("v2"));
-		batch.put(new DefaultSlice("k3"), new DefaultSlice("v3"));
-		batch.put(new DefaultSlice("largekey"), new DefaultSlice("vlarge"));
+		batch.put(new UnpooledSlice("k1"), new UnpooledSlice("v1"));
+		batch.put(new UnpooledSlice("k2"), new UnpooledSlice("v2"));
+		batch.put(new UnpooledSlice("k3"), new UnpooledSlice("v3"));
+		batch.put(new UnpooledSlice("largekey"), new UnpooledSlice("vlarge"));
 		assertTrue(WriteBatchInternal.insertInto(batch, memtable).ok());
 
 		Iterator0 iter = memtable.newIterator();
@@ -1164,13 +1165,13 @@ public class TestTable {
 	public void testTableTestApproximateOffsetOfPlain() {
 		TableConstructor c = new TableConstructor(BytewiseComparatorImpl.getInstance());
 
-		c.add(str2ByteBuf("k01"), new DefaultSlice("hello"));
-		c.add(str2ByteBuf("k02"), new DefaultSlice("hello2"));
-		c.add(str2ByteBuf("k03"), new DefaultSlice(TestUtil.makeString(10000, 'x')));
-		c.add(str2ByteBuf("k04"), new DefaultSlice(TestUtil.makeString(200000, 'x')));
-		c.add(str2ByteBuf("k05"), new DefaultSlice(TestUtil.makeString(300000, 'x')));
-		c.add(str2ByteBuf("k06"), new DefaultSlice("hello3"));
-		c.add(str2ByteBuf("k07"), new DefaultSlice(TestUtil.makeString(100000, 'x')));
+		c.add(str2ByteBuf("k01"), new UnpooledSlice("hello"));
+		c.add(str2ByteBuf("k02"), new UnpooledSlice("hello2"));
+		c.add(str2ByteBuf("k03"), new UnpooledSlice(TestUtil.makeString(10000, 'x')));
+		c.add(str2ByteBuf("k04"), new UnpooledSlice(TestUtil.makeString(200000, 'x')));
+		c.add(str2ByteBuf("k05"), new UnpooledSlice(TestUtil.makeString(300000, 'x')));
+		c.add(str2ByteBuf("k06"), new UnpooledSlice("hello3"));
+		c.add(str2ByteBuf("k07"), new UnpooledSlice(TestUtil.makeString(100000, 'x')));
 		
 		ArrayList<ByteBuf> keys = new ArrayList<>();
 		Object0<TreeMap<ByteBuf,ByteBuf>> kvmap0 = new Object0<>();
@@ -1179,22 +1180,22 @@ public class TestTable {
 		options.compression = CompressionType.kNoCompression;
 		c.finish(options, keys, kvmap0);
 
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("abc")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k01")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k01a")),      0,      0));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k02")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k03")),       0,      0));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k04")),   10000,  11000));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k04a")), 210000, 211000));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k05")),  210000, 211000));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k06")),  510000, 511000));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k07")),  510000, 511000));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("xyz")),  610000, 612000));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("abc")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k01")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k01a")),      0,      0));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k02")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k03")),       0,      0));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k04")),   10000,  11000));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k04a")), 210000, 211000));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k05")),  210000, 211000));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k06")),  510000, 511000));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k07")),  510000, 511000));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("xyz")),  610000, 612000));
 	}
 
 	static boolean SnappyCompressionSupported() {
-		ByteBuf out = ByteBufFactory.defaultByteBuf();
-		Slice in = new DefaultSlice("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+		ByteBuf out = ByteBufFactory.newUnpooled();
+		Slice in = new UnpooledSlice("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 		return Snappy.compress(in.data(), in.offset(), in.size(), out);
 	}
 	
@@ -1207,10 +1208,10 @@ public class TestTable {
 
 		Random0 rnd = new Random0(301);
 		TableConstructor c = new TableConstructor(BytewiseComparatorImpl.getInstance());
-		ByteBuf tmp = ByteBufFactory.defaultByteBuf();
-		c.add(str2ByteBuf("k01"), new DefaultSlice("hello"));
+		ByteBuf tmp = ByteBufFactory.newUnpooled();
+		c.add(str2ByteBuf("k01"), new UnpooledSlice("hello"));
 		c.add(str2ByteBuf("k02"), TestUtil.compressibleString(rnd, 0.25, 10000, tmp));
-		c.add(str2ByteBuf("k03"), new DefaultSlice("hello3"));
+		c.add(str2ByteBuf("k03"), new UnpooledSlice("hello3"));
 		c.add(str2ByteBuf("k04"), TestUtil.compressibleString(rnd, 0.25, 10000, tmp));
 		  
 		ArrayList<ByteBuf> keys = new ArrayList<>();
@@ -1226,22 +1227,22 @@ public class TestTable {
 		int min_z = expected - kSlop;
 		int max_z = expected + kSlop;
 
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("abc")), 0, kSlop));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k01")), 0, kSlop));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k02")), 0, kSlop));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("abc")), 0, kSlop));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k01")), 0, kSlop));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k02")), 0, kSlop));
 		// Have now emitted a large compressible string, so adjust expected offset.
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k03")), min_z, max_z));
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("k04")), min_z, max_z));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k03")), min_z, max_z));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("k04")), min_z, max_z));
 		// Have now emitted two large compressible strings, so adjust expected offset.
-		assertTrue(between(c.approximateOffsetOf(new DefaultSlice("xyz")), 2 * min_z, 2 * max_z));
+		assertTrue(between(c.approximateOffsetOf(new UnpooledSlice("xyz")), 2 * min_z, 2 * max_z));
 	}
 
 	@Test
 	public void testReverseKeyComparator() {
 		TreeMap<ByteBuf,String> m = new TreeMap<ByteBuf,String>(new ByteBufComparator(new ReverseKeyComparator()));
-		m.put(ByteBufFactory.defaultByteBuf("abc"), "abc");
-		m.put(ByteBufFactory.defaultByteBuf("abcd"), "abcd");
-		m.put(ByteBufFactory.defaultByteBuf("ac"), "abcd");
+		m.put(ByteBufFactory.newUnpooled("abc"), "abc");
+		m.put(ByteBufFactory.newUnpooled("abcd"), "abcd");
+		m.put(ByteBufFactory.newUnpooled("ac"), "abcd");
 		
 		for (ByteBuf buf : m.keySet()) {
 			System.out.println(Strings.escapeString(buf));

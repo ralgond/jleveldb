@@ -36,7 +36,7 @@ import com.tchaicatkovsky.jleveldb.WritableFile;
 import com.tchaicatkovsky.jleveldb.db.format.DBFormat;
 import com.tchaicatkovsky.jleveldb.db.format.InternalKey;
 import com.tchaicatkovsky.jleveldb.db.format.InternalKeyComparator;
-import com.tchaicatkovsky.jleveldb.table.Merger;
+import com.tchaicatkovsky.jleveldb.table.MergingIterator;
 import com.tchaicatkovsky.jleveldb.table.Table;
 import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator;
 import com.tchaicatkovsky.jleveldb.util.Boolean0;
@@ -834,7 +834,7 @@ public class VersionSet {
 		}
 		
 		assert(list.size() <= space);
-		Iterator0 result = Merger.newMergingIterator(icmp, list);
+		Iterator0 result = MergingIterator.newMergingIterator(icmp, list);
 		list = null; //delete[] list;
 		return result;
 	}

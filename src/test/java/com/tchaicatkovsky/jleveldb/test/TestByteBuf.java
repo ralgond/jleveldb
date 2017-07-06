@@ -12,7 +12,7 @@ import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class TestDefaultByteBuf {
+public class TestByteBuf {
 	@Test
 	public void testRequire() throws Exception {
 		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled(); 
@@ -31,23 +31,23 @@ public class TestDefaultByteBuf {
 		buf.require(17);
 		assertTrue(buf.capacity() == 32);
 		
-		ReflectionUtil.setValue(buf, "limit", buf.offset()+16);
+		ReflectionUtil.setValue(buf, "size", buf.offset()+16);
 		buf.require(17);
 		assertTrue(buf.capacity() == 64);
 	}
 	
 	@Test
 	public void testAppend() {
-		int ARRAY_SIZE = 127;
+		int array_size = 127;
 		
-		byte[] a = new byte[ARRAY_SIZE];
-		for (int i = 0; i < ARRAY_SIZE; i++)
+		byte[] a = new byte[array_size];
+		for (int i = 0; i < array_size; i++)
 			a[i] = (byte)i;
 		
-		for (int COPY_LEN = 1; COPY_LEN <= 127; COPY_LEN++) {
+		for (int copy_len = 1; copy_len <= 127; copy_len++) {
 			UnpooledByteBuf buf1 = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
 			int offset = 0;
-			int len = COPY_LEN;
+			int len = copy_len;
 			while (offset < a.length) {
 				len = ((a.length - offset < len) ? a.length - offset : len);
 				buf1.append(a, offset, len);
@@ -55,7 +55,7 @@ public class TestDefaultByteBuf {
 			}
 			
 			assertTrue(buf1.capacity() == 128);
-			assertTrue(buf1.data()[ARRAY_SIZE] == 0);
+			assertTrue(buf1.data()[array_size] == 0);
 			
 			for (int i = 0; i < a.length; i++) {
 				assertTrue(buf1.data()[i] == a[i]);
@@ -63,16 +63,24 @@ public class TestDefaultByteBuf {
 		}
 	}
 	
+	static Slice S0(ByteBuf b) {
+		return SliceFactory.newUnpooled(b);
+	}
+	
 	@Test
 	public void testFixedCoding01() throws Exception {
 		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
+		Slice s = null;
+		
 		buf.addFixedNat32(0);
 		buf.addFixedNat32(Short.MAX_VALUE);
 		buf.addFixedNat32(Integer.MAX_VALUE);
 		
-		assertTrue(buf.readFixedNat32() == 0);
-		assertTrue(buf.readFixedNat32() == Short.MAX_VALUE);
-		assertTrue(buf.readFixedNat32() == Integer.MAX_VALUE);
+		s = S0(buf);
+		
+		assertTrue(s.readFixedNat32() == 0);
+		assertTrue(s.readFixedNat32() == Short.MAX_VALUE);
+		assertTrue(s.readFixedNat32() == Integer.MAX_VALUE);
 		
 		buf.clear();
 		
@@ -81,10 +89,12 @@ public class TestDefaultByteBuf {
 		buf.addFixedNat64(Integer.MAX_VALUE);
 		buf.addFixedNat64(Long.MAX_VALUE);
 
-		assertTrue(buf.readFixedNat64() == 0);
-		assertTrue(buf.readFixedNat64() == Short.MAX_VALUE);
-		assertTrue(buf.readFixedNat64() == Integer.MAX_VALUE);
-		assertTrue(buf.readFixedNat64() == Long.MAX_VALUE);
+		s = S0(buf);
+		
+		assertTrue(s.readFixedNat64() == 0);
+		assertTrue(s.readFixedNat64() == Short.MAX_VALUE);
+		assertTrue(s.readFixedNat64() == Integer.MAX_VALUE);
+		assertTrue(s.readFixedNat64() == Long.MAX_VALUE);
 		
 		buf.clear();
 		
@@ -96,25 +106,34 @@ public class TestDefaultByteBuf {
 		buf.addFixedNat32(Integer.MAX_VALUE);
 		buf.addFixedNat64(0);
 		
-		assertTrue(buf.readFixedNat64() == Long.MAX_VALUE);
-		assertTrue(buf.readFixedNat32() == 0);
-		assertTrue(buf.readFixedNat64() == Integer.MAX_VALUE);
-		assertTrue(buf.readFixedNat32() == Short.MAX_VALUE);
-		assertTrue(buf.readFixedNat64() == Short.MAX_VALUE);
-		assertTrue(buf.readFixedNat32() == Integer.MAX_VALUE);
-		assertTrue(buf.readFixedNat64() == 0);
+		s = S0(buf);
+		
+		assertTrue(s.readFixedNat64() == Long.MAX_VALUE);
+		assertTrue(s.readFixedNat32() == 0);
+		assertTrue(s.readFixedNat64() == Integer.MAX_VALUE);
+		assertTrue(s.readFixedNat32() == Short.MAX_VALUE);
+		assertTrue(s.readFixedNat64() == Short.MAX_VALUE);
+		assertTrue(s.readFixedNat32() == Integer.MAX_VALUE);
+		assertTrue(s.readFixedNat64() == 0);
 	}
+	
+
 	
 	@Test
 	public void testVarCoding01() throws Exception {
 		UnpooledByteBuf buf = (UnpooledByteBuf)ByteBufFactory.newUnpooled();
+		Slice s = null;
+		
 		buf.addVarNat32(0);
 		buf.addVarNat32(Short.MAX_VALUE);
 		buf.addVarNat32(Integer.MAX_VALUE);
 		
-		assertTrue(buf.readVarNat32() == 0);
-		assertTrue(buf.readVarNat32() == Short.MAX_VALUE);
-		assertTrue(buf.readVarNat32() == Integer.MAX_VALUE);
+		
+		s = S0(buf);
+		
+		assertTrue(s.readVarNat32() == 0);
+		assertTrue(s.readVarNat32() == Short.MAX_VALUE);
+		assertTrue(s.readVarNat32() == Integer.MAX_VALUE);
 		
 		buf.clear();
 		
@@ -123,13 +142,15 @@ public class TestDefaultByteBuf {
 		buf.addVarNat64(Integer.MAX_VALUE);
 		buf.addVarNat64(Long.MAX_VALUE);
 
-		assertTrue(buf.readVarNat64() == 0);
-		assertTrue(buf.readVarNat64() == Short.MAX_VALUE);
-		assertTrue(buf.readVarNat64() == Integer.MAX_VALUE);
-		assertTrue(buf.readVarNat64() == Long.MAX_VALUE);
+		s = S0(buf);
+		
+		assertTrue(s.readVarNat64() == 0);
+		assertTrue(s.readVarNat64() == Short.MAX_VALUE);
+		assertTrue(s.readVarNat64() == Integer.MAX_VALUE);
+		assertTrue(s.readVarNat64() == Long.MAX_VALUE);
 		
 		buf.clear();
-		
+			
 		buf.addVarNat64(Long.MAX_VALUE);
 		buf.addVarNat32(0);
 		buf.addVarNat64(Integer.MAX_VALUE);
@@ -138,13 +159,15 @@ public class TestDefaultByteBuf {
 		buf.addVarNat32(Integer.MAX_VALUE);
 		buf.addVarNat64(0);
 		
-		assertTrue(buf.readVarNat64() == Long.MAX_VALUE);
-		assertTrue(buf.readVarNat32() == 0);
-		assertTrue(buf.readVarNat64() == Integer.MAX_VALUE);
-		assertTrue(buf.readVarNat32() == Short.MAX_VALUE);
-		assertTrue(buf.readVarNat64() == Short.MAX_VALUE);
-		assertTrue(buf.readVarNat32() == Integer.MAX_VALUE);
-		assertTrue(buf.readVarNat64() == 0);
+		s = S0(buf);
+		
+		assertTrue(s.readVarNat64() == Long.MAX_VALUE);
+		assertTrue(s.readVarNat32() == 0);
+		assertTrue(s.readVarNat64() == Integer.MAX_VALUE);
+		assertTrue(s.readVarNat32() == Short.MAX_VALUE);
+		assertTrue(s.readVarNat64() == Short.MAX_VALUE);
+		assertTrue(s.readVarNat32() == Integer.MAX_VALUE);
+		assertTrue(s.readVarNat64() == 0);
 	}
 	
 	@Test

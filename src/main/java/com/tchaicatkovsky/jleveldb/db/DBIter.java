@@ -27,6 +27,7 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
+import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class DBIter extends Iterator0 {
 
@@ -222,7 +223,7 @@ public class DBIter extends Iterator0 {
 		clearSavedValue();
 		savedKey.clear();
 		DBFormat.appendInternalKey(savedKey, new ParsedInternalKey(target, sequence, DBFormat.kValueTypeForSeek));
-		iter.seek(savedKey);
+		iter.seek(SliceFactory.newUnpooled(savedKey));
 		if (iter.valid()) {
 			findNextUserEntry(false, savedKey);
 		} else {
@@ -291,13 +292,15 @@ public class DBIter extends Iterator0 {
 	@Override
 	public Slice key() {
 		assert(valid);
-		return (direction == Direction.kForward) ? DBFormat.extractUserKey(iter.key()) : savedKey;
+		return (direction == Direction.kForward) ? 
+				DBFormat.extractUserKey(iter.key()) : SliceFactory.newUnpooled(savedKey);
 	}
 
 	@Override
 	public Slice value() {
 		assert(valid);
-		return (direction == Direction.kForward) ? iter.value() : savedValue;
+		return (direction == Direction.kForward) ? 
+				iter.value() : SliceFactory.newUnpooled(savedValue);
 	}
 
 	@Override

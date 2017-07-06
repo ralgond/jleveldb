@@ -28,7 +28,7 @@ import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
 
-public class Format {
+public class TableFormat {
 	/**
 	 * BlockHandle is a pointer to the extent of a file that stores a data 
 	 * block or a meta block.

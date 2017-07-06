@@ -30,7 +30,7 @@ import com.tchaicatkovsky.jleveldb.table.Block;
 import com.tchaicatkovsky.jleveldb.table.BlockBuilder;
 import com.tchaicatkovsky.jleveldb.table.Table;
 import com.tchaicatkovsky.jleveldb.table.TableBuilder;
-import com.tchaicatkovsky.jleveldb.table.Format.BlockContents;
+import com.tchaicatkovsky.jleveldb.table.TableFormat.BlockContents;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;

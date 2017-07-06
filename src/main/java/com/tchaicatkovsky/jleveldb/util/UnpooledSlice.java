@@ -55,12 +55,12 @@ public class UnpooledSlice implements Slice {
 		init(s.data(), s.offset(), s.size());
 	}
 	
-	public void init(UnpooledSlice s) {
-		init(s.data(), s.offset(), s.size());
+	public void init(ByteBuf b) {
+		init(b.data(), b.offset(), b.size());
 	}
 	
-	public void init(ByteBuf buf) {
-		init(buf.data(), 0, buf.size());
+	public void init(UnpooledSlice s) {
+		init(s.data(), s.offset(), s.size());
 	}
 	
 	@Override
@@ -166,5 +166,41 @@ public class UnpooledSlice implements Slice {
 	@Override
 	public String toString() {
 		return encodeToString();
+	}
+	
+	
+	
+	@Override
+	public int readFixedNat32() {
+		int ret = Coding.decodeFixedNat32(data, offset, limit);
+		offset += 4;
+		return ret;
+	}
+	
+	@Override
+	public long readFixedNat64() {
+		long ret = Coding.decodeFixedNat64(data, offset, limit);
+		offset += 8;
+		return ret;
+	}
+	
+	@Override
+	public int readVarNat32() {
+		return Coding.popVarNat32(this);
+	}
+
+	@Override
+	public long readVarNat64() {
+		return Coding.popVarNat64(this);
+	}
+	
+	@Override
+	public Slice readLengthPrefixedSlice() {
+		int size = readVarNat32();
+		Slice slice = SliceFactory.newUnpooled();
+		slice.init(new byte[size], 0, size);
+		System.arraycopy(data, offset, slice.data(), 0, size);
+		offset += size;
+		return slice;
 	}
 }

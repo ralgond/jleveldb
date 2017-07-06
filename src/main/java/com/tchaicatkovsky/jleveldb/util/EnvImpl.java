@@ -32,15 +32,18 @@ import java.nio.channels.FileLock;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.TreeSet;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.tchaicatkovsky.jleveldb.Env;
 import com.tchaicatkovsky.jleveldb.FileLock0;
+import com.tchaicatkovsky.jleveldb.LevelDB;
 import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.RandomAccessFile0;
 import com.tchaicatkovsky.jleveldb.SequentialFile;
@@ -51,6 +54,113 @@ import sun.nio.ch.DirectBuffer;
 
 @SuppressWarnings("restriction")
 public class EnvImpl implements Env {
+	
+	enum FileOpType{
+		Open,
+		Delete,
+		Close
+	}
+	static class FileOp {
+		FileOpType type;
+		String fname;
+	}
+	
+	static class FileOpRecord {
+		Mutex mutex = new Mutex();
+		ArrayList<FileOp> opList = new ArrayList<>();
+		
+		public void addFileOp(FileOp op) {
+			try {
+				mutex.lock();
+				opList.add(op);
+			} finally {
+				mutex.unlock();
+			}
+		}
+		
+		public void addFileOp(String fname, FileOpType type) {
+			FileOp op = new FileOp();
+			op.fname = fname;
+			op.type = type;
+			addFileOp(op);
+		}
+		
+		public ArrayList<String> getUnclosedFileList() {
+			try {
+				mutex.lock();
+				TreeMap<String,Integer> map = new TreeMap<>();
+				for (FileOp op : opList) {
+					if (op.type == FileOpType.Open) {
+						Integer cnt = map.get(op.fname);
+						if (cnt == null)
+							map.put(op.fname, 1);
+						else
+							map.put(op.fname, cnt+1);
+					} else if (op.type == FileOpType.Close) {
+						Integer cnt = map.get(op.fname);
+						if (cnt == null) {
+							System.err.printf("[getUnclosedFileList] close un-exists file, file=%s\n",
+										op.fname);
+						} else {
+							if (cnt == 1)
+								map.remove(op.fname);
+							else
+								map.put(op.fname, cnt-1);
+						}
+					}
+				}
+				
+				ArrayList<String> ret = new ArrayList<>();
+				for (Map.Entry<String, Integer> e : map.entrySet()) {
+					ret.add(e.getKey());
+				}
+				return ret;
+			} finally {
+				mutex.unlock();
+			}
+		}
+		
+		public void printFileOpList() {
+			try {
+				mutex.lock();
+				
+				System.err.printf("FileOpList:\n");
+				for (FileOp op : opList) {
+					System.err.printf("name=%s\ttype=%s\n", op.fname, op.type.name());
+				}
+				
+			} finally {
+				mutex.unlock();
+			}
+		}
+		
+		public void clearFileOpList() {
+			try {
+				mutex.lock();
+				opList.clear();
+			} finally {
+				mutex.unlock();
+			}
+		}
+	}
+	
+	FileOpRecord fileOpRecord = new FileOpRecord();
+	
+	@Override
+	public ArrayList<String> getUnclosedFileList() {
+		return fileOpRecord.getUnclosedFileList();
+	}
+	
+	@Override
+	public void printFileOpList() {
+		fileOpRecord.printFileOpList();
+	}
+	
+	@Override
+	public void clearFileOpList() {
+		fileOpRecord.clearFileOpList();
+	}
+	
 	/**
 	 * Helper class to limit resource usage to avoid exhaustion.
 	 * Currently used to limit read-only file descriptors and mmap file usage 
@@ -115,36 +225,50 @@ public class EnvImpl implements Env {
 		}
 	};
 
-	static class SequentialFileImpl implements SequentialFile {
+	class SequentialFileImpl implements SequentialFile {
 		String filename;
 		DataInputStream dis;
 		FileInputStream fis;
-
+		Mutex mutex  = new Mutex();
+		
 		public SequentialFileImpl(String fname) {
 			filename = fname;
 		}
 
 		public Status open() {
 			try {
+				mutex.lock();
+				
 				fis = new FileInputStream(new File(filename));
 				dis = new DataInputStream(fis);
+				
+				fileOpRecord.addFileOp(filename, FileOpType.Open);
+				
 				return Status.ok0();
 			} catch (IOException e) {
 				e.printStackTrace();
 				return Status.ioError(filename + " SequentialFileImpl.open failed: " + e);
+			} finally {
+				mutex.unlock();
 			}
 		}
 
 		public void close() {
 			try {
+				mutex.lock();
+				
 				if (dis != null) {
 					dis.close();
 					dis = null;
 					fis.close();
 					fis = null;
+					
+					fileOpRecord.addFileOp(filename, FileOpType.Close);
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
+			} finally {
+				mutex.unlock();
 			}
 		}
 
@@ -185,31 +309,43 @@ public class EnvImpl implements Env {
 		}
 	}
 
-	static class RandomAccessFileImpl implements RandomAccessFile0 {
+	class RandomAccessFileImpl implements RandomAccessFile0 {
 		String filename;
 		DataInputStream dis;
-
+		Mutex mutex = new Mutex();
+		
 		public RandomAccessFileImpl(String fname) {
 			filename = fname;
 		}
 
 		public Status open() {
 			try {
+				mutex.lock();
 				dis = new DataInputStream(new FileInputStream(new File(filename)));
+				
+				fileOpRecord.addFileOp(filename, FileOpType.Open);
+				
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
 				return Status.ioError(filename + " RandomAccessFileImpl.open failed: " + e);
+			} finally {
+				mutex.unlock();
 			}
 		}
 
 		public void close() {
 			try {
+				mutex.lock();
 				if (dis != null) {
 					dis.close();
 					dis = null;
+					
+					fileOpRecord.addFileOp(filename, FileOpType.Close);
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
+			} finally {
+				mutex.unlock();
 			}
 		}
 
@@ -236,24 +372,31 @@ public class EnvImpl implements Env {
 		}
 	}
 
-	static class MmapReadableFile implements RandomAccessFile0 {
+	class MmapReadableFile implements RandomAccessFile0 {
 		String filename;
 		MappedByteBuffer buffer = null;
 		RandomAccessFile file = null;
 		long fileSize = 0;
-
+		Mutex mutex = new Mutex();
 		public MmapReadableFile(String fname) {
 			filename = fname;
 		}
 
 		public Status open() {
 			try {
+				mutex.lock();
+				
 				fileSize = (new File(filename)).length();
 				file = new RandomAccessFile(filename, "r");
 				buffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
+				
+				fileOpRecord.addFileOp(filename, FileOpType.Open);
+				
 				return Status.ok0();
 			} catch (IOException e) {
 				return Status.ioError(filename + " MmapReadableFile.open failed: " + e);
+			} finally {
+				mutex.unlock();
 			}
 		}
 
@@ -263,14 +406,19 @@ public class EnvImpl implements Env {
 
 		public void close() {
 			try {
+				mutex.lock();
 				if (file != null) {
 					if (buffer != null && ((DirectBuffer) buffer).cleaner() != null)
 						((DirectBuffer) buffer).cleaner().clean();
 					file.close();
 					file = null;
+					
+					fileOpRecord.addFileOp(filename, FileOpType.Close);
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
+			} finally {
+				mutex.unlock();
 			}
 		}
 
@@ -299,12 +447,13 @@ public class EnvImpl implements Env {
 		}
 	}
 
-	static class WritableFileImpl implements WritableFile {
+	class WritableFileImpl implements WritableFile {
 		String filename;
 		boolean append;
 		FileOutputStream fos;
 		DataOutputStream dos;
-
+		Mutex mutex = new Mutex();
+		
 		public WritableFileImpl(String fname, boolean append) {
 			filename = fname;
 			this.append = append;
@@ -312,11 +461,18 @@ public class EnvImpl implements Env {
 
 		public Status open() {
 			try {
+				mutex.lock();
+				
 				fos = new FileOutputStream(new File(filename), append);
 				dos = new DataOutputStream(fos);
+				
+				fileOpRecord.addFileOp(filename, FileOpType.Open);
+				
 				return Status.ok0();
 			} catch (FileNotFoundException e) {
 				return Status.ioError(filename + " WritableFileImpl.open failed: " + e);
+			} finally {
+				mutex.unlock();
 			}
 		}
 
@@ -331,6 +487,7 @@ public class EnvImpl implements Env {
 
 		public Status close() {
 			try {
+				mutex.lock();
 				if (fos != null) {
 					dos.flush();
 					fos.flush();
@@ -338,10 +495,14 @@ public class EnvImpl implements Env {
 					fos = null;
 					dos.close();
 					dos = null;
+					
+					fileOpRecord.addFileOp(filename, FileOpType.Close);
 				}
 				return Status.ok0();
 			} catch (IOException e) {
 				return Status.ioError(filename + " WritableFileImpl.closed failed: " + e.getMessage());
+			} finally {
+				mutex.unlock();
 			}
 		}
 
@@ -370,28 +531,6 @@ public class EnvImpl implements Env {
 		}
 	}
 
-	static class LockTable {
-		Mutex mu = new Mutex();
-		TreeSet<String> lockedFiles = new TreeSet<String>();
-
-		public boolean insert(String fname) {
-			mu.lock();
-			try {
-				return lockedFiles.add(fname);
-			} finally {
-				mu.unlock();
-			}
-		}
-
-		public void remove(String fname) {
-			mu.lock();
-			try {
-				lockedFiles.remove(fname);
-			} finally {
-				mu.unlock();
-			}
-		}
-	};
 
 	ReentrantLock mu;
 	Condition bgsignal;
@@ -749,5 +888,10 @@ public class EnvImpl implements Env {
 				e.printStackTrace();
 			}
 		}
+	}
+	
+	@Override
+	public Env clone() {
+		return LevelDB.defaultEnv();
 	}
 }

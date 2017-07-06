@@ -37,4 +37,8 @@ public class SliceFactory {
 		ret.init(s.data(), s.offset(), s.size());
 		return ret;
 	}
+	
+	public static Slice newUnpooled(ByteBuf b) {
+		return newUnpooled(b.data(), b.offset(), b.size());
+	}
 }

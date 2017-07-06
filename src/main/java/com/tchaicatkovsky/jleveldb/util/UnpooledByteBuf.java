@@ -21,14 +21,14 @@ import java.nio.BufferOverflowException;
 public class UnpooledByteBuf implements ByteBuf {
 
 	byte[] data;
-	int limit;
 	int offset;
+	int size;
 	int capacity;
 
 	public UnpooledByteBuf() {
 		data = null;
-		limit = 0;
 		offset = 0;
+		size = 0;
 		capacity = 0;
 	}
 	
@@ -43,23 +43,13 @@ public class UnpooledByteBuf implements ByteBuf {
 	}
 	
 	@Override
-	final public int incrOffset(int incr) {
-		assert(offset+incr >= 0 && offset+incr <= limit);
-		
-		offset += incr;
-		return offset;
-	}
-	
-	@Override
-	final public void setOffset(int offset) {
-		assert(offset >= 0 & offset <= limit);
-		
-		this.offset = offset;
+	final public int endOffset() {
+		return offset + size;
 	}
 	
 	@Override
 	final public int size() {
-		return limit;
+		return size;
 	}
 	
 	@Override
@@ -68,49 +58,23 @@ public class UnpooledByteBuf implements ByteBuf {
 	}
 	
 	@Override
-	final public int limit() {
-		return limit;
-	}
-	
-	@Override
 	final public byte getByte(int idx) {
-		if (idx < 0 || idx >= limit)
+		if (idx < 0 || idx >= size)
 			throw new BufferOverflowException();
-		return data[idx];
+		return data[offset + idx];
 	}
 	
 	@Override
 	final public void setByte(int idx, byte b) {
-		if (idx < 0 || idx >= limit)
+		if (idx < 0 || idx >= size)
 			throw new BufferOverflowException();
-		data[idx] = b;
-	}
-	
-	@Override
-	public void init(Slice s) {
-		// Do nothing
-	}
-	
-	@Override
-	public void init(byte[] data, int offset, int size) {
-		// Do nothing
-	}
-	
-	@Override
-	public void assign(byte[] data, int size) {
-		assign(data, 0, size);
-	}
-	
-	@Override
-	public void assign(byte[] data, int offset, int size) {
-		clear();
-		append(data, offset, size);
+		data[offset + idx] = b;
 	}
 
 	@Override
 	public ByteBuf clone() {
 		ByteBuf ret = new UnpooledByteBuf();
-		ret.assign(data, 0, size());
+		ret.assign(data, offset, size());
 		return ret;
 	}
 	
@@ -119,18 +83,17 @@ public class UnpooledByteBuf implements ByteBuf {
 		if (data == null || size() == 0)
 			return "";
 		
-		return new String(data, 0, size());
+		return new String(data, offset, size());
 	}
 
 	@Override
 	final public void clear() {
-		offset = 0;
-		limit = 0;
+		size = 0;
 	}
 	
 	@Override
 	final public boolean empty() {
-		return size() == 0;
+		return size == 0;
 	}
 	
 	@Override
@@ -138,17 +101,17 @@ public class UnpooledByteBuf implements ByteBuf {
 		UnpooledByteBuf b = (UnpooledByteBuf)buf0;
 		
 		byte[] data0 = data;
-		int limit0 = limit;
+		int size0 = size;
 		int offset0 = offset;
 		int capacity0 = capacity;
 		
 		data = b.data;
-		limit = b.limit;
+		size = b.size;
 		offset = b.offset;
 		capacity = b.capacity;
 		
 		b.data = data0;
-		b.limit = limit0;
+		b.size = size0;
 		b.offset = offset0;
 		b.capacity = capacity0;
 	}
@@ -163,9 +126,8 @@ public class UnpooledByteBuf implements ByteBuf {
 		if (n < 0)
 			return;
 		
-		offset = 0;
 		if (n < size()) {
-			limit = n;
+			size = n;
 			return;
 		}
 		
@@ -174,14 +136,15 @@ public class UnpooledByteBuf implements ByteBuf {
 		if (newcapacity > capacity()) {
 			byte[] newData = new byte[newcapacity];
 			if (size() > 0)
-				System.arraycopy(data, 0, newData, 0, size());
+				System.arraycopy(data, offset, newData, 0, size());
 			data = newData;
+			offset = 0;
 			capacity = newcapacity;
 		}
 		
 		for (int i = oldSize; i < n; i++)
 			data[i] = value;
-		limit = n;
+		size = n;
 	}
 	
 	final int calculateCapacity(int size) {
@@ -198,13 +161,14 @@ public class UnpooledByteBuf implements ByteBuf {
 		if (bytes <= 0)
 			return;
 		
-		if (capacity - limit < bytes) {
-			int total  = limit + bytes;
+		if (capacity - size < bytes) {
+			int total  = size + bytes;
 			int newcapacity = calculateCapacity(total);
 			byte[] newData = new byte[newcapacity];
 			if (size() > 0)
-				System.arraycopy(data, 0, newData, 0, size());
+				System.arraycopy(data, offset, newData, 0, size());
 			data = newData;
+			offset = 0;
 			capacity = newcapacity;
 		}
 	}
@@ -220,7 +184,7 @@ public class UnpooledByteBuf implements ByteBuf {
 			int size = size();
 			byte[] bdata = b.data;
 			for (int i = 0; i < size; i++) {
-				if (data[i] != bdata[i])
+				if (data[offset+i] != bdata[b.offset+i])
 					return false;
 			}
 			return true;
@@ -230,77 +194,111 @@ public class UnpooledByteBuf implements ByteBuf {
 	}
 	
 	@Override
-	final public void append(byte[] buf, int size) {
-		append(buf, 0 ,size);
+	public void append(byte[] buf, int n) {
+		append(buf, 0 ,n);
 	}
 	
 	@Override
-	final public void append(byte[] buf, int offset, int size) {
-		require(size);
-		if (size <= 0)
+	public void append(byte[] buf, int off0, int n) {
+		if (n <= 0)
 			return;
 		
-		System.arraycopy(buf, offset, data, limit, size);
-		limit += size;
+		require(n);
+		System.arraycopy(buf, off0, data, endOffset(), n);
+		size += n;
 	}
 	
 	@Override
-	final public void append(ByteBuf buf) {
-		append(buf.data(), 0, buf.size());
+	public void append(String s) {
+		byte[] b = s.getBytes();
+		append(b, 0, b.length);
+	}
+	
+	@Override
+	public void append(ByteBuf buf) {
+		append(buf.data(), buf.offset(), buf.size());
+	}
+	
+	@Override
+	public void append(Slice slice) {
+		append(slice.data(), slice.offset(), slice.size());
 	}
 	
 	@Override
 	final public void addByte(byte b) {
 		require(1);
-		data[limit++] = b;
+		data[size++] = b;
+	}
+	
+	public void assign(byte[] data, int n) {
+		clear();
+		append(data, n);
+	}
+	
+	public void assign(byte[] data, int off, int n) {
+		clear();
+		append(data, off, n);
 	}
 	
 	@Override
 	public void assign(String s) {
-		byte[] b = s.getBytes();
-		assign(b, 0, b.length);
+		clear();
+		append(s);
 	}
 	
 	@Override
 	public void assign(ByteBuf buf) {
-		assign(buf.data(), 0, buf.size());
+		clear();
+		append(buf);
+	}
+	
+	@Override
+	public void assign(Slice slice) {
+		clear();
+		append(slice);
 	}
 
 	@Override
 	final public void addFixedNat32(int value) {
 		require(4);
-		Coding.encodeFixedNat32(data, limit, limit+4, value);
-		limit += 4;
+		int limit = offset + size;
+		Coding.encodeFixedNat32(data, limit, value);
+		size += 4;
 	}
 	
 	@Override
 	final public void addFixedNat32Long(long value) {
 		require(4);
+		int limit = offset + size;
 		Coding.encodeFixedNat32Long(data, limit, limit+4, value);
-		limit += 4;
+		size += 4;
 	}
 
 	@Override
 	final public void addFixedNat64(long value) {
 		require(8);
+		int limit = offset + size;
 		Coding.encodeFixedNat64(data, limit, limit+8, value);
-		limit += 8;
+		size += 8;
 	}
 
 	@Override
 	final public void addVarNat32(int value) {
-		byte[] tmp = new byte[8]; //TODO
-		int offset = Coding.encodeVarNat32(tmp, 0, 8, value);
-		append(tmp, offset);
+		int vlen = Coding.varNatLength(value);
+		require(vlen);
+		int limit = offset + size;
+		Coding.encodeVarNat32(data, limit, limit+vlen, value);
+		size += vlen;
 	}
 
 	@Override
 	final public void addVarNat64(long value) {
-		byte[] tmp = new byte[16]; //TODO
-		int offset = Coding.encodeVarNat64(tmp, 0, 16, value);
-		append(tmp, offset);
+		int vlen = Coding.varNatLength(value);
+		require(vlen);
+		int limit = offset + size;
+		Coding.encodeVarNat64(data, limit, limit+vlen, value);
+		size += vlen;
 	}
-	
 
 	@Override
 	final public void addLengthPrefixedSlice(Slice value) {
@@ -308,55 +306,19 @@ public class UnpooledByteBuf implements ByteBuf {
 		append(value.data(), value.offset(), value.size());
 	}
 	
-	@Override
-	final public int readFixedNat32() {
-		int ret = Coding.decodeFixedNat32(data, offset, capacity);
-		offset += 4;
-		return ret;
-	}
-	
-	@Override
-	final public long readFixedNat64() {
-		long ret = Coding.decodeFixedNat64(data, offset, capacity);
-		offset += 8;
-		return ret;
-	}
-	
-	@Override
-	final public int readVarNat32() {
-		return Coding.popVarNat32(this);
-	}
 
-	@Override
-	final public long readVarNat64() {
-		return Coding.popVarNat64(this);
-	}
-	
-	@Override
-	final public Slice readLengthPrefixedSlice() {
-		int size = readVarNat32();
-		Slice slice = SliceFactory.newUnpooled();
-		slice.init(new byte[size], 0, size);
-		System.arraycopy(data, offset, slice.data(), 0, size);
-		offset += size;
-		return slice;
-	}
-	
-
-	
 	@Override
 	public long hashCode0() {
 		return Hash.hash0(data, offset, size(), 301);
 	}
 	
 	@Override
-	public void removePrefix(int n) {
-		assert(n <= size());
-		offset +=n ;
+	public int compare(Slice b) {
+		return ByteUtils.bytewiseCompare(data, offset, size(), b.data(), b.offset(), b.size());
 	}
 	
 	@Override
-	final public int compare(Slice b) {
+	public int compare(ByteBuf b) {
 		return ByteUtils.bytewiseCompare(data, offset, size(), b.data(), b.offset(), b.size());
 	}
 }

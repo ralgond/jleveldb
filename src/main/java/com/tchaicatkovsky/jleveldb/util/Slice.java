@@ -31,6 +31,8 @@ public interface Slice {
 	
 	void init(Slice s);
 	
+	void init(ByteBuf b);
+	
 	void init(byte[] data, int offset, int size);
 	
 	byte getByte(int idx);
@@ -48,4 +50,34 @@ public interface Slice {
 	long hashCode0();
 	
 	Slice clone();
+	
+	/**
+	 * read 32bit fixed natural number.
+	 * @return
+	 */
+	int readFixedNat32();
+	
+	/**
+	 * read 64bit fixed natural number.
+	 * @return
+	 */
+	long readFixedNat64();
+	
+	/**
+	 * read 32bit var natural number.
+	 * @return
+	 */
+	int readVarNat32();
+	
+	/**
+	 * read 64bit var natural number.
+	 * @return
+	 */
+	long readVarNat64();
+	
+	/**
+	 * read slice.
+	 * @param value
+	 */
+	Slice readLengthPrefixedSlice();
 }

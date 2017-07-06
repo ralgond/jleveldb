@@ -33,6 +33,18 @@ public abstract class Comparator0 {
 		return compare(a.data(), a.offset(), a.size(), b.data(), b.offset(), b.size());
 	}
 	
+	public int compare(ByteBuf a, Slice b) {
+		return compare(a.data(), a.offset(), a.size(), b.data(), b.offset(), b.size());
+	}
+	
+	public int compare(Slice a, ByteBuf b) {
+		return compare(a.data(), a.offset(), a.size(), b.data(), b.offset(), b.size());
+	}
+	
+	public int compare(ByteBuf a, ByteBuf b) {
+		return compare(a.data(), a.offset(), a.size(), b.data(), b.offset(), b.size());
+	}
+	
 	/**
 	 * The name of the comparator.  Used to check for comparator 
 	 * mismatches (i.e., a DB created with one comparator is 

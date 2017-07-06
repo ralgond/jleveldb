@@ -24,8 +24,17 @@ public abstract class Logger0 {
 
 	public abstract void log(String format, Object... objects);
 
+	public static boolean enable = true;
+	
+	public static void disableLogger0() {
+		enable = false;
+	}
+	
+	public static void enableLogger0() {
+		enable = true;
+	}
 	public static void log0(Logger0 log, String format, Object... objects) {
-		if (log != null)
+		if (log != null && enable)
 			log.log(format, objects);
 	}
 

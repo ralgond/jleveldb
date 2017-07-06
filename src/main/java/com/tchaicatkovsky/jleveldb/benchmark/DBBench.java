@@ -275,7 +275,7 @@ public class DBBench {
 				byte[] buf = String.format("%6.1f MB/s", (bytes / 1048576.0) / elapsed).getBytes();
 				extra.assign(buf, 0, buf.length);
 			}
-			appendWithSpace(extra, message);
+			appendWithSpace(extra, SliceFactory.newUnpooled(message));
 
 			System.out.printf("%-12s : %11.3f millis/op;%s%s\n", name.encodeToString(), seconds * 1e3 / done, (extra.empty() ? "" : " "), extra.encodeToString());
 

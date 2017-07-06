@@ -22,6 +22,7 @@ import com.tchaicatkovsky.jleveldb.FileType;
 import com.tchaicatkovsky.jleveldb.FilterPolicy;
 import com.tchaicatkovsky.jleveldb.Iterator0;
 import com.tchaicatkovsky.jleveldb.LevelDB;
+import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.Options;
 import com.tchaicatkovsky.jleveldb.RandomAccessFile0;
 import com.tchaicatkovsky.jleveldb.Range;
@@ -61,6 +62,15 @@ import static org.junit.Assert.assertTrue;
 
 public class TestDB {
 
+	static Slice S0(ByteBuf b) {
+		return SliceFactory.newUnpooled(b);
+	}
+	
+	static Slice S0(String s) {
+		byte[] b = s.getBytes();
+		return SliceFactory.newUnpooled(b, 0, b.length);
+	}
+	
 	static ByteBuf randomString(Random0 rnd, int len) {
 		ByteBuf r = ByteBufFactory.newUnpooled();
 		TestUtil.randomString(rnd, len, r);
@@ -103,6 +113,12 @@ public class TestDB {
 			countRandomReads = false;
 			manifestSyncError.set(null);
 			manifestWriteError.set(null);
+		}
+		
+		@Override
+		public Env clone() {
+			setTarget(target().clone());
+			return this;		
 		}
 
 		static class DataFile implements WritableFile {
@@ -270,12 +286,14 @@ public class TestDB {
 		public int optionConfig;
 
 		String dbname;
-		SpecialEnv env;
+		final SpecialEnv env;
 		DB db;
 
 		Options lastOptions;
 
 		public DBTestRunner() throws Exception {
+			//System.setOut(new PrintStream(new DummyOutputStream()));
+			Logger0.disableLogger0();
 			optionConfig = OptionConfig.kDefault.ordinal();
 			env = new SpecialEnv(LevelDB.defaultEnv());
 			filterPolicy = BloomFilterPolicy.newBloomFilterPolicy(10);
@@ -286,9 +304,12 @@ public class TestDB {
 			reopen();
 		}
 
+		
 		public void delete() throws Exception {
 			if (db != null)
-				db.close();
+				close();
+			
+			
 			LevelDB.destroyDB(dbname, new Options());
 			filterPolicy = null;
 		}
@@ -334,11 +355,22 @@ public class TestDB {
 		public void close() {
 			db.close();
 			db = null;
+			
+			ArrayList<String> l = env.getUnclosedFileList();
+			
+			System.out.printf("Unclosed File List(%d) OptionConfig=%s:", 
+					l.size(), getOptionConfig(optionConfig));
+			
+			for (String filename : l)
+				System.out.println(filename);
+			if (l.size() > 0)
+				env.printFileOpList();
+			System.out.println("");
+			env.clearFileOpList();
 		}
 
 		public void destroyAndReopen(Options options) throws Exception {
-			db.close();
-			db = null;
+			close();
 			LevelDB.destroyDB(dbname, new Options());
 			assertTrue(tryReopen(options).ok());
 		}
@@ -347,29 +379,23 @@ public class TestDB {
 			destroyAndReopen(null);
 		}
 
-		OptionConfig getOptionConfig(int i) {
+		String getOptionConfig(int i) {
 			if (i == OptionConfig.kDefault.ordinal())
-				return OptionConfig.kDefault;
+				return OptionConfig.kDefault.name();
 			else if (i == OptionConfig.kReuse.ordinal())
-				return OptionConfig.kReuse;
+				return OptionConfig.kReuse.name();
 			else if (i == OptionConfig.kFilter.ordinal())
-				return OptionConfig.kFilter;
+				return OptionConfig.kFilter.name();
 			else if (i == OptionConfig.kUncompressed.ordinal())
-				return OptionConfig.kUncompressed;
+				return OptionConfig.kUncompressed.name();
 			else
-				return null;
+				return "<null>";
 		}
 
 		public Status tryReopen(Options options) throws Exception {
-			System.out.println("\n\n");
-			System.out.println("[DEBUG] ===================================================");
-			System.out.println("[DEBUG] optionsConfig=" + optionConfig + ", " + getOptionConfig(optionConfig).name());
-			System.out.println("[DEBUG] ===================================================");
+			if (db != null)
+				close();
 
-			if (db != null) {
-				db.close();
-				db = null;
-			}
 			Options opts;
 			if (options != null) {
 				opts = options.cloneOptions();
@@ -394,6 +420,10 @@ public class TestDB {
 		}
 
 		public Status put(String k, String v) throws Exception {
+			return db.put(new WriteOptions(), SliceFactory.newUnpooled(k), SliceFactory.newUnpooled(v));
+		}
+		
+		public Status put(String k, ByteBuf v) throws Exception {
 			return db.put(new WriteOptions(), SliceFactory.newUnpooled(k), SliceFactory.newUnpooled(v));
 		}
 
@@ -573,8 +603,8 @@ public class TestDB {
 		// covering the range [small,large].
 		public void makeTables(int n, String small, String large) throws Exception {
 			for (int i = 0; i < n; i++) {
-				put(SliceFactory.newUnpooled(small), SliceFactory.newUnpooled("begin"));
-				put(SliceFactory.newUnpooled(large), SliceFactory.newUnpooled("end"));
+				put(small, "begin");
+				put(large, "end");
 				dbfull().TEST_CompactMemTable();
 			}
 		}
@@ -635,13 +665,22 @@ public class TestDB {
 		}
 	}
 
+	private String getMethodName() {  
+        StackTraceElement[] stacktrace = Thread.currentThread().getStackTrace();  
+        StackTraceElement e = stacktrace[2];  
+        String methodName = e.getMethodName();  
+        return methodName;  
+    }  
+	
 	@Test
 	public void testEmpty() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
 				assertTrue(r.db != null);
-				assertEquals("NOT_FOUND", r.get(SliceFactory.newUnpooled("foo")));
+				assertEquals("NOT_FOUND", r.get("foo"));
 			} while (r.changeOptions());
 		} finally {
 			r.delete();
@@ -650,6 +689,8 @@ public class TestDB {
 
 	@Test
 	public void testReadWrite() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -667,10 +708,12 @@ public class TestDB {
 
 	@Test
 	public void testPutDeleteGet() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
-				assertTrue(r.db.put(new WriteOptions(), SliceFactory.newUnpooled("foo"), SliceFactory.newUnpooled("v1")).ok());
+				assertTrue(r.db.put(new WriteOptions(), S0("foo"), S0("v1")).ok());
 				assertEquals("v1", r.get("foo"));
 				assertTrue(r.db.put(new WriteOptions(), SliceFactory.newUnpooled("foo"), SliceFactory.newUnpooled("v2")).ok());
 				assertEquals("v2", r.get("foo"));
@@ -684,6 +727,8 @@ public class TestDB {
 
 	@Test
 	public void testGetFromImmutableLayer() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -708,6 +753,8 @@ public class TestDB {
 
 	@Test
 	public void testGetFromVersions() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -722,6 +769,8 @@ public class TestDB {
 
 	@Test
 	public void testGetMemUsage() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -739,6 +788,8 @@ public class TestDB {
 
 	@Test
 	public void testGetSnapshot() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -763,6 +814,8 @@ public class TestDB {
 
 	@Test
 	public void testGetLevel0Ordering() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -784,11 +837,13 @@ public class TestDB {
 
 	@Test
 	public void testGetOrderedByLevels() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
 				assertTrue(r.put("foo", "v1").ok());
-				r.compact(SliceFactory.newUnpooled("a"), SliceFactory.newUnpooled("z"));
+				r.compact("a", "z");
 				assertEquals("v1", r.get("foo"));
 				assertTrue(r.put("foo", "v2").ok());
 				assertEquals("v2", r.get("foo"));
@@ -802,6 +857,8 @@ public class TestDB {
 
 	@Test
 	public void testGetPicksCorrectFile() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -823,6 +880,8 @@ public class TestDB {
 
 	@Test
 	public void testGetEncountersEmptyLevel() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -867,6 +926,8 @@ public class TestDB {
 
 	@Test
 	public void testIterEmpty() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Iterator0 iter = r.db.newIterator(new ReadOptions());
@@ -877,7 +938,7 @@ public class TestDB {
 			iter.seekToLast();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(SliceFactory.newUnpooled("foo"));
+			iter.seek(S0("foo"));
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
 			iter.delete();
@@ -888,6 +949,8 @@ public class TestDB {
 
 	@Test
 	public void testIterSingle() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			assertTrue(r.put("a", "va").ok());
@@ -911,17 +974,17 @@ public class TestDB {
 			iter.prev();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(SliceFactory.newUnpooled(""));
+			iter.seek(S0(""));
 			assertEquals(r.iterStatus(iter), "a->va");
 			iter.next();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(SliceFactory.newUnpooled("a"));
+			iter.seek(S0("a"));
 			assertEquals(r.iterStatus(iter), "a->va");
 			iter.next();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(SliceFactory.newUnpooled("b"));
+			iter.seek(S0("b"));
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
 			iter.delete();
@@ -932,7 +995,8 @@ public class TestDB {
 
 	@Test
 	public void testIterMulti() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			assertTrue(r.put("a", "va").ok());
@@ -966,15 +1030,15 @@ public class TestDB {
 			iter.next();
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
-			iter.seek(SliceFactory.newUnpooled(""));
+			iter.seek(S0(""));
 			assertEquals(r.iterStatus(iter), "a->va");
-			iter.seek(SliceFactory.newUnpooled("a"));
+			iter.seek(S0("a"));
 			assertEquals(r.iterStatus(iter), "a->va");
-			iter.seek(SliceFactory.newUnpooled("ax"));
+			iter.seek(S0("ax"));
 			assertEquals(r.iterStatus(iter), "b->vb");
-			iter.seek(SliceFactory.newUnpooled("b"));
+			iter.seek(S0("b"));
 			assertEquals(r.iterStatus(iter), "b->vb");
-			iter.seek(SliceFactory.newUnpooled("z"));
+			iter.seek(S0("z"));
 			assertEquals(r.iterStatus(iter), "(invalid)");
 
 			// Switch from reverse to forward
@@ -996,7 +1060,7 @@ public class TestDB {
 			assertTrue(r.put("a2", "va3").ok());
 			assertTrue(r.put("b", "vb2").ok());
 			assertTrue(r.put("c", "vc2").ok());
-			assertTrue(r.delete(SliceFactory.newUnpooled("b")).ok());
+			assertTrue(r.delete(S0("b")).ok());
 			iter.seekToFirst();
 			assertEquals(r.iterStatus(iter), "a->va");
 			iter.next();
@@ -1022,6 +1086,8 @@ public class TestDB {
 
 	@Test
 	public void testIterSmallAndLargeMix() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			assertTrue(r.put("a", "va").ok());
@@ -1066,17 +1132,19 @@ public class TestDB {
 
 	@Test
 	public void testIterMultiWithDelete() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
 				assertTrue(r.put("a", "va").ok());
 				assertTrue(r.put("b", "vb").ok());
 				assertTrue(r.put("c", "vc").ok());
-				assertTrue(r.delete(SliceFactory.newUnpooled("b")).ok());
+				assertTrue(r.delete(S0("b")).ok());
 				assertEquals("NOT_FOUND", r.get("b"));
 
 				Iterator0 iter = r.db.newIterator(new ReadOptions());
-				iter.seek(SliceFactory.newUnpooled("c"));
+				iter.seek(S0("c"));
 				assertEquals(r.iterStatus(iter), "c->vc");
 				iter.prev();
 				assertEquals(r.iterStatus(iter), "a->va");
@@ -1089,6 +1157,8 @@ public class TestDB {
 
 	@Test
 	public void testRecover() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1117,6 +1187,8 @@ public class TestDB {
 
 	@Test
 	public void testRecoveryWithEmptyLog() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1135,6 +1207,8 @@ public class TestDB {
 
 	@Test
 	public void testRecoverDuringMemtableCompaction() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1173,7 +1247,8 @@ public class TestDB {
 
 	@Test
 	public void testMinorCompactionsHappen() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Options options = r.currentOptions().cloneOptions();
@@ -1208,7 +1283,8 @@ public class TestDB {
 
 	@Test
 	public void testRecoverWithLargeLog() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			{
@@ -1239,7 +1315,8 @@ public class TestDB {
 
 	@Test
 	public void testCompactionsGenerateMultipleFiles() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Options options = r.currentOptions().cloneOptions();
@@ -1272,7 +1349,8 @@ public class TestDB {
 
 	@Test
 	public void testRepeatedWritesToSameKey() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Options options = r.currentOptions().cloneOptions();
@@ -1298,7 +1376,8 @@ public class TestDB {
 
 	@Test
 	public void testSparseMerge() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Options options = r.currentOptions().cloneOptions();
@@ -1352,13 +1431,10 @@ public class TestDB {
 		return result;
 	}
 
-	Slice slice(String s) {
-		return SliceFactory.newUnpooled(s);
-	}
-
 	@Test
 	public void testApproximateSizes() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1367,9 +1443,9 @@ public class TestDB {
 				options.compression = CompressionType.kNoCompression;
 				r.destroyAndReopen();
 
-				assertTrue(between(r.size(slice(""), slice("xyz")), 0, 0));
+				assertTrue(between(r.size(S0(""), S0("xyz")), 0, 0));
 				r.reopen(options);
-				assertTrue(between(r.size(slice(""), slice("xyz")), 0, 0));
+				assertTrue(between(r.size(S0(""), S0("xyz")), 0, 0));
 
 				// Write 8MB (80 values, each 100K)
 				assertEquals(r.numTableFilesAtLevel(0), 0);
@@ -1383,14 +1459,14 @@ public class TestDB {
 
 				// 0 because GetApproximateSizes() does not account for memtable
 				// space
-				assertTrue(between(r.size(slice(""), slice(Key(50))), 0, 0));
+				assertTrue(between(r.size(S0(""), S0(Key(50))), 0, 0));
 
 				if (options.reuseLogs) {
 					// Recovery will reuse memtable, and GetApproximateSizes() does
 					// not
 					// account for memtable usage;
 					r.reopen(options);
-					assertTrue(between(r.size(slice(""), slice(Key(50))), 0, 0));
+					assertTrue(between(r.size(S0(""), S0(Key(50))), 0, 0));
 					continue;
 				}
 
@@ -1400,17 +1476,17 @@ public class TestDB {
 
 					for (int compact_start = 0; compact_start < N; compact_start += 10) {
 						for (int i = 0; i < N; i += 10) {
-							assertTrue(between(r.size(slice(""), slice(Key(i))), S1 * i, S2 * i));
-							assertTrue(between(r.size(slice(""), slice(Key(i) + ".suffix")), S1 * (i + 1), S2 * (i + 1)));
-							assertTrue(between(r.size(slice(Key(i)), slice(Key(i + 10))), S1 * 10, S2 * 10));
+							assertTrue(between(r.size(S0(""), S0(Key(i))), S1 * i, S2 * i));
+							assertTrue(between(r.size(S0(""), S0(Key(i) + ".suffix")), S1 * (i + 1), S2 * (i + 1)));
+							assertTrue(between(r.size(S0(Key(i)), S0(Key(i + 10))), S1 * 10, S2 * 10));
 						}
-						assertTrue(between(r.size(slice(""), slice(Key(50))), S1 * 50, S2 * 50));
-						assertTrue(between(r.size(slice(""), slice(Key(50) + ".suffix")), S1 * 50, S2 * 50));
+						assertTrue(between(r.size(S0(""), S0(Key(50))), S1 * 50, S2 * 50));
+						assertTrue(between(r.size(S0(""), S0(Key(50) + ".suffix")), S1 * 50, S2 * 50));
 
 						String cstart_str = Key(compact_start);
 						String cend_str = Key(compact_start + 9);
-						Slice cstart = slice(cstart_str);
-						Slice cend = slice(cend_str);
+						Slice cstart = S0(cstart_str);
+						Slice cend = S0(cend_str);
 						r.dbfull().TEST_CompactRange(0, cstart, cend);
 					}
 
@@ -1425,7 +1501,8 @@ public class TestDB {
 
 	@Test
 	public void testApproximateSizes_MixOfSmallAndLarge() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1435,7 +1512,7 @@ public class TestDB {
 
 				Random0 rnd = new Random0(301);
 				ByteBuf big1 = randomString(rnd, 100000);
-				assertTrue(r.put(Key(0), randomString(rnd, 10000)).ok());
+				assertTrue(r.put(Key(0), randomString(rnd, 10000) ).ok());
 				assertTrue(r.put(Key(1), randomString(rnd, 10000)).ok());
 				assertTrue(r.put(Key(2), big1).ok());
 				assertTrue(r.put(Key(3), randomString(rnd, 10000)).ok());
@@ -1454,17 +1531,17 @@ public class TestDB {
 				for (int run = 0; run < 3; run++) {
 					r.reopen(options);
 
-					assertTrue(between(r.size(slice(""), slice(Key(0))), 0, 0));
-					assertTrue(between(r.size(slice(""), slice(Key(1))), 10000, 11000));
-					assertTrue(between(r.size(slice(""), slice(Key(2))), 20000, 21000));
-					assertTrue(between(r.size(slice(""), slice(Key(3))), 120000, 121000));
-					assertTrue(between(r.size(slice(""), slice(Key(4))), 130000, 131000));
-					assertTrue(between(r.size(slice(""), slice(Key(5))), 230000, 231000));
-					assertTrue(between(r.size(slice(""), slice(Key(6))), 240000, 241000));
-					assertTrue(between(r.size(slice(""), slice(Key(7))), 540000, 541000));
-					assertTrue(between(r.size(slice(""), slice(Key(8))), 550000, 560000));
+					assertTrue(between(r.size(S0(""), S0(Key(0))), 0, 0));
+					assertTrue(between(r.size(S0(""), S0(Key(1))), 10000, 11000));
+					assertTrue(between(r.size(S0(""), S0(Key(2))), 20000, 21000));
+					assertTrue(between(r.size(S0(""), S0(Key(3))), 120000, 121000));
+					assertTrue(between(r.size(S0(""), S0(Key(4))), 130000, 131000));
+					assertTrue(between(r.size(S0(""), S0(Key(5))), 230000, 231000));
+					assertTrue(between(r.size(S0(""), S0(Key(6))), 240000, 241000));
+					assertTrue(between(r.size(S0(""), S0(Key(7))), 540000, 541000));
+					assertTrue(between(r.size(S0(""), S0(Key(8))), 550000, 560000));
 
-					assertTrue(between(r.size(slice(Key(3)), slice(Key(5))), 110000, 111000));
+					assertTrue(between(r.size(S0(Key(3)), S0(Key(5))), 110000, 111000));
 
 					r.dbfull().TEST_CompactRange(0, null, null);
 				}
@@ -1476,7 +1553,8 @@ public class TestDB {
 
 	@Test
 	public void testIteratorPinsRef() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			r.put("foo", "hello");
@@ -1505,7 +1583,8 @@ public class TestDB {
 
 	@Test
 	public void testSnapshot() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1541,7 +1620,8 @@ public class TestDB {
 
 	@Test
 	public void testHiddenValuesAreRemoved() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1559,20 +1639,20 @@ public class TestDB {
 				assertTrue(r.numTableFilesAtLevel(0) > 0);
 
 				assertEquals(big.encodeToString(), r.get("foo", snapshot));
-				assertTrue(between(r.size(slice(""), slice("pastfoo")), 50000, 60000));
+				assertTrue(between(r.size(S0(""), S0("pastfoo")), 50000, 60000));
 
 				r.db.releaseSnapshot(snapshot);
-				assertEquals(r.allEntriesFor(slice("foo")), "[ tiny, " + big.encodeToString() + " ]");
+				assertEquals(r.allEntriesFor(S0("foo")), "[ tiny, " + big.encodeToString() + " ]");
 
-				Slice x = slice("x");
+				Slice x = S0("x");
 				r.dbfull().TEST_CompactRange(0, null, x);
-				assertEquals(r.allEntriesFor(slice("foo")), "[ tiny ]");
+				assertEquals(r.allEntriesFor(S0("foo")), "[ tiny ]");
 				assertEquals(r.numTableFilesAtLevel(0), 0);
 				assertTrue(r.numTableFilesAtLevel(1) >= 1);
 
 				r.dbfull().TEST_CompactRange(1, null, x);
-				assertEquals(r.allEntriesFor(slice("foo")), "[ tiny ]");
-				assertTrue(between(r.size(slice(""), slice("pastfoo")), 0, 1000));
+				assertEquals(r.allEntriesFor(S0("foo")), "[ tiny ]");
+				assertTrue(between(r.size(S0(""), S0("pastfoo")), 0, 1000));
 			} while (r.changeOptions());
 		} finally {
 			r.delete();
@@ -1581,7 +1661,8 @@ public class TestDB {
 
 	@Test
 	public void testDeletionMarkers1() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			r.put("foo", "v1");
@@ -1601,21 +1682,21 @@ public class TestDB {
 
 			r.delete("foo");
 			r.put("foo", "v2");
-			assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ v2, DEL, v1 ]");
 			assertTrue(r.dbfull().TEST_CompactMemTable().ok()); // Moves to level last-2
 
-			assertEquals(r.allEntriesFor(slice("foo")), "[ v2, DEL, v1 ]");
-			Slice z = slice("z");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ v2, DEL, v1 ]");
+			Slice z = S0("z");
 			r.dbfull().TEST_CompactRange(last - 2, null, z);
 
 			// DEL eliminated, but v1 remains because we aren't compacting that level
 			// (DEL can be eliminated because v2 hides v1).
-			assertEquals(r.allEntriesFor(slice("foo")), "[ v2, v1 ]");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ v2, v1 ]");
 			r.dbfull().TEST_CompactRange(last - 1, null, null);
 
 			// Merging last-1 w/ last, so we are the base level for "foo", so DEL is
 			// removed. (as is v1).
-			assertEquals(r.allEntriesFor(slice("foo")), "[ v2 ]");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ v2 ]");
 		} finally {
 			r.delete();
 		}
@@ -1623,7 +1704,8 @@ public class TestDB {
 
 	@Test
 	public void testDeletionMarkers2() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			r.put("foo", "v1");
@@ -1640,17 +1722,17 @@ public class TestDB {
 			assertEquals(r.numTableFilesAtLevel(last - 1), 1);
 
 			r.delete("foo");
-			assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ DEL, v1 ]");
 			assertTrue(r.dbfull().TEST_CompactMemTable().ok()); // Moves to level
 																// last-2
-			assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ DEL, v1 ]");
 			r.dbfull().TEST_CompactRange(last - 2, null, null);
 			// DEL kept: "last" file overlaps
-			assertEquals(r.allEntriesFor(slice("foo")), "[ DEL, v1 ]");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ DEL, v1 ]");
 			r.dbfull().TEST_CompactRange(last - 1, null, null);
 			// Merging last-1 w/ last, so we are the base level for "foo", so
 			// DEL is removed. (as is v1).
-			assertEquals(r.allEntriesFor(slice("foo")), "[ ]");
+			assertEquals(r.allEntriesFor(S0("foo")), "[ ]");
 		} finally {
 			r.delete();
 		}
@@ -1658,7 +1740,8 @@ public class TestDB {
 
 	@Test
 	public void testOverlapInLevel0() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -1708,7 +1791,8 @@ public class TestDB {
 
 	@Test
 	public void testL0_CompactionBug_Issue44_a() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			r.reopen();
@@ -1732,7 +1816,8 @@ public class TestDB {
 
 	@Test
 	public void testL0_CompactionBug_Issue44_b() throws Exception {
-
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			r.reopen();
@@ -1783,6 +1868,8 @@ public class TestDB {
 
 	@Test
 	public void testComparatorCheck() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			NewComparator cmp = new NewComparator();
@@ -1830,6 +1917,8 @@ public class TestDB {
 
 	@Test
 	public void testCustomComparator() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			NumberComparator cmp = new NumberComparator();
@@ -1866,6 +1955,8 @@ public class TestDB {
 
 	@Test
 	public void testManualCompaction() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			assertEquals(DBFormat.kMaxMemCompactLevel, 2);
@@ -1906,6 +1997,8 @@ public class TestDB {
 
 	@Test
 	public void testDBOpen_Options() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			String dbname = TestUtil.tmpDir() + "/db_options_test";
@@ -1960,6 +2053,8 @@ public class TestDB {
 
 	@Test
 	public void testLocking() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Object0<DB> db2 = new Object0<>();
@@ -1974,6 +2069,8 @@ public class TestDB {
 	// Check that number of files does not grow when we are out of space
 	@Test
 	public void testNoSpace() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Options options = r.currentOptions().cloneOptions();
@@ -2000,6 +2097,8 @@ public class TestDB {
 
 	@Test
 	public void testNonWritableFileSystem() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			Options options = r.currentOptions().cloneOptions();
@@ -2027,6 +2126,8 @@ public class TestDB {
 
 	@Test
 	public void testWriteSyncError() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			// Check that log sync errors cause the DB to disallow future writes.
@@ -2039,12 +2140,12 @@ public class TestDB {
 
 			// (b) Normal write should succeed
 			WriteOptions w = new WriteOptions();
-			assertTrue(r.db.put(w, SliceFactory.newUnpooled("k1"), SliceFactory.newUnpooled("v1")).ok());
+			assertTrue(r.db.put(w, S0("k1"), S0("v1")).ok());
 			assertEquals("v1", r.get("k1"));
 
 			// (c) Do a sync write; should fail
 			w.sync = true;
-			assertTrue(!r.db.put(w, SliceFactory.newUnpooled("k2"), SliceFactory.newUnpooled("v2")).ok());
+			assertTrue(!r.db.put(w, S0("k2"), S0("v2")).ok());
 			assertEquals("v1", r.get("k1"));
 			assertEquals("NOT_FOUND", r.get("k2"));
 
@@ -2053,7 +2154,7 @@ public class TestDB {
 
 			// (e) Do a non-sync write; should fail
 			w.sync = false;
-			assertTrue(!r.db.put(w, SliceFactory.newUnpooled("k3"), SliceFactory.newUnpooled("v3")).ok());
+			assertTrue(!r.db.put(w, S0("k3"), S0("v3")).ok());
 			assertEquals("v1", r.get("k1"));
 			assertEquals("NOT_FOUND", r.get("k2"));
 			assertEquals("NOT_FOUND", r.get("k3"));
@@ -2065,6 +2166,8 @@ public class TestDB {
 
 	@Test
 	public void testManifestWriteError() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			// Test for the following problem:
@@ -2113,6 +2216,8 @@ public class TestDB {
 
 	@Test
 	public void testMissingSSTFile() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			assertTrue(r.put("foo", "bar").ok());
@@ -2137,6 +2242,8 @@ public class TestDB {
 
 	@Test
 	public void testStillReadSST() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			assertTrue(r.put("foo", "bar").ok());
@@ -2159,6 +2266,8 @@ public class TestDB {
 
 	@Test
 	public void testFilesDeletedAfterCompaction() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			assertTrue(r.put("foo", "v2").ok());
@@ -2184,6 +2293,8 @@ public class TestDB {
 
 	@Test
 	public void testBloomFilter01() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			r.destroyAndReopen();
@@ -2212,6 +2323,8 @@ public class TestDB {
 
 	@Test
 	public void testBloomFilter() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			r.destroyAndReopen();
@@ -2331,10 +2444,10 @@ public class TestDB {
 						// Write values of the form <key, my id, counter>.
 						// We add some padding for force compactions.
 						String value1 = String.format("%d.%d.%-1000d", key, id, counter);
-						assertTrue(db.put(new WriteOptions(), SliceFactory.newUnpooled(key1), SliceFactory.newUnpooled(value1)).ok());
+						assertTrue(db.put(new WriteOptions(), S0(key1), S0(value1)).ok());
 					} else {
 						// Read a value and verify that it matches the pattern written above.
-						Status s = db.get(new ReadOptions(), SliceFactory.newUnpooled(key1), value);
+						Status s = db.get(new ReadOptions(), S0(key1), value);
 						if (s.isNotFound()) {
 							// Key has not yet been written
 						} else {
@@ -2371,6 +2484,8 @@ public class TestDB {
 
 	@Test
 	public void testMultiThreaded() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		DBTestRunner r = new DBTestRunner();
 		try {
 			do {
@@ -2447,8 +2562,8 @@ public class TestDB {
 			VersionEdit vbase = new VersionEdit();
 			long fnum = 1;
 			for (int i = 0; i < num_base_files; i++) {
-				InternalKey start = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum)), (long) 1, ValueType.Value);
-				InternalKey limit = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum + 1)), (long) 1, ValueType.Deletion);
+				InternalKey start = new InternalKey(S0(makeKey(2 * fnum)), (long) 1, ValueType.Value);
+				InternalKey limit = new InternalKey(S0(makeKey(2 * fnum + 1)), (long) 1, ValueType.Deletion);
 				vbase.addFile(2, fnum++, 1 /* file size */, start, limit, 10);
 			}
 			assertTrue(vset.logAndApply(vbase, mutex).ok());
@@ -2458,8 +2573,8 @@ public class TestDB {
 			for (int i = 0; i < iters; i++) {
 				VersionEdit vedit = new VersionEdit();
 				vedit.deleteFile(2, fnum);
-				InternalKey start = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum)), 1, ValueType.Value);
-				InternalKey limit = new InternalKey(SliceFactory.newUnpooled(makeKey(2 * fnum + 1)), 1, ValueType.Deletion);
+				InternalKey start = new InternalKey(S0(makeKey(2 * fnum)), 1, ValueType.Value);
+				InternalKey limit = new InternalKey(S0(makeKey(2 * fnum + 1)), 1, ValueType.Deletion);
 				vedit.addFile(2, fnum++, 1 /* file size */, start, limit, 10);
 				vset.logAndApply(vedit, mutex);
 			}
@@ -2474,6 +2589,8 @@ public class TestDB {
 
 	@Test
 	public void benchmark() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		BM_LogAndApply(1000, 1);
 		BM_LogAndApply(1000, 100);
 		BM_LogAndApply(1000, 10000);
@@ -2738,8 +2855,12 @@ public class TestDB {
 		return ok;
 	}
 
+
+	
 	//TODO
 	public void testRandomized() throws Exception {
+		System.err.println("Start "+getMethodName()+":");
+		
 		Random0 rnd = new Random0(TestUtil.randomSeed());
 
 		DBTestRunner r = new DBTestRunner();
@@ -2761,13 +2882,13 @@ public class TestDB {
 					if (p < 45) { // Put
 						k = randomKey(rnd);
 						v = randomString(rnd, (int) (rnd.oneIn(20) ? 100 + rnd.uniform(100) : rnd.uniform(8)));
-						assertTrue(model.put(new WriteOptions(), k, v).ok());
-						assertTrue(r.db.put(new WriteOptions(), k, v).ok());
+						assertTrue(model.put( new WriteOptions(), S0(k), S0(v) ).ok());
+						assertTrue(r.db.put(new WriteOptions(), S0(k), S0(v) ).ok());
 
 					} else if (p < 90) { // Delete
 						k = randomKey(rnd);
-						assertTrue(model.delete(new WriteOptions(), k).ok());
-						assertTrue(r.db.delete(new WriteOptions(), k).ok());
+						assertTrue(model.delete(new WriteOptions(), S0(k)).ok());
+						assertTrue(r.db.delete(new WriteOptions(), S0(k)).ok());
 
 					} else { // Multi-element batch
 						WriteBatch b = new WriteBatch();
@@ -2781,9 +2902,9 @@ public class TestDB {
 							}
 							if (rnd.oneIn(2)) {
 								v = randomString(rnd, (int) rnd.uniform(10));
-								b.put(k, v);
+								b.put(S0(k), S0(v));
 							} else {
-								b.delete(k);
+								b.delete(S0(k));
 							}
 						}
 						assertTrue(model.write(new WriteOptions(), b).ok());

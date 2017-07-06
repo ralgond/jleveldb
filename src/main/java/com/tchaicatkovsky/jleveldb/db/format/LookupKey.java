@@ -48,12 +48,12 @@ public class LookupKey {
 		
 		buf.addVarNat32(usize + 8);
 		
-		kstart = buf.limit();
+		kstart = buf.endOffset();
 		
 		buf.append(userKey.data(), usize);
 		buf.addFixedNat64(DBFormat.packSequenceAndType(sequence, DBFormat.kValueTypeForSeek));
 		
-		end = buf.limit();
+		end = buf.endOffset();
 		
 		data = buf.data();
 		

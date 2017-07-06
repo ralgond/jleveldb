@@ -19,7 +19,7 @@ package com.tchaicatkovsky.jleveldb.table;
 import com.tchaicatkovsky.jleveldb.Iterator0;
 import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.Status;
-import com.tchaicatkovsky.jleveldb.table.Format.BlockContents;
+import com.tchaicatkovsky.jleveldb.table.TableFormat.BlockContents;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;

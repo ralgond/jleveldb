@@ -20,8 +20,8 @@ import com.tchaicatkovsky.jleveldb.CompressionType;
 import com.tchaicatkovsky.jleveldb.Options;
 import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.WritableFile;
-import com.tchaicatkovsky.jleveldb.table.Format.BlockHandle;
-import com.tchaicatkovsky.jleveldb.table.Format.Footer;
+import com.tchaicatkovsky.jleveldb.table.TableFormat.BlockHandle;
+import com.tchaicatkovsky.jleveldb.table.TableFormat.Footer;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
@@ -307,16 +307,16 @@ public class TableBuilder {
 		handle.setSize(blockContents.size());
 		r.status = r.file.append(blockContents);
 		if (r.status.ok()) {
-			byte[] trailer = new byte[Format.kBlockTrailerSize];
+			byte[] trailer = new byte[TableFormat.kBlockTrailerSize];
 			trailer[0] = type.getType();
 			Crc32C chksum = new Crc32C();
 			chksum.update(blockContents.data(), blockContents.offset(), blockContents.size());
 			chksum.update(trailer, 0, 1);
 			long crc = chksum.getValue();
 			Coding.encodeFixedNat32Long(trailer, 1, 5, Crc32C.mask(crc));
-			r.status = r.file.append(SliceFactory.newUnpooled(trailer, 0, Format.kBlockTrailerSize));
+			r.status = r.file.append(SliceFactory.newUnpooled(trailer, 0, TableFormat.kBlockTrailerSize));
 			if (r.status.ok()) {
-				r.offset += blockContents.size() + Format.kBlockTrailerSize;
+				r.offset += blockContents.size() + TableFormat.kBlockTrailerSize;
 			}
 		}
 	}

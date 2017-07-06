@@ -76,6 +76,11 @@ public class LevelDB {
 				break;
 			}
 		}
-		return defaultEnv;
+		try {
+			return defaultEnv.getClass().newInstance();
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 }

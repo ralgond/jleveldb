@@ -21,9 +21,9 @@ import com.tchaicatkovsky.jleveldb.Options;
 import com.tchaicatkovsky.jleveldb.RandomAccessFile0;
 import com.tchaicatkovsky.jleveldb.ReadOptions;
 import com.tchaicatkovsky.jleveldb.Status;
-import com.tchaicatkovsky.jleveldb.table.Format.BlockContents;
-import com.tchaicatkovsky.jleveldb.table.Format.BlockHandle;
-import com.tchaicatkovsky.jleveldb.table.Format.Footer;
+import com.tchaicatkovsky.jleveldb.table.TableFormat.BlockContents;
+import com.tchaicatkovsky.jleveldb.table.TableFormat.BlockHandle;
+import com.tchaicatkovsky.jleveldb.table.TableFormat.Footer;
 import com.tchaicatkovsky.jleveldb.table.TwoLevelIterator.BlockFunction;
 import com.tchaicatkovsky.jleveldb.util.BytewiseComparatorImpl;
 import com.tchaicatkovsky.jleveldb.util.Cache;
@@ -103,7 +103,7 @@ public class Table {
 				if (cacheHandle != null) {
 					block = (Block) (blockCache.value(cacheHandle));
 				} else {
-					s = Format.readBlock(table.rep.file, options, handle, contents);
+					s = TableFormat.readBlock(table.rep.file, options, handle, contents);
 					if (s.ok()) {
 						block = new Block(contents);
 						if (contents.cachable && options.fillCache) {
@@ -113,7 +113,7 @@ public class Table {
 					}
 				}
 			} else {
-				s = Format.readBlock(table.rep.file, options, handle, contents);
+				s = TableFormat.readBlock(table.rep.file, options, handle, contents);
 				if (s.ok()) {
 					block = new Block(contents);
 				}
@@ -283,7 +283,7 @@ public class Table {
 		}
 		BlockContents contents = new BlockContents();
 
-		if (!Format.readBlock(rep.file, opt, footer.metaindexHandle(), contents).ok()) {
+		if (!TableFormat.readBlock(rep.file, opt, footer.metaindexHandle(), contents).ok()) {
 			// Do not propagate errors since meta info is not needed for operation
 			return;
 		}
@@ -315,7 +315,7 @@ public class Table {
 		}
 		BlockContents block = new BlockContents();
 
-		if (!Format.readBlock(rep.file, opt, filterHandle, block).ok()) {
+		if (!TableFormat.readBlock(rep.file, opt, filterHandle, block).ok()) {
 			return;
 		}
 		if (block.heapAllocated) {
@@ -349,7 +349,7 @@ public class Table {
 			if (options.paranoidChecks) {
 				opt.verifyChecksums = true;
 			}
-			s = Format.readBlock(file, opt, footer.indexHandle(), contents);
+			s = TableFormat.readBlock(file, opt, footer.indexHandle(), contents);
 			if (s.ok())
 				indexBlock = new Block(contents);
 		}

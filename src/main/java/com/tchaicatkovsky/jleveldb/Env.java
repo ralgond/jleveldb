@@ -16,6 +16,7 @@
  */
 package com.tchaicatkovsky.jleveldb;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
@@ -229,5 +230,11 @@ public interface Env {
 	 */
 	Status readFileToString(String fname, ByteBuf data);
 	
+	ArrayList<String> getUnclosedFileList();
 	
+	void printFileOpList();
+	
+	void clearFileOpList();
+	
+	Env clone();
 }

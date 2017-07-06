@@ -16,6 +16,7 @@
  */
 package com.tchaicatkovsky.jleveldb;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
@@ -37,6 +38,10 @@ public class EnvWrapper implements Env {
 
 	public Env target() {
 		return target;
+	}
+	
+	public void setTarget(Env target) {
+		this.target = target;
 	}
 
 	@Override
@@ -147,5 +152,25 @@ public class EnvWrapper implements Env {
 	@Override
 	public Status readFileToString(String fname, ByteBuf data) {
 		return target.readFileToString(fname, data);
+	}
+	
+	@Override
+	public ArrayList<String> getUnclosedFileList() {
+		return target.getUnclosedFileList();
+	}
+	
+	@Override
+	public void printFileOpList() {
+		target.printFileOpList();
+	}
+	
+	@Override
+	public void clearFileOpList() {
+		target.clearFileOpList();
+	}
+	
+	@Override
+	public Env clone() {
+		return new EnvWrapper(target.clone());
 	}
 }

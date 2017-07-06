@@ -210,7 +210,7 @@ public class Options {
 		ret.createIfMissing = createIfMissing;
 		ret.errorIfExists = errorIfExists;
 		ret.paranoidChecks = paranoidChecks;
-		ret.env = env;
+		ret.env = env.clone();
 		ret.infoLog = infoLog;
 
 		ret.writeBufferSize = writeBufferSize;

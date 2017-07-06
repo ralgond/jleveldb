@@ -50,7 +50,7 @@ import com.tchaicatkovsky.jleveldb.db.format.InternalKeyComparator;
 import com.tchaicatkovsky.jleveldb.db.format.LookupKey;
 import com.tchaicatkovsky.jleveldb.db.format.ParsedInternalKey;
 import com.tchaicatkovsky.jleveldb.db.format.ValueType;
-import com.tchaicatkovsky.jleveldb.table.Merger;
+import com.tchaicatkovsky.jleveldb.table.MergingIterator;
 import com.tchaicatkovsky.jleveldb.table.TableBuilder;
 import com.tchaicatkovsky.jleveldb.util.Boolean0;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
@@ -1593,7 +1593,7 @@ public class DBImpl implements DB {
 			immtable.ref();
 		}
 		versions.current().addIterators(options, list);
-		Iterator0 internalIter = Merger.newMergingIterator(internalComparator, list);
+		Iterator0 internalIter = MergingIterator.newMergingIterator(internalComparator, list);
 		versions.current().ref();
 
 		cleanup.mutex = mutex;

@@ -16,29 +16,60 @@
  */
 package com.tchaicatkovsky.jleveldb.util;
 
-public interface ByteBuf extends Slice {
+public interface ByteBuf {
+	
+	byte[] data();
+	
+	int offset();
+	
+	int endOffset();
+	
+	/**
+	 * @return
+	 */
+	int size();
 	
 	int capacity();
 	
-	
+	/**
+	 * call resize(bytes, (byte)0x00);
+	 * @param bytes
+	 */
 	void resize(int bytes);
 	
-	void resize(int bytes, byte value);
+	void resize(int bytes, byte initialValue);
 	
 	void require(int bytes);
 	
 	void swap(ByteBuf buf);
 	
+	/**
+	 * return data[offset+idx]
+	 * @param idx
+	 * @return
+	 */
 	byte getByte(int idx);
 	
+	/**
+	 * data[offset+idx] = b;
+	 * @param idx
+	 * @param b
+	 */
 	void setByte(int idx, byte b);
 	
 	ByteBuf clone();
+	
+	void clear();
+	
+	boolean empty();
 
+	String encodeToString();
 	
-	public String encodeToString();
+	long hashCode0();
 	
+	int compare(Slice slice);
 	
+	int compare(ByteBuf b);
 	
 	void assign(byte[] data, int size);
 	
@@ -48,13 +79,18 @@ public interface ByteBuf extends Slice {
 	
 	void assign(ByteBuf buf);
 	
+	void assign(Slice slice);
 
 	
 	void append(byte[] buf, int size);
 	
 	void append(byte[] buf, int offset, int size);
 	
+	void append(String s);
+	
 	void append(ByteBuf buf);
+	
+	void append(Slice slice);
 	
 	void addByte(byte b);
 	
@@ -94,34 +130,4 @@ public interface ByteBuf extends Slice {
 	 * @param value
 	 */
 	public void addLengthPrefixedSlice(Slice value);
-	
-	/**
-	 * read 32bit fixed natural number.
-	 * @return
-	 */
-	public int readFixedNat32();
-	
-	/**
-	 * read 64bit fixed natural number.
-	 * @return
-	 */
-	public long readFixedNat64();
-	
-	/**
-	 * read 32bit var natural number.
-	 * @return
-	 */
-	public int readVarNat32();
-	
-	/**
-	 * read 64bit var natural number.
-	 * @return
-	 */
-	public long readVarNat64();
-	
-	/**
-	 * read slice.
-	 * @param value
-	 */
-	public Slice readLengthPrefixedSlice();
 }

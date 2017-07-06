@@ -26,6 +26,8 @@ import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class WriteBatch {
 
+	public ByteBuf rep = ByteBufFactory.newUnpooled();
+	
 	public WriteBatch() {
 		clear();
 	}
@@ -112,6 +114,4 @@ public class WriteBatch {
 		    return Status.ok0();
 		}
 	}
-
-	public ByteBuf rep = ByteBufFactory.newUnpooled();
 }

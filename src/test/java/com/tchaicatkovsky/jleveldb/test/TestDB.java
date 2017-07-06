@@ -357,15 +357,16 @@ public class TestDB {
 			db = null;
 			
 			ArrayList<String> l = env.getUnclosedFileList();
-			
-			System.out.printf("Unclosed File List(%d) OptionConfig=%s:", 
-					l.size(), getOptionConfig(optionConfig));
-			
-			for (String filename : l)
-				System.out.println(filename);
-			if (l.size() > 0)
-				env.printFileOpList();
-			System.out.println("");
+			if (l.size() > 0) {
+				System.out.printf("Unclosed File List(%d) OptionConfig=%s:", 
+						l.size(), getOptionConfig(optionConfig));
+				
+				for (String filename : l)
+					System.out.println(filename);
+				if (l.size() > 0)
+					env.printFileOpList();
+				System.out.println("");
+			}
 			env.clearFileOpList();
 		}
 
@@ -2741,7 +2742,7 @@ public class TestDB {
 			public TreeMap<Slice, Slice> map;
 
 			public void put(Slice key, Slice value) {
-				map.put(key, value);
+				map.put(key.clone(), value.clone());
 			}
 
 			public void delete(Slice key) {
@@ -2766,7 +2767,9 @@ public class TestDB {
 		public Iterator0 newIterator(ReadOptions options) {
 			if (options.snapshot == null) {
 				TreeMap<Slice, Slice> saved = new TreeMap<>(kSliceComparator);
-				saved.putAll(map);
+				for (Map.Entry<Slice, Slice> e : map.entrySet()) {
+					saved.put(e.getKey().clone(), e.getValue().clone());
+				}
 				return new ModelIter(saved, true);
 			} else {
 				TreeMap<Slice, Slice> snapshotState = ((ModelSnapshot) (options.snapshot)).map;
@@ -2777,7 +2780,10 @@ public class TestDB {
 		@Override
 		public Snapshot getSnapshot() {
 			ModelSnapshot snapshot = new ModelSnapshot();
-			snapshot.map = map;
+			snapshot.map = new TreeMap<>(kSliceComparator);
+			for (Map.Entry<Slice, Slice> e : map.entrySet()) {
+				snapshot.map.put(e.getKey().clone(), e.getValue().clone());
+			}
 			return snapshot;
 		}
 
@@ -2824,7 +2830,6 @@ public class TestDB {
 
 		miter.seekToFirst();
 		dbiter.seekToFirst();
-		System.err.printf("miter.key=%s, dbiter.key=%s\n", Strings.escapeString(miter.key()), Strings.escapeString(dbiter.key()));
 
 		for (miter.seekToFirst(), dbiter.seekToFirst(); ok && miter.valid() && dbiter.valid(); miter.next(), dbiter.next()) {
 			count++;
@@ -2858,6 +2863,7 @@ public class TestDB {
 
 	
 	//TODO
+	@Test
 	public void testRandomized() throws Exception {
 		System.err.println("Start "+getMethodName()+":");
 		
@@ -2874,22 +2880,20 @@ public class TestDB {
 				ByteBuf v = null;
 
 				for (int step = 0; step < N; step++) {
-					if (step % 100 == 0) {
+					if ((step % 100) == 0)
 						System.err.printf("Step %d of %d\n", step, N);
-					}
-					// TODO(sanjay): Test Get() works
+					
+					// TODO: Test Get() works
 					long p = rnd.uniform(100);
-					if (p < 45) { // Put
+					if (p < 45) { // put
 						k = randomKey(rnd);
 						v = randomString(rnd, (int) (rnd.oneIn(20) ? 100 + rnd.uniform(100) : rnd.uniform(8)));
 						assertTrue(model.put( new WriteOptions(), S0(k), S0(v) ).ok());
-						assertTrue(r.db.put(new WriteOptions(), S0(k), S0(v) ).ok());
-
+						assertTrue(r.db.put( new WriteOptions(), S0(k), S0(v) ).ok());
 					} else if (p < 90) { // Delete
 						k = randomKey(rnd);
 						assertTrue(model.delete(new WriteOptions(), S0(k)).ok());
 						assertTrue(r.db.delete(new WriteOptions(), S0(k)).ok());
-
 					} else { // Multi-element batch
 						WriteBatch b = new WriteBatch();
 						final long num = rnd.uniform(8);

@@ -35,7 +35,7 @@ public class Hash {
 		
 		// Pick up four bytes at a time
 		while (offset + 4 <= limit) {
-		    long w = (Coding.decodeFixedNat32(data, offset) & kUint32Mask);
+		    long w = (Coding.decodeFixedNat32Long(data, offset) & kUint32Mask);
 		    offset += 4;
 		    h += w; h &= kUint32Mask;
 		    h *= m; h &= kUint32Mask;

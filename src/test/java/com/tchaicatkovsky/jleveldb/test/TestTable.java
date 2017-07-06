@@ -49,6 +49,11 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
 public class TestTable {
+	
+	static {
+		Logger0.disableLogger0();
+	}
+	
 	// Return reverse of "key".
 	// Used to test non-lexicographic comparators.
 	static Slice reverse(Slice key) {
@@ -963,6 +968,8 @@ public class TestTable {
 	
 	@Test
 	public void testEmpty() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 			h.init(kTestArgList[i]);
@@ -977,6 +984,8 @@ public class TestTable {
 	// seems to.
 	@Test
 	public void testZeroRestartPointsInBlock() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		byte[] data = new byte[4];
 		BlockContents contents = new BlockContents();
 		contents.data = SliceFactory.newUnpooled(data, 0, data.length);
@@ -1000,6 +1009,8 @@ public class TestTable {
 	
 	@Test
 	public void testSimpleEmptyKey() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
@@ -1013,6 +1024,8 @@ public class TestTable {
 	
 	@Test
 	public void testSimpleSingle() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
@@ -1026,6 +1039,8 @@ public class TestTable {
 	
 	@Test
 	public void testSimpleMulti() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
@@ -1041,6 +1056,8 @@ public class TestTable {
 	
 	@Test
 	public void testSimpleSpecialKey() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		byte[] b = new byte[] {(byte)0xff, (byte)0xff};
 		
 		Harness h = new Harness();
@@ -1055,6 +1072,8 @@ public class TestTable {
 	
 	@Test
 	public void testRandomized() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
@@ -1078,6 +1097,8 @@ public class TestTable {
 	
 	@Test
 	public void testRandomizedLongDB() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		Random0 rnd = new Random0(TestUtil.randomSeed());
 		TestArgs args = new TestArgs( TestType.DB_TEST, false, 16 );
 		Harness h = new Harness();
@@ -1105,6 +1126,8 @@ public class TestTable {
 	
 	@Test
 	public void testMemTableTestSimple() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		InternalKeyComparator cmp = new InternalKeyComparator(BytewiseComparatorImpl.getInstance());
 		MemTable memtable = new MemTable(cmp);
 		memtable.ref();
@@ -1140,6 +1163,8 @@ public class TestTable {
 	
 	@Test
 	public void testTableTestApproximateOffsetOfPlain() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		TableConstructor c = new TableConstructor(BytewiseComparatorImpl.getInstance());
 
 		c.add(str2ByteBuf("k01"), SliceFactory.newUnpooled("hello"));
@@ -1178,6 +1203,8 @@ public class TestTable {
 	
 	//TODO
 	public void testTableTestApproximateOffsetOfCompressed() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		if (!SnappyCompressionSupported()) {
 		    System.err.println("skipping compression tests");
 		    return;
@@ -1216,6 +1243,8 @@ public class TestTable {
 
 	@Test
 	public void testReverseKeyComparator() {
+		System.err.println("Start "+getMethodName()+":");
+		
 		TreeMap<ByteBuf,String> m = new TreeMap<ByteBuf,String>(new ByteBufComparator(new ReverseKeyComparator()));
 		m.put(ByteBufFactory.newUnpooled("abc"), "abc");
 		m.put(ByteBufFactory.newUnpooled("abcd"), "abcd");
@@ -1225,4 +1254,11 @@ public class TestTable {
 			System.out.println(Strings.escapeString(buf));
 		}
 	}
+	
+	private String getMethodName() {  
+        StackTraceElement[] stacktrace = Thread.currentThread().getStackTrace();  
+        StackTraceElement e = stacktrace[2];  
+        String methodName = e.getMethodName();  
+        return methodName;  
+    } 
 }

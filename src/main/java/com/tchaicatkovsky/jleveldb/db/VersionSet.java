@@ -76,7 +76,13 @@ public class VersionSet {
 	long prevLogNumber;  // 0 or backing store for memtable being compacted
 	
 	// Opened lazily
+	/**
+	 * MANIFEST file
+	 */
 	WritableFile descriptorFile;
+	/**
+	 * MANIFEST log writer
+	 */
 	LogWriter descriptorLog;
 	Version dummyVersions; // Head of circular doubly-linked list of versions.
 	Version current; // == dummyVersions.prev
@@ -280,13 +286,10 @@ public class VersionSet {
 		    	//dumpFileMetaDataList(level, baseFiles);
 		    	TreeSet<FileMetaData> added = levels[level].addedFiles;
 		    	
-		    	//v.files[level].reserve(base_files.size() + added->size());
-		    	
 		    	final int baseFilesSize = baseFiles.size();
 		    	int startIdx = 0;
 		    	for (FileMetaData fmd : added) {
 		    		// Add all smaller files listed in base
-		    		//int upperIdx = ListUtils.upperBound(baseFiles, fmd, cmp);
 		    		int endIdx = ListUtils.lowerBound(baseFiles, fmd, cmp);
 		    		
 		    		for (int i = startIdx; i < endIdx && i < baseFilesSize; i++)
@@ -365,8 +368,8 @@ public class VersionSet {
 		String newManifestFile = null;
 		Status s = Status.ok0();
 		if (descriptorLog == null) {
-			// No reason to unlock *mu here since we only hit this path in the
-			// first call to LogAndApply (when opening the database).
+			// No reason to unlock mu here since we only hit this path in the
+			// first call to logAndApply (when opening the database).
 			assert(descriptorFile == null);
 			newManifestFile = FileName.getDescriptorFileName(dbname, manifestFileNumber);
 			edit.setNextFile(nextFileNumber);
@@ -414,8 +417,8 @@ public class VersionSet {
 			v.delete();
 			v = null;
 			if (newManifestFile != null && !newManifestFile.isEmpty()) {
-				descriptorLog.delete(); //delete descriptor_log_;
-			   	descriptorFile.delete(); //delete descriptor_file_;
+				descriptorLog.delete();
+			   	descriptorFile.delete();
 			    descriptorLog = null;
 			    descriptorFile = null;
 			    env.deleteFile(newManifestFile);
@@ -679,7 +682,7 @@ public class VersionSet {
 		    assert(level+1 < DBFormat.kNumLevels);
 		    c = new Compaction(options, level);
 
-		    // Pick the first file that comes after compact_pointer_[level]
+		    // Pick the first file that comes after compactPointer[level]
 		    for (int i = 0; i < current.levelFiles(level).size(); i++) {
 		    	FileMetaData f = current.levelFiles(level).get(i);
 		    	if (compactPointer[level].empty() ||

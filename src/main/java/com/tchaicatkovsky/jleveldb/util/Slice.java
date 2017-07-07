@@ -43,7 +43,11 @@ public interface Slice {
 	
 	String encodeToString();
 	
-	int compare(Slice b);
+	String escapeString();
+	
+	int compare(Slice s);
+	
+	int compare(ByteBuf b);
 	
 	void removePrefix(int n);
 	

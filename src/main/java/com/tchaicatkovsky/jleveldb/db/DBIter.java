@@ -47,8 +47,14 @@ public class DBIter extends Iterator0 {
 	final long sequence;
 
 	Status status = Status.ok0();
-	ByteBuf savedKey = ByteBufFactory.newUnpooled();      // == current key when direction_== kReverse
-	ByteBuf savedValue = ByteBufFactory.newUnpooled();    // == current raw value when direction == kReverse
+	/**
+	 * == current key when direction_== kReverse
+	 */
+	ByteBuf savedKey = ByteBufFactory.newUnpooled();
+	/**
+	 * == current raw value when direction == kReverse
+	 */
+	ByteBuf savedValue = ByteBufFactory.newUnpooled();
 	Direction direction;
 	boolean valid;
 

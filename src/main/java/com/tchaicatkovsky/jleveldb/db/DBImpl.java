@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.tchaicatkovsky.jleveldb.DB;
@@ -64,7 +63,6 @@ import com.tchaicatkovsky.jleveldb.util.Mutex;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class DBImpl implements DB {
 
@@ -88,9 +86,15 @@ public class DBImpl implements DB {
 
 	Mutex mutex;
 	AtomicReference<Object> shuttingDown;
-	CondVar bgCv; // Signalled when background work finishes
+	/**
+	 * Signalled when background work finishes
+	 */
+	CondVar bgCv;
 	MemTable memtable = null;
-	MemTable immtable = null; // Memtable being compacted
+	/**
+	 * Memtable being compacted
+	 */
+	MemTable immtable = null;
 	AtomicReference<Object> hasImm = new AtomicReference<Object>(); // So bg thread can detect non-null imm
 	WritableFile logFile = null;
 	long logFileNumber = 0;
@@ -117,9 +121,18 @@ public class DBImpl implements DB {
 	class ManualCompaction {
 		public int level;
 		public boolean done;
-		public InternalKey begin; // null means beginning of key range
-		public InternalKey end; // NULL means end of key range
-		public InternalKey tmpStorage; // Used to keep track of compaction progress
+		/**
+		 * null means beginning of key range
+		 */
+		public InternalKey begin;
+		/**
+		 * null means end of key range
+		 */
+		public InternalKey end;
+		/**
+		 * Used to keep track of compaction progress
+		 */
+		public InternalKey tmpStorage = new InternalKey();
 	}
 
 	ManualCompaction manualCompaction;
@@ -279,7 +292,9 @@ public class DBImpl implements DB {
 
 		hasImm.set(null);
 
-		// Reserve ten files or so for other uses and give the rest to TableCache.
+		/**
+		 * Reserve ten files or so for other uses and give the rest to TableCache.
+		 */
 		int tableCacheSize = options.maxOpenFiles - kNumNonTableCacheFiles;
 
 		tableCache = new TableCache(dbname, options, tableCacheSize);
@@ -593,7 +608,7 @@ public class DBImpl implements DB {
 			LogWriter logWriter = new LogWriter(file.getValue());
 			ByteBuf record = ByteBufFactory.newUnpooled();
 			ndb.encodeTo(record);
-			s = logWriter.addRecord(SliceFactory.newUnpooled(record)); // TODO: new DefaultSlice(record) -> record
+			s = logWriter.addRecord(SliceFactory.newUnpooled(record));
 			if (s.ok()) {
 				s = file.getValue().close();
 			}
@@ -777,7 +792,6 @@ public class DBImpl implements DB {
 		}
 	}
 
-	AtomicLong memtableCompactIsn = new AtomicLong(1);
 
 	/**
 	 * Compact the in-memory write buffer to disk. Switches to a new
@@ -800,9 +814,8 @@ public class DBImpl implements DB {
 		base.unref();
 		base = null;
 
-		if (s.ok() && shuttingDown.get() != null) {
+		if (s.ok() && shuttingDown.get() != null)
 			s = new Status(Status.Code.IOError, "Deleting DB during memtable compaction");
-		}
 
 		// Replace immutable memtable with the generated Table
 		if (s.ok()) {
@@ -814,8 +827,8 @@ public class DBImpl implements DB {
 		if (s.ok()) {
 			// Commit to the new state
 			immtable.unref();
-			immtable = null; // imm_->Unref();
-			hasImm.set(null); // has_imm_.Release_Store(NULL);
+			immtable = null;
+			hasImm.set(null);
 			deleteObsoleteFiles();
 		} else {
 			recordBackgroundError(s);
@@ -1000,15 +1013,15 @@ public class DBImpl implements DB {
 
 		pendingOutputs.remove(meta.number);
 
-		// Note that if file_size is zero, the file has been deleted and
+		// Note that if fileSize is zero, the file has been deleted and
 		// should not be added to the manifest.
 		int level = 0;
 		if (s.ok() && meta.fileSize > 0) {
 			Slice minUserKey = meta.smallest.userKey();
 			Slice maxUserKey = meta.largest.userKey();
-			if (base != null) {
+			if (base != null)
 				level = base.pickLevelForMemTableOutput(minUserKey, maxUserKey);
-			}
+			
 			edit.addFile(level, meta.number, meta.fileSize, meta.smallest, meta.largest, meta.numEntries);
 		}
 
@@ -1083,7 +1096,7 @@ public class DBImpl implements DB {
 					logFileNumber = newLogNumber;
 					logWriter = new LogWriter(lfile.getValue());
 					immtable = memtable;
-					hasImm.set(immtable); // has_imm_.Release_Store(imm_);
+					hasImm.set(immtable);
 					memtable = new MemTable(internalComparator);
 					memtable.ref();
 					force = false; // Do not force another compaction if have room
@@ -1158,7 +1171,7 @@ public class DBImpl implements DB {
 		mutex.assertHeld();
 		if (bgCompactionScheduled) {
 			// Already scheduled
-		} else if (shuttingDown.get() != null) { // shutting_down_.Acquire_Load()
+		} else if (shuttingDown.get() != null) {
 			// DB is being deleted; no more background compactions
 		} else if (!bgError.ok()) {
 			// Already got an error; no more changes
@@ -1180,7 +1193,7 @@ public class DBImpl implements DB {
 		mutex.lock();
 		try {
 			assert (bgCompactionScheduled);
-			if (shuttingDown.get() != null) { // shutting_down_.Acquire_Load()
+			if (shuttingDown.get() != null) {
 				// No more background work when shutting down.
 			} else if (!bgError.ok()) {
 				// No more background work after a background error.
@@ -1216,7 +1229,7 @@ public class DBImpl implements DB {
 
 		Compaction c;
 		boolean isManual = (manualCompaction != null);
-		InternalKey manualEnd = null;
+		InternalKey manualEnd = new InternalKey();
 		if (isManual) {
 			ManualCompaction m = manualCompaction;
 			c = versions.compactRange(m.level, m.begin, m.end);
@@ -1519,15 +1532,14 @@ public class DBImpl implements DB {
 			input.next();
 		}
 
-		if (status.ok() && shuttingDown.get() != null) {
+		if (status.ok() && shuttingDown.get() != null)
 			status = new Status(Status.Code.IOError, "Deleting DB during compaction");
-		}
-		if (status.ok() && compact.builder != null) {
+
+		if (status.ok() && compact.builder != null)
 			status = finishCompactionOutputFile(compact, input);
-		}
-		if (status.ok()) {
+
+		if (status.ok())
 			status = input.status();
-		}
 
 		input.delete();
 		input = null;
@@ -1539,20 +1551,17 @@ public class DBImpl implements DB {
 				stat.bytesRead += compact.compaction.input(which, i).fileSize;
 			}
 		}
-		for (int i = 0; i < compact.outputs.size(); i++) {
+		for (int i = 0; i < compact.outputs.size(); i++)
 			stat.bytesWritten += compact.outputs.get(i).fileSize;
-		}
 
 		mutex.lock();
 		stats[compact.compaction.level() + 1].add(stat);
 
-		if (status.ok()) {
+		if (status.ok())
 			status = installCompactionResults(compact);
-		}
 
-		if (!status.ok()) {
+		if (!status.ok())
 			recordBackgroundError(status);
-		}
 
 		Logger0.log0(options.infoLog, "compacted to: {}", versions.levelSummary());
 		return status;
@@ -1571,9 +1580,8 @@ public class DBImpl implements DB {
 	public void recordReadSample(Slice key) {
 		mutex.lock();
 		try {
-			if (versions.current().recordReadSample(key)) {
+			if (versions.current().recordReadSample(key))
 				maybeScheduleCompaction();
-			}
 		} finally {
 			mutex.unlock();
 		}
@@ -1699,7 +1707,7 @@ public class DBImpl implements DB {
 				}
 			}
 
-			TEST_CompactMemTable(); // TODO(sanjay): Skip if memtable does not overlap
+			TEST_CompactMemTable(); // TODO: Skip if memtable does not overlap
 			for (int level = 0; level < maxLevelWithFiles; level++) {
 				TEST_CompactRange(level, begin, end);
 			}
@@ -1806,27 +1814,27 @@ public class DBImpl implements DB {
 
 	@Override
 	public String debugDataRange() {
-		String s = "";
+		StringBuilder s = new StringBuilder();
 
 		{
-			s += "Memtable: (";
+			s.append("Memtable: (");
 			Iterator0 memit = memtable.newIterator();
 
 			memit.seekToFirst();
 			if (!memit.valid()) {
-				s += "null";
+				s.append("null");
 			} else {
-				s += Strings.escapeString(memit.key());
+				s.append(memit.key().escapeString());
 			}
-			s += ", ";
+			s.append(", ");
 			memit.seekToLast();
 			if (!memit.valid()) {
-				s += "null";
+				s.append("null");
 			} else {
-				s += Strings.escapeString(memit.key());
+				s.append(memit.key().escapeString());
 			}
 
-			s += ")\n";
+			s.append(")\n");
 
 			memit.delete();
 			memit = null;
@@ -1834,24 +1842,24 @@ public class DBImpl implements DB {
 
 		{
 			if (immtable != null) {
-				s += "Immtable: (";
+				s.append("Immtable: (");
 				Iterator0 memit = immtable.newIterator();
 
 				memit.seekToFirst();
 				if (!memit.valid()) {
-					s += "null";
+					s.append("null");
 				} else {
-					s += Strings.escapeString(memit.key());
+					s.append(memit.key().escapeString());
 				}
-				s += ", ";
+				s.append(", ");
 				memit.seekToLast();
 				if (!memit.valid()) {
-					s += "null";
+					s.append("null");
 				} else {
-					s += Strings.escapeString(memit.key());
+					s.append(memit.key().escapeString());
 				}
 
-				s += ")\n";
+				s.append(")\n");
 
 				memit.delete();
 				memit = null;
@@ -1859,12 +1867,12 @@ public class DBImpl implements DB {
 		}
 
 		{
-			s += "Files: (\n";
-			s += versions.debugDataRange();
-			s += ")\n";
+			s.append("Files: (\n");
+			s.append(versions.debugDataRange());
+			s.append(")\n");
 		}
 
-		return s;
+		return s.toString();
 	}
 
 	public Iterator0 TEST_NewInternalIterator() {

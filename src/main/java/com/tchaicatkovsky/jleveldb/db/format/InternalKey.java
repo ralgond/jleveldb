@@ -20,7 +20,6 @@ import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 /**
  * Modules in this directory should keep internal keys wrapped inside
@@ -89,7 +88,7 @@ public class InternalKey {
 			result = parsed.debugString();
 		} else {
 		    result = "(bad)";
-		    result += Strings.escapeString(rep);
+		    result += rep.escapeString();
 		}
 		return result;
 	}

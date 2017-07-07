@@ -57,7 +57,7 @@ public class TestFilterBlock {
 		TestHashFilter policy = new TestHashFilter();
 		FilterBlockBuilder builder = new FilterBlockBuilder(policy);
 		Slice block = builder.finish();
-		assertEquals("\\x00\\x00\\x00\\x00\\x0b", Strings.escapeString(block));
+		assertEquals("\\x00\\x00\\x00\\x00\\x0b", block.escapeString());
 		FilterBlockReader reader = new FilterBlockReader(policy, block);
 		assertTrue(reader.keyMayMatch(0, SliceFactory.newUnpooled("foo")));
 		assertTrue(reader.keyMayMatch(100000, SliceFactory.newUnpooled("foo")));

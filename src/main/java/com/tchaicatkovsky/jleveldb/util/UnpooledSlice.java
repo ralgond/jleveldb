@@ -115,6 +115,11 @@ public class UnpooledSlice implements Slice {
 	}
 	
 	@Override
+	public String escapeString() {
+		return Strings.escapeString(this);
+	}
+	
+	@Override
 	public void clear() {
 		data = null;
 		offset = 0;
@@ -127,7 +132,12 @@ public class UnpooledSlice implements Slice {
 	}
 	
 	@Override
-	final public int compare(Slice b) {
+	final public int compare(Slice s) {
+		return ByteUtils.bytewiseCompare(data, offset, size(), s.data(), s.offset(), s.size());
+	}
+	
+	@Override
+	final public int compare(ByteBuf b) {
 		return ByteUtils.bytewiseCompare(data, offset, size(), b.data(), b.offset(), b.size());
 	}
 	

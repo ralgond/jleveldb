@@ -86,8 +86,7 @@ public class Table {
 		Cache.Handle cacheHandle = null;
 
 		BlockHandle handle = new BlockHandle();
-		Slice input = indexValue.clone();
-		Status s = handle.decodeFrom(input);
+		Status s = handle.decodeFrom(indexValue.clone());
 
 		// TODO(design) We intentionally allow extra stuff in indexValue so that
 		// we can add more features in the future.
@@ -246,10 +245,9 @@ public class Table {
 
 		iiter.seek(ikey);
 		if (iiter.valid()) {
-			Slice handleValue = iiter.value().clone();
 			FilterBlockReader filter = rep.filter;
 			BlockHandle handle = new BlockHandle();
-			if (filter != null && handle.decodeFrom(handleValue).ok() && 
+			if (filter != null && handle.decodeFrom(iiter.value().clone()).ok() && 
 					!filter.keyMayMatch(handle.offset(), ikey)) {
 				// Not found
 			} else {

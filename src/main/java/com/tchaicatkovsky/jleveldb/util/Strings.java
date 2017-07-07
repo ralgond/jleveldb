@@ -35,7 +35,7 @@ public class Strings {
 	}
 
 	public static String escapeString(ByteBuf buf) {
-		return escapeString(buf.data(), 0, buf.size());
+		return escapeString(buf.data(), buf.offset(), buf.size());
 	}
 
 	public static String escapeString(Slice slice) {

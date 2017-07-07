@@ -356,7 +356,7 @@ public class TestDB {
 			db.close();
 			db = null;
 			
-			ArrayList<String> l = env.getUnclosedFileList();
+			ArrayList<String> l = env.Test_getUnclosedFileList();
 			if (l.size() > 0) {
 				System.out.printf("Unclosed File List(%d) OptionConfig=%s:", 
 						l.size(), getOptionConfig(optionConfig));
@@ -364,10 +364,10 @@ public class TestDB {
 				for (String filename : l)
 					System.out.println(filename);
 				if (l.size() > 0)
-					env.printFileOpList();
+					env.Test_printFileOpList();
 				System.out.println("");
 			}
-			env.clearFileOpList();
+			env.Test_clearFileOpList();
 		}
 
 		public void destroyAndReopen(Options options) throws Exception {
@@ -445,7 +445,7 @@ public class TestDB {
 			} else if (!s.ok()) {
 				return "" + s;
 			}
-			return Strings.escapeString(result);
+			return result.escapeString();
 		}
 
 		public String get(Slice k, Snapshot snapshot) throws Exception {
@@ -471,7 +471,7 @@ public class TestDB {
 		String iterStatus(Iterator0 iter) {
 			String result = "";
 			if (iter.valid()) {
-				result = Strings.escapeString(iter.key()) + "->" + Strings.escapeString(iter.value());
+				result = iter.key().escapeString() + "->" + iter.value().escapeString();
 			} else {
 				result = "(invalid)";
 			}
@@ -530,7 +530,7 @@ public class TestDB {
 						first = false;
 						switch (ikey.type) {
 						case Value:
-							result.append(Strings.escapeString(iter.value()));
+							result.append(iter.value().escapeString());
 							break;
 						case Deletion:
 							result.append("DEL");
@@ -2834,14 +2834,16 @@ public class TestDB {
 		for (miter.seekToFirst(), dbiter.seekToFirst(); ok && miter.valid() && dbiter.valid(); miter.next(), dbiter.next()) {
 			count++;
 			if (miter.key().compare(dbiter.key()) != 0) {
-				System.err.printf("step %d: Key mismatch: '%s' vs. '%s'\n", step, Strings.escapeString(miter.key()), Strings.escapeString(dbiter.key()));
+				System.err.printf("step %d: Key mismatch: '%s' vs. '%s'\n", 
+						step, miter.key().escapeString(), dbiter.key().escapeString());
 				ok = false;
 				break;
 			}
 
 			if (miter.value().compare(dbiter.value()) != 0) {
-				System.err.printf("step %d: Value mismatch for key '%s': '%s' vs. '%s'\n", step, Strings.escapeString(miter.key()), Strings.escapeString(miter.value()),
-						Strings.escapeString(miter.value()));
+				System.err.printf("step %d: Value mismatch for key '%s': '%s' vs. '%s'\n", 
+						step, miter.key().escapeString(), miter.value().escapeString(),
+						miter.value().escapeString());
 				ok = false;
 			}
 		}

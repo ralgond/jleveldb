@@ -85,6 +85,11 @@ public class UnpooledByteBuf implements ByteBuf {
 		
 		return new String(data, offset, size());
 	}
+	
+	@Override
+	public String escapeString() {
+		return Strings.escapeString(this);
+	}
 
 	@Override
 	final public void clear() {

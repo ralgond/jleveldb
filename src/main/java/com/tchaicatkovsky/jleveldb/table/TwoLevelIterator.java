@@ -22,7 +22,6 @@ import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
 import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Slice;
-import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 
 public class TwoLevelIterator extends Iterator0 {
 	
@@ -56,9 +55,11 @@ public class TwoLevelIterator extends Iterator0 {
 	ReadOptions options;
 	Status status = Status.ok0();
 	Iterator0Wrapper indexIter = new Iterator0Wrapper();
-	Iterator0Wrapper dataIter = new Iterator0Wrapper(); // May be NULL
-	// If dataIter is non-null, then "dataBlockHandle" holds the
-	// "indexValue" passed to blockFunction to create the dataIter.
+	Iterator0Wrapper dataIter = new Iterator0Wrapper(); // May be null
+	/**
+	 * If dataIter is non-null, then "dataBlockHandle" holds the
+	 * "indexValue" passed to blockFunction to create the dataIter.
+	 */
 	ByteBuf dataBlockHandle = ByteBufFactory.newUnpooled();
 	
 	public TwoLevelIterator(Iterator0 indexIter0, BlockFunction blockFunction, Object arg, ReadOptions options) {
@@ -143,7 +144,6 @@ public class TwoLevelIterator extends Iterator0 {
 	}
 	
 	public Status status() {
-		// It'd be nice if status() returned a const Status& instead of a Status
 	    if (!indexIter.status().ok()) {
 	    	return indexIter.status();
 	    } else if (dataIter.iter() != null && !dataIter.status().ok()) {
@@ -197,7 +197,7 @@ public class TwoLevelIterator extends Iterator0 {
 			setDataIterator(null);
 		} else {
 			Slice handle = indexIter.value();
-			if (dataIter.iter() != null && handle.compare(SliceFactory.newUnpooled(dataBlockHandle)) == 0) {
+			if (dataIter.iter() != null && handle.compare(dataBlockHandle) == 0) {
 				// dataIter is already constructed with this iterator, so
 			    // no need to change anything
 			} else {

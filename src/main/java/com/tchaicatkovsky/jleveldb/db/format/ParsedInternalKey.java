@@ -19,7 +19,6 @@ package com.tchaicatkovsky.jleveldb.db.format;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class ParsedInternalKey {
 	public Slice userKey;
@@ -75,6 +74,6 @@ public class ParsedInternalKey {
 	}
 	
 	public String debugString() {
-		return Strings.escapeString(userKey) + String.format("' @ %d : %d", sequence, type.type);
+		return userKey.escapeString() + String.format("' @ %d : %d", sequence, type.type);
 	}
 };

@@ -724,11 +724,11 @@ public class TestTable {
 						iter0.seek(SliceFactory.newUnpooled(e.getKey()));
 						if (iter0.valid()) {
 							System.out.printf("[DEBUG] testForwardScan NOT-EQUALS, check, key0=%s, value0=%s\n", 
-								Strings.escapeString(e.getKey()), null);
+								e.getKey().escapeString(), null);
 						} else {
 							Slice value0 = iter0.value();
 							System.out.printf("[DEBUG] testForwardScan NOT-EQUALS, check, key0=%s, value0=%s\n", 
-									Strings.escapeString(e.getKey()), Strings.escapeString(value0));	
+									e.getKey().escapeString(), value0.escapeString());	
 						}
 						iter0.delete();
 						iter0 = null;
@@ -777,7 +777,7 @@ public class TestTable {
 		}
 		
 		static String toString(Map.Entry<ByteBuf, ByteBuf> e) {
-			return "'" + Strings.escapeString(e.getKey()) + "->" + Strings.escapeString(e.getValue())  + "'";
+			return "'" + e.getKey().escapeString() + "->" + e.getValue().escapeString()  + "'";
 		}
 		
 		static String toString(Iterator<Map.Entry<ByteBuf, ByteBuf>> it) {
@@ -786,7 +786,7 @@ public class TestTable {
 		    } else {
 		    	Map.Entry<ByteBuf, ByteBuf> e = it.next();
 		    	//return "'" + e.getKey().encodeToString() + "->" + e.getValue().encodeToString() + "'";
-		    	return "'" + Strings.escapeString(e.getKey()) + "->" + Strings.escapeString(e.getValue())  + "'";
+		    	return "'" + e.getKey().escapeString() + "->" + e.getValue().escapeString()  + "'";
 		    }
 		}
 		
@@ -796,7 +796,7 @@ public class TestTable {
 		    } else {
 		    	Map.Entry<ByteBuf, ByteBuf> e = l.get(pos);
 		    	//return "'" + e.getKey().encodeToString() + "->" + e.getValue().encodeToString() + "'";
-		    	return "'" + Strings.escapeString(e.getKey()) + "->" + Strings.escapeString(e.getValue())  + "'";
+		    	return "'" + e.getKey().escapeString() + "->" + e.getValue().escapeString()  + "'";
 		    }
 		}
 		
@@ -806,7 +806,7 @@ public class TestTable {
 				return "END";
 			} else {
 				//return "'" + it.key().encodeToString() + "->" + it.value().encodeToString() + "'";
-				return "'" + Strings.escapeString(it.key()) + "->" + Strings.escapeString(it.value()) + "'";
+				return "'" + it.key().escapeString() + "->" + it.value().escapeString() + "'";
 			}
 		}
 		
@@ -879,7 +879,7 @@ public class TestTable {
 						
 						if (kVerbose) {
 							System.err.printf("Seek '%s' , l.size=%d, lowerBound=%d\n", 
-									Strings.escapeString(key), entryList.size(), modelPos.getValue());
+									key.escapeString(), entryList.size(), modelPos.getValue());
 						}
 						
 						iter.seek(SliceFactory.newUnpooled(key));
@@ -1251,7 +1251,7 @@ public class TestTable {
 		m.put(ByteBufFactory.newUnpooled("ac"), "abcd");
 		
 		for (ByteBuf buf : m.keySet()) {
-			System.out.println(Strings.escapeString(buf));
+			System.out.println(buf.escapeString());
 		}
 	}
 	

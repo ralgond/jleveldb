@@ -17,7 +17,6 @@
 package com.tchaicatkovsky.jleveldb.table;
 
 import com.tchaicatkovsky.jleveldb.Iterator0;
-import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.Status;
 import com.tchaicatkovsky.jleveldb.table.TableFormat.BlockContents;
 import com.tchaicatkovsky.jleveldb.util.ByteBuf;
@@ -27,7 +26,6 @@ import com.tchaicatkovsky.jleveldb.util.Comparator0;
 import com.tchaicatkovsky.jleveldb.util.Integer0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class Block {
 	Slice data;
@@ -171,29 +169,6 @@ public class Block {
 		}
 		
 		public void seek(Slice target) {
-			if (Logger0.getDebug()) {
-				seekToFirst();
-				String s = "[";
-				if (valid())
-					s += Strings.escapeString(key());
-				else
-					s += "null";
-				
-				s += ", ";
-				
-				seekToLast();
-				if (valid())
-					s += Strings.escapeString(key());
-				else
-					s += "null";
-				s += "]";
-				
-				if (Logger0.getDebug())
-					Thread.dumpStack();
-				Logger0.debug("Block.Iter seek: target=%s, dataRange=%s\n", 
-						Strings.escapeString(target), s);
-			}
-			
 			// Binary search in restart array to find the last restart point
 		    // with a key < target
 			

@@ -65,6 +65,8 @@ public interface ByteBuf {
 
 	String encodeToString();
 	
+	String escapeString();
+	
 	long hashCode0();
 	
 	int compare(Slice slice);

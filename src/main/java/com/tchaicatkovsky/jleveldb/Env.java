@@ -230,11 +230,20 @@ public interface Env {
 	 */
 	Status readFileToString(String fname, ByteBuf data);
 	
-	ArrayList<String> getUnclosedFileList();
-	
-	void printFileOpList();
-	
-	void clearFileOpList();
-	
+	/**
+	 * Make a deeply copy of current env.
+	 * @return
+	 */
 	Env clone();
+	
+	/**
+	 * To detect file resource leaking, mainly used in test phase.
+	 * 
+	 * @return
+	 */
+	ArrayList<String> Test_getUnclosedFileList();
+	
+	void Test_printFileOpList();
+	
+	void Test_clearFileOpList();
 }

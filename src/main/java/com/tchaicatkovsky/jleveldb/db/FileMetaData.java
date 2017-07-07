@@ -20,11 +20,23 @@ import com.tchaicatkovsky.jleveldb.db.format.InternalKey;
 
 public class FileMetaData {
 	public int refs;
-	int allowedSeeks; // Seeks allowed until compaction
+	/**
+	 * Seeks allowed until compaction
+	 */
+	int allowedSeeks;
 	public long number;
-	public long fileSize;    // File size in bytes;
-	public InternalKey smallest = new InternalKey();       // Smallest internal key served by table
-	public InternalKey largest = new InternalKey();        // Largest internal key served by table
+	/**
+	 * File size in bytes;
+	 */
+	public long fileSize;
+	/**
+	 * Smallest internal key served by table
+	 */
+	public InternalKey smallest = new InternalKey();
+	/**
+	 * Largest internal key served by table
+	 */
+	public InternalKey largest = new InternalKey();
 	public int numEntries;
 	
 	public FileMetaData() {

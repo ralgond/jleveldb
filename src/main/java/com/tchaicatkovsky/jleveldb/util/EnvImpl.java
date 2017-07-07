@@ -147,17 +147,17 @@ public class EnvImpl implements Env {
 	FileOpRecord fileOpRecord = new FileOpRecord();
 	
 	@Override
-	public ArrayList<String> getUnclosedFileList() {
+	public ArrayList<String> Test_getUnclosedFileList() {
 		return fileOpRecord.getUnclosedFileList();
 	}
 	
 	@Override
-	public void printFileOpList() {
+	public void Test_printFileOpList() {
 		fileOpRecord.printFileOpList();
 	}
 	
 	@Override
-	public void clearFileOpList() {
+	public void Test_clearFileOpList() {
 		fileOpRecord.clearFileOpList();
 	}
 	

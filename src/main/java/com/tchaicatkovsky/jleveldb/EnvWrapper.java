@@ -155,18 +155,18 @@ public class EnvWrapper implements Env {
 	}
 	
 	@Override
-	public ArrayList<String> getUnclosedFileList() {
-		return target.getUnclosedFileList();
+	public ArrayList<String> Test_getUnclosedFileList() {
+		return target.Test_getUnclosedFileList();
 	}
 	
 	@Override
-	public void printFileOpList() {
-		target.printFileOpList();
+	public void Test_printFileOpList() {
+		target.Test_printFileOpList();
 	}
 	
 	@Override
-	public void clearFileOpList() {
-		target.clearFileOpList();
+	public void Test_clearFileOpList() {
+		target.Test_clearFileOpList();
 	}
 	
 	@Override

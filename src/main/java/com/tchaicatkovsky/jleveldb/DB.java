@@ -37,7 +37,7 @@ public interface DB {
 	 * @return OK on success else a non-OK status on error.
 	 * @throws Exception
 	 */
-	Status open(Options options, String name) throws Exception;
+	Status open(Options options, String name);
 
 	/**
 	 * Set the database entry for "key" to "value". Returns OK on success, and a non-OK status on error.</br>
@@ -51,7 +51,7 @@ public interface DB {
 	 * @return
 	 * @throws Exception
 	 */
-	Status put(WriteOptions options, Slice key, Slice value) throws Exception;
+	Status put(WriteOptions options, Slice key, Slice value);
 
 	/**
 	 * Remove the database entry (if any) for "key". Returns OK on success, and a non-OK status on error. It is not an error if "key" did not exist in the database.</br>
@@ -64,7 +64,7 @@ public interface DB {
 	 * @return
 	 * @throws Exception
 	 */
-	Status delete(WriteOptions options, Slice key) throws Exception;
+	Status delete(WriteOptions options, Slice key);
 
 	/**
 	 * Apply the specified updates to the database. Returns OK on success, non-OK on failure.</br>
@@ -77,7 +77,7 @@ public interface DB {
 	 * @return
 	 * @throws Exception
 	 */
-	Status write(WriteOptions options, WriteBatch updates) throws Exception;
+	Status write(WriteOptions options, WriteBatch updates);
 
 	/**
 	 * If the database contains an entry for "key" store the corresponding value in *value and return OK.</br>
@@ -95,7 +95,7 @@ public interface DB {
 	 * @return
 	 * @throws Exception
 	 */
-	Status get(ReadOptions options, Slice key, ByteBuf value) throws Exception;
+	Status get(ReadOptions options, Slice key, ByteBuf value);
 
 	/**
 	 * Return a heap-allocated iterator over the contents of the database. The result of NewIterator() is initially invalid (caller must call one of the Seek methods on the iterator before using
@@ -173,7 +173,10 @@ public interface DB {
 	 * @param end
 	 */
 	void compactRange(Slice begin, Slice end) throws Exception;
-
+	
+	/**
+	 * Release all resources.
+	 */
 	void close();
 
 	String debugDataRange();

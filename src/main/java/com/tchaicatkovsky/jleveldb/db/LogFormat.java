@@ -39,9 +39,9 @@ public class LogFormat {
 		}
 	}
 	
-	static final int kMaxRecordType = RecordType.LastType.getType();
+	public static final int kMaxRecordType = RecordType.LastType.getType();
 	
-	static final int kBlockSize = 32768;
+	public static final int kBlockSize = 32768;
 	
-	static final int kHeaderSize = 4 + 2 + 1;
+	public static final int kHeaderSize = 4 + 2 + 1;
 }

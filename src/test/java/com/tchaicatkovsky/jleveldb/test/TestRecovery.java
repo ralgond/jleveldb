@@ -7,6 +7,7 @@ import com.tchaicatkovsky.jleveldb.Env;
 import com.tchaicatkovsky.jleveldb.FileName;
 import com.tchaicatkovsky.jleveldb.FileType;
 import com.tchaicatkovsky.jleveldb.LevelDB;
+import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.Options;
 import com.tchaicatkovsky.jleveldb.ReadOptions;
 import com.tchaicatkovsky.jleveldb.Snapshot;
@@ -23,7 +24,7 @@ import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.TestUtil;
+import com.tchaicatkovsky.jleveldb.util.Utils;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -32,8 +33,12 @@ import static org.junit.Assert.assertEquals;
 import java.util.ArrayList;
 
 public class TestRecovery {
+	static {
+		Logger0.disableLogger0();
+	}
+	
 	static class RecoveryRunner {
-		String dbname = TestUtil.tmpDir() + "/recovery_test";
+		String dbname = Utils.tmpDir() + "/recovery_test";
 		Env env;
 		DB db;
 		

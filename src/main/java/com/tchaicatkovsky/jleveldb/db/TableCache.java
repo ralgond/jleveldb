@@ -48,7 +48,7 @@ public class TableCache {
 		}
 	};
 
-	static Cache.Deleter deleteEntryCallback = new Cache.Deleter() {
+	static Cache.Deleter deleteTableAndFile = new Cache.Deleter() {
 		public void run(Slice key, Object value) {
 			TableAndFile tf = (TableAndFile) value;
 			if (tf == null)
@@ -97,7 +97,7 @@ public class TableCache {
 
 	/**
 	 * Return an iterator for the specified file number (the corresponding file
-	 * length must be exactly "file_size" bytes). If "table0" is non-null, also
+	 * length must be exactly "fileSize" bytes). If "table0" is non-null, also
 	 * sets "table0" be the Table object underlying the returned
 	 * iterator, or null if no Table object underlies the returned iterator. The
 	 * returned "table0" object is owned by the cache and should not be deleted,
@@ -115,13 +115,16 @@ public class TableCache {
 
 		Object0<Cache.Handle> handle0 = new Object0<>();
 		Status s = findTable(fileNumber, fileSize, handle0);
+		
 		if (!s.ok())
 			return Iterator0.newErrorIterator(s);
-
+		
 		Cache.Handle handle = handle0.getValue();
 
 		Table table = ((TableAndFile) cache.value(handle)).table;
+				
 		Iterator0 result = table.newIterator(options);
+				
 		result.registerCleanup(new UnrefEntry(cache, handle));
 		if (table0 != null)
 			table0.setValue(table);
@@ -193,9 +196,8 @@ public class TableCache {
 			}
 
 			Object0<Table> table0 = new Object0<Table>();
-			if (s.ok()) {
+			if (s.ok())
 				s = Table.open(options, file0.getValue(), fileSize, table0);
-			}
 
 			if (!s.ok()) {
 				assert (table0.getValue() == null);
@@ -208,9 +210,8 @@ public class TableCache {
 				TableAndFile tf = new TableAndFile();
 				tf.file = file0.getValue();
 				tf.table = table0.getValue();
-				handle.setValue(cache.insert(key, tf, 1, deleteEntryCallback));
+				handle.setValue(cache.insert(key, tf, 1, deleteTableAndFile));
 			}
-
 		}
 		return s;
 	}

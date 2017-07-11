@@ -6,6 +6,7 @@ import com.tchaicatkovsky.jleveldb.CompressionType;
 import com.tchaicatkovsky.jleveldb.DB;
 import com.tchaicatkovsky.jleveldb.Iterator0;
 import com.tchaicatkovsky.jleveldb.LevelDB;
+import com.tchaicatkovsky.jleveldb.Logger0;
 import com.tchaicatkovsky.jleveldb.Options;
 import com.tchaicatkovsky.jleveldb.Range;
 import com.tchaicatkovsky.jleveldb.ReadOptions;
@@ -15,7 +16,7 @@ import com.tchaicatkovsky.jleveldb.util.Cache;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.TestUtil;
+import com.tchaicatkovsky.jleveldb.util.Utils;
 
 import static org.junit.Assert.assertTrue;
 
@@ -27,6 +28,10 @@ public class TestAutoCompact {
 	static  int kTotalSize = 100 * 1024 * 1024;
 	static  int kCount = kTotalSize / kValueSize;
 	
+	static {
+		Logger0.disableLogger0();
+	}
+	
 	static class AutoCompactRunner {
 		String dbname;
 		Cache tinyCache;
@@ -34,7 +39,7 @@ public class TestAutoCompact {
 		DB db;
 		
 		public AutoCompactRunner() throws Exception {
-			dbname = TestUtil.tmpDir() + "/autocompact_test";
+			dbname = Utils.tmpDir() + "/autocompact_test";
 		    tinyCache = Cache.newLRUCache(100);
 		    options.blockCache = tinyCache;
 		    LevelDB.destroyDB(dbname, options);
@@ -73,7 +78,7 @@ public class TestAutoCompact {
 		// Read through the first n keys repeatedly and check that they get
 		// compacted (verified by checking the size of the key space).
 		public void DoReads(int n) throws Exception {
-			String value = TestUtil.makeString(kValueSize, 'x');
+			String value = Utils.makeString(kValueSize, 'x');
 			DBImpl dbi = (DBImpl)(db);
 
 			// Fill database

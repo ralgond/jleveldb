@@ -488,16 +488,13 @@ public class EnvImpl implements Env {
 		public Status close() {
 			try {
 				mutex.lock();
-				if (fos != null) {
-					dos.flush();
-					fos.flush();
-					fos.close();
-					fos = null;
+				if (dos != null) {
 					dos.close();
+					fos = null;
 					dos = null;
 					
 					fileOpRecord.addFileOp(filename, FileOpType.Close);
-				}
+				} 
 				return Status.ok0();
 			} catch (IOException e) {
 				return Status.ioError(filename + " WritableFileImpl.closed failed: " + e.getMessage());
@@ -517,7 +514,8 @@ public class EnvImpl implements Env {
 
 		public Status sync() {
 			try {
-				fos.getFD().sync();
+				if (fos != null && fos.getFD() != null)
+					fos.getFD().sync();
 				return Status.ok0();
 			} catch (SyncFailedException e) {
 				return Status.ioError(filename + " WritableFileImpl.sync failed: " + e.getMessage());
@@ -590,6 +588,9 @@ public class EnvImpl implements Env {
 
 	@Override
 	public Status newWritableFile(String fname, Object0<WritableFile> result) {
+//		if (fname.contains("000012.ldb")) {
+//			Thread.dumpStack();
+//		}
 		WritableFileImpl f = new WritableFileImpl(fname, false); // FILE* f = fopen(fname.c_str(), "w");
 		Status s = f.open();
 		if (s.ok())
@@ -628,16 +629,21 @@ public class EnvImpl implements Env {
 
 	@Override
 	public Status deleteFile(String fname) {
-		// try {
-		// Files.delete(FileSystems.getDefault().getPath(fname));
-		// return Status.ok0();
-		// } catch (IOException e) {
-		// e.printStackTrace();
-		// return Status.ioError(fname+" deleteFile failed: "+e);
-		// }
-
-		(new File(fname)).delete();
-		return Status.ok0();
+		try {
+			if (!fileExists(fname))
+				return Status.ok0();
+			
+			Files.delete(FileSystems.getDefault().getPath(fname));
+			return Status.ok0();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return Status.ioError(fname + " deleteFile failed: " + e);
+		}
+		 
+//		boolean ret = (new File(fname)).delete();
+//		if (!ret)
+//			System.out.printf("[DEBUG] EnvImpl.deleteFile failed, fname=%s\n", fname);
+		//return Status.ok0();
 	}
 
 	@Override
@@ -831,26 +837,23 @@ public class EnvImpl implements Env {
 	}
 
 	Status doWriteStringToFile(Slice data, String fname, boolean shouldSync) {
-		if (fname.contains("MANIFEST"))
-			Thread.dumpStack();
-
 		Object0<WritableFile> file0 = new Object0<WritableFile>();
 		Status s = newWritableFile(fname, file0);
-		if (!s.ok()) {
+		if (!s.ok())
 			return s;
-		}
+		
 		WritableFile file = file0.getValue();
 		s = file.append(data);
-		if (s.ok() && shouldSync) {
+		if (s.ok() && shouldSync)
 			s = file.sync();
-		}
-		if (s.ok()) {
+		
+		if (s.ok())
 			s = file.close();
-		}
+		
 		file.delete(); // Will auto-close if we did not close above
-		if (!s.ok()) {
+		if (!s.ok())
 			deleteFile(fname);
-		}
+
 		return s;
 	}
 

@@ -67,7 +67,7 @@ public class VersionSet {
 	Env env;
 	String dbname;
 	Options options;
-	TableCache tableCache;
+	public TableCache tableCache;
 	InternalKeyComparator icmp;
 	long nextFileNumber;
 	long manifestFileNumber;
@@ -1125,15 +1125,11 @@ public class VersionSet {
 		  }
 
 		  ByteBuf record = ByteBufFactory.newUnpooled();
-		  record.require(1); //TODO
+		  record.require(1);
 		  edit.encodeTo(record);
-		  return log.addRecord(SliceFactory.newUnpooled(record)); //TODO: new DefaultSlice(record)->record
+		  return log.addRecord(SliceFactory.newUnpooled(record));
 	}
 
-	
-
-	
-	
 	public String debugDataRange() {
 		String s = "";
 		if (current == null)

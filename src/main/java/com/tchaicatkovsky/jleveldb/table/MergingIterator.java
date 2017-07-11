@@ -47,10 +47,12 @@ public class MergingIterator extends Iterator0 {
 	}
 
 	public void seekToFirst() {
-		for (int i = 0; i < n; i++)
+		for (int i = 0; i < n; i++) {
 			children[i].seekToFirst();
-
+		}
+		
 		findSmallest();
+		
 		direction = Direction.kForward;
 	}
 

@@ -14,6 +14,7 @@ import com.tchaicatkovsky.jleveldb.util.Long0;
 import com.tchaicatkovsky.jleveldb.util.Object0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
+import com.tchaicatkovsky.jleveldb.util.Utils;
 
 //import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -21,11 +22,11 @@ import static org.junit.Assert.assertTrue;
 public class TestEnvImpl {
 	@Test
 	public void testWritableFile() {
-		String dirname = "./data/test";
+		String dirname = "./data2/test";
 		EnvImpl env = new EnvImpl();
-		FileUtils.deletePath("./data");
+		FileUtils.deletePath("./data2");
 		
-		env.createDir("./data");
+		env.createDir("./data2");
 		Status s = env.createDir(dirname);
 		if (!s.ok()) {
 			System.out.println(s.message());
@@ -121,6 +122,26 @@ public class TestEnvImpl {
 			});
 			Thread.sleep(1000);
 		}
+	}
+	
+	@Test
+	public void test02() throws Exception {
+		EnvImpl env = new EnvImpl();
+		String newDir = Utils.tmpDir()+"/test_env";
+		env.createDir(newDir);
+		
+		Slice content = SliceFactory.newUnpooled(Utils.makeString(10000, 'a'));
+		
+		String newFile = newDir + "/test01";
+		
+		env.writeStringToFile(content, newFile);
+		
+		ByteBuf data = ByteBufFactory.newUnpooled();
+		
+		env.readFileToString(newFile, data);
+		
+		System.out.println(content.equals(SliceFactory.newUnpooled(data)));
+		
 		
 	}
 }

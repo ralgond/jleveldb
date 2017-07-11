@@ -1,6 +1,8 @@
 package com.tchaicatkovsky.jleveldb.util;
 
-public class TestUtil {
+import java.util.Map;
+
+public class Utils {
 	public static Slice randomString(Random0 rnd, int len, ByteBuf dst) {
 		dst.resize(len);
 		for (int i = 0; i < len; i++) {
@@ -48,7 +50,9 @@ public class TestUtil {
 	}
 	
 	public static int randomSeed() {
-		return 301;
+		Map<String, String> map = System.getenv();
+		String seed = map.get("TEST_RANDOM_SEED");
+		return (seed == null) ? 301 : Integer.parseInt(seed);
 	}
 	
 	public static String makeString(int n, char c) {

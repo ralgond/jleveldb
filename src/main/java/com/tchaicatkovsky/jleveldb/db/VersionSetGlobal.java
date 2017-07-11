@@ -96,7 +96,7 @@ public class VersionSetGlobal {
 		int right = files.size();
 
 		while (left < right) {
-			int mid = (left + right) / 2;
+			int mid = left + (right-left) / 2;
 			FileMetaData f = files.get(mid);
 			if (icmp.compare(f.largest.encode(), key) < 0) {
 				// Key at "mid.largest" is < "target".  Therefore all

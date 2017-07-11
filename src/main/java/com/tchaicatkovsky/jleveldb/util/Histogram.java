@@ -68,7 +68,7 @@ public class Histogram {
 
 			// Add hash marks based on percentage; 20 marks for 100%.
 			int marks = (int) (20 * (buckets[b] / num) + 0.5);
-			r.append(TestUtil.makeString(marks, '#'));
+			r.append(Utils.makeString(marks, '#'));
 			r.append('\n');
 		}
 		return r.toString();

@@ -42,8 +42,7 @@ import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
-import com.tchaicatkovsky.jleveldb.util.Strings;
-import com.tchaicatkovsky.jleveldb.util.TestUtil;
+import com.tchaicatkovsky.jleveldb.util.Utils;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -548,7 +547,7 @@ public class TestTable {
 		}
 
 		void newDB() {
-		    String name = TestUtil.tmpDir() + "/table_testdb";
+		    String name = Utils.tmpDir() + "/table_testdb";
 
 		    Status status = Status.ok0();
 		    
@@ -973,7 +972,7 @@ public class TestTable {
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 			h.init(kTestArgList[i]);
-			Random0 rnd = new Random0(TestUtil.randomSeed() + 1);
+			Random0 rnd = new Random0(Utils.randomSeed() + 1);
 			h.test(rnd);
 		}
 		h.delete();
@@ -1014,7 +1013,7 @@ public class TestTable {
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
-		    Random0 rnd = new Random0(TestUtil.randomSeed() + 1);
+		    Random0 rnd = new Random0(Utils.randomSeed() + 1);
 		   
 		    h.add(str2ByteBuf(""), SliceFactory.newUnpooled("v"));
 		    h.test(rnd);
@@ -1029,7 +1028,7 @@ public class TestTable {
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
-		    Random0 rnd = new Random0(TestUtil.randomSeed() + 2);
+		    Random0 rnd = new Random0(Utils.randomSeed() + 2);
 		    
 		    h.add(str2ByteBuf("abc"), SliceFactory.newUnpooled("v"));
 		    h.test(rnd);
@@ -1044,7 +1043,7 @@ public class TestTable {
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
-		    Random0 rnd = new Random0(TestUtil.randomSeed() + 3);
+		    Random0 rnd = new Random0(Utils.randomSeed() + 3);
 		    
 		    h.add(str2ByteBuf("abc"), SliceFactory.newUnpooled("v"));
 		    h.add(str2ByteBuf("abcd"), SliceFactory.newUnpooled("v"));
@@ -1063,7 +1062,7 @@ public class TestTable {
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
-		    Random0 rnd = new Random0(TestUtil.randomSeed() + 4);
+		    Random0 rnd = new Random0(Utils.randomSeed() + 4);
 		    h.add(ByteBufFactory.newUnpooled(b, b.length), SliceFactory.newUnpooled("v3"));
 		    h.test(rnd);
 		}
@@ -1077,7 +1076,7 @@ public class TestTable {
 		Harness h = new Harness();
 		for (int i = 0; i < kTestArgList.length; i++) {
 		    h.init(kTestArgList[i]);
-		    Random0 rnd = new Random0(TestUtil.randomSeed() + 5);
+		    Random0 rnd = new Random0(Utils.randomSeed() + 5);
 		    for (int num_entries = 0; num_entries < 2000;
 		         num_entries += (num_entries < 50 ? 1 : 200)) {
 		    	if ((num_entries % 10) == 0) {
@@ -1086,8 +1085,8 @@ public class TestTable {
 		    	}
 		    	for (int e = 0; e < num_entries; e++) {
 		    		ByteBuf v = ByteBufFactory.newUnpooled();
-		    		h.add(TestUtil.randomKey(rnd, (int)rnd.skewed(4)),
-		    				TestUtil.randomString(rnd, (int)rnd.skewed(5), v));
+		    		h.add(Utils.randomKey(rnd, (int)rnd.skewed(4)),
+		    				Utils.randomString(rnd, (int)rnd.skewed(5), v));
 		    	}
 		    	h.test(rnd);
 		    }
@@ -1099,15 +1098,15 @@ public class TestTable {
 	public void testRandomizedLongDB() {
 		System.err.println("Start "+getMethodName()+":");
 		
-		Random0 rnd = new Random0(TestUtil.randomSeed());
+		Random0 rnd = new Random0(Utils.randomSeed());
 		TestArgs args = new TestArgs( TestType.DB_TEST, false, 16 );
 		Harness h = new Harness();
 		h.init(args);
 		int num_entries = 100000;
 		for (int i = 0; i < num_entries; i++) {
 		    ByteBuf v = ByteBufFactory.newUnpooled();
-		    h.add(TestUtil.randomKey(rnd, (int)rnd.skewed(4)),
-		    		TestUtil.randomString(rnd, (int)rnd.skewed(5), v));
+		    h.add(Utils.randomKey(rnd, (int)rnd.skewed(4)),
+		    		Utils.randomString(rnd, (int)rnd.skewed(5), v));
 		}
 		h.test(rnd);
 		
@@ -1169,11 +1168,11 @@ public class TestTable {
 
 		c.add(str2ByteBuf("k01"), SliceFactory.newUnpooled("hello"));
 		c.add(str2ByteBuf("k02"), SliceFactory.newUnpooled("hello2"));
-		c.add(str2ByteBuf("k03"), SliceFactory.newUnpooled(TestUtil.makeString(10000, 'x')));
-		c.add(str2ByteBuf("k04"), SliceFactory.newUnpooled(TestUtil.makeString(200000, 'x')));
-		c.add(str2ByteBuf("k05"), SliceFactory.newUnpooled(TestUtil.makeString(300000, 'x')));
+		c.add(str2ByteBuf("k03"), SliceFactory.newUnpooled(Utils.makeString(10000, 'x')));
+		c.add(str2ByteBuf("k04"), SliceFactory.newUnpooled(Utils.makeString(200000, 'x')));
+		c.add(str2ByteBuf("k05"), SliceFactory.newUnpooled(Utils.makeString(300000, 'x')));
 		c.add(str2ByteBuf("k06"), SliceFactory.newUnpooled("hello3"));
-		c.add(str2ByteBuf("k07"), SliceFactory.newUnpooled(TestUtil.makeString(100000, 'x')));
+		c.add(str2ByteBuf("k07"), SliceFactory.newUnpooled(Utils.makeString(100000, 'x')));
 		
 		ArrayList<ByteBuf> keys = new ArrayList<>();
 		Object0<TreeMap<ByteBuf,ByteBuf>> kvmap0 = new Object0<>();
@@ -1214,9 +1213,9 @@ public class TestTable {
 		TableConstructor c = new TableConstructor(BytewiseComparatorImpl.getInstance());
 		ByteBuf tmp = ByteBufFactory.newUnpooled();
 		c.add(str2ByteBuf("k01"), SliceFactory.newUnpooled("hello"));
-		c.add(str2ByteBuf("k02"), TestUtil.compressibleString(rnd, 0.25, 10000, tmp));
+		c.add(str2ByteBuf("k02"), Utils.compressibleString(rnd, 0.25, 10000, tmp));
 		c.add(str2ByteBuf("k03"), SliceFactory.newUnpooled("hello3"));
-		c.add(str2ByteBuf("k04"), TestUtil.compressibleString(rnd, 0.25, 10000, tmp));
+		c.add(str2ByteBuf("k04"), Utils.compressibleString(rnd, 0.25, 10000, tmp));
 		  
 		ArrayList<ByteBuf> keys = new ArrayList<>();
 		Object0<TreeMap<ByteBuf,ByteBuf>> kvmap0 = new Object0<>();

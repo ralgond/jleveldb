@@ -33,11 +33,20 @@ public class Mutex {
 		lock.unlock();
 	}
 	
+	public void tryUnlock() {
+		if (lock.isHeldByCurrentThread())
+			lock.unlock();
+	}
+	
 	public void assertHeld() {
 		assert(lock.isHeldByCurrentThread());
 	}
 	
 	public CondVar newCondVar() {
 		return new CondVar(lock.newCondition());
+	}
+	
+	public boolean isHeldByCurrentThread() {
+		return lock.isHeldByCurrentThread();
 	}
 }

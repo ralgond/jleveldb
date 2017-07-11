@@ -12,7 +12,7 @@ import com.tchaicatkovsky.jleveldb.util.ByteBufFactory;
 import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.TestUtil;
+import com.tchaicatkovsky.jleveldb.util.Utils;
 
 public class TestCoding {
 
@@ -166,7 +166,7 @@ public class TestCoding {
 		s.addLengthPrefixedSlice(SliceFactory.newUnpooled(""));
 		s.addLengthPrefixedSlice(SliceFactory.newUnpooled("foo"));
 		s.addLengthPrefixedSlice(SliceFactory.newUnpooled("bar"));
-		s.addLengthPrefixedSlice(SliceFactory.newUnpooled(TestUtil.makeString(200, 'x')));
+		s.addLengthPrefixedSlice(SliceFactory.newUnpooled(Utils.makeString(200, 'x')));
 
 		Slice input = SliceFactory.newUnpooled(s);
 		Slice v = SliceFactory.newUnpooled();
@@ -177,7 +177,7 @@ public class TestCoding {
 		assertTrue(Coding.popLengthPrefixedSlice(input, v));
 		assertEquals("bar", v.encodeToString());
 		assertTrue(Coding.popLengthPrefixedSlice(input, v));
-		assertEquals(TestUtil.makeString(200, 'x'), v.encodeToString());
+		assertEquals(Utils.makeString(200, 'x'), v.encodeToString());
 		assertEquals("", input.encodeToString());
 	}
 }

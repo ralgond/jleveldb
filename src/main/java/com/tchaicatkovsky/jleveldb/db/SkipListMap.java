@@ -20,7 +20,9 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
+
+import com.tchaicatkovsky.jleveldb.util.Utils;
 
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
@@ -32,7 +34,7 @@ public class SkipListMap<K, V> {
 
 	//private static Logger logger = LoggerFactory.getLogger(SkipListMap.class);
 	
-	ThreadLocalRandom rnd = ThreadLocalRandom.current();
+	Random rnd = new Random(Utils.randomSeed());
 	Comparator<K> comp;
 	final int maxLevel;
 	final Node<K,V> head;

@@ -270,6 +270,9 @@ public class ShardedLRUCache extends Cache {
 					usage += charge;
 					finishErase(table.insert(e));
 				} // else don't cache.  (Tests use capacity_==0 to turn off caching.)
+//				else {
+//					deleter.run(key, value);
+//				}
 				
 				while (usage > capacity && lru.next != lru) {
 				    LRUHandle old = lru.next;

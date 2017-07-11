@@ -77,14 +77,7 @@ public class TableBuilder {
 		}
 
 		public void delete() {
-			if (file != null) {
-				file.delete();
-				file = null;
-			}
-			if (filterBlockBuilder != null) {
-				filterBlockBuilder.delete();
-				filterBlockBuilder = null;
-			}
+			
 		}
 	}
 

@@ -39,13 +39,13 @@ public class Builder {
 	 * @param dbname
 	 * @param env
 	 * @param options
-	 * @param tcache
+	 * @param tableCache
 	 * @param iter
 	 * @param meta
 	 * @return
 	 */
 	public static Status buildTable(String dbname, Env env, Options options, 
-			TableCache tcache, Iterator0 memiter, FileMetaData meta) {
+			TableCache tableCache, Iterator0 memiter, FileMetaData meta) {
 		
 		
 		Status s = Status.ok0();
@@ -96,7 +96,7 @@ public class Builder {
 			
 			if (s.ok()) {
 				// Verify that the table is usable
-				Iterator0 it = tcache.newIterator(new ReadOptions(), meta.number, meta.fileSize);
+				Iterator0 it = tableCache.newIterator(new ReadOptions(), meta.number, meta.fileSize);
 				s = it.status();
 				it.delete();
 			}

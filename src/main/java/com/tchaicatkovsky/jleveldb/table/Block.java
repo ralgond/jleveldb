@@ -62,9 +62,7 @@ public class Block {
 		if (size < 4) {
 		    return Iterator0.newErrorIterator(Status.corruption("bad block contents"));
 		}
-		
 		int numRestarts = numRestarts();
-		
 		if (numRestarts == 0) {
 			return Iterator0.newEmptyIterator();
 		} else {

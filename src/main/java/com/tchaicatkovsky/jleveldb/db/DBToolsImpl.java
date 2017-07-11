@@ -65,8 +65,7 @@ public class DBToolsImpl implements DBTools {
 
 	@Override
 	public Status repairDB(String dbname, Options options) throws Exception {
-		// TODO Auto-generated method stub
-		return null;
+		Repairer repairer = new Repairer(dbname, options);
+		return repairer.run();
 	}
-	
 }

@@ -16,7 +16,6 @@ import com.tchaicatkovsky.jleveldb.util.Coding;
 import com.tchaicatkovsky.jleveldb.util.Hash;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
-import com.tchaicatkovsky.jleveldb.util.Strings;
 
 public class TestFilterBlock {
 	// For testing: emit an array with one hash value per key

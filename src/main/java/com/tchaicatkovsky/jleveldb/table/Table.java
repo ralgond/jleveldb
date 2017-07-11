@@ -193,7 +193,9 @@ public class Table {
 	 * @return
 	 */
 	public Iterator0 newIterator(ReadOptions options) {
-		return TwoLevelIterator.newTwoLevelIterator(rep.indexBlock.newIterator(rep.options.comparator), blockReaderCallback, this, options);
+		Iterator0 idxIter = rep.indexBlock.newIterator(rep.options.comparator);
+		return TwoLevelIterator.newTwoLevelIterator(idxIter, 
+				blockReaderCallback, this, options);
 	}
 
 	/**

@@ -47,7 +47,7 @@ import com.tchaicatkovsky.jleveldb.util.Random0;
 import com.tchaicatkovsky.jleveldb.util.Slice;
 import com.tchaicatkovsky.jleveldb.util.SliceFactory;
 import com.tchaicatkovsky.jleveldb.util.Snappy;
-import com.tchaicatkovsky.jleveldb.util.TestUtil;
+import com.tchaicatkovsky.jleveldb.util.Utils;
 
 public class DBBench {
 
@@ -127,7 +127,7 @@ public class DBBench {
 			while (data.size() < 1048576) {
 				// Add a short fragment that is as compressible as specified
 				// by FLAGS_compression_ratio.
-				TestUtil.compressibleString(rnd, FLAGS_compression_ratio, 100, piece);
+				Utils.compressibleString(rnd, FLAGS_compression_ratio, 100, piece);
 				data.append(piece);
 			}
 			pos = 0;
@@ -768,7 +768,7 @@ public class DBBench {
 			// Checksum about 500MB of data total
 			int size = 4096;
 			String label = "(4K per op)";
-			String data0 = TestUtil.makeString(size, 'x');
+			String data0 = Utils.makeString(size, 'x');
 			byte[] data = data0.getBytes();
 			long bytes = 0;
 			long crc = 0;

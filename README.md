@@ -1,2 +1,2 @@
 # jleveldb
-Leveldb java edition
+A pure java edition of Leveldb

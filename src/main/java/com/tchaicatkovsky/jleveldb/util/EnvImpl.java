@@ -703,7 +703,7 @@ public class EnvImpl implements Env {
 	@Override
 	public Status lockFile(String fname, Object0<FileLock0> lock0) {
 		FileOutputStream os = null;
-		try {
+		try {	
 			os = new FileOutputStream(new File(fname));
 			FileChannel channel = os.getChannel();
 			FileLock lock = channel.tryLock();

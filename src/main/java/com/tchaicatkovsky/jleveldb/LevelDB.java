@@ -16,6 +16,7 @@
  */
 package com.tchaicatkovsky.jleveldb;
 
+import java.io.File;
 import java.util.ServiceLoader;
 
 import com.tchaicatkovsky.jleveldb.util.Object0;
@@ -26,7 +27,8 @@ public class LevelDB {
 	private static Env defaultEnv = null;
 	private static DB defaultDB = null;
 
-	public static Status newDB(Options options, String name, Object0<DB> dbOut) throws Exception {
+	public static Status newDB(Options options, String dbname, Object0<DB> dbOut) throws Exception {
+		(new File(dbname)).mkdirs();
 		if (defaultDB == null) {
 			ServiceLoader<DB> serviceLoader = ServiceLoader.load(DB.class);
 			for (DB db0 : serviceLoader) {
@@ -36,7 +38,7 @@ public class LevelDB {
 		}
 		dbOut.setValue(null);
 		DB newOne = defaultDB.getClass().newInstance();
-		Status s = newOne.open(options, name);
+		Status s = newOne.open(options, dbname);
 		if (s.ok())
 			dbOut.setValue(newOne);
 		else {

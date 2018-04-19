@@ -1,0 +1,7 @@
+JLevelDB
+Copyright 2017-2018 Teng Huang <ht201509 at 163 dot com>
+
+Some portions of code in this project are translated from LevelDB 
+Copyright (C) The Apache Software Foundation 
+https://github.com/google/leveldb 
+Licensed under BSD-3-Clause license.

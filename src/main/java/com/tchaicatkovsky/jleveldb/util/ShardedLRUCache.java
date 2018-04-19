@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017-2018, Teng Huang <ht201509 at 163 dot com>
+ * Copyright (c) 2017-2018 Teng Huang <ht201509 at 163 dot com>
  * All rights reserved.
  * 
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -17,31 +17,36 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
+ * This file is translated from source code file Copyright (c) 2011 
+ * The LevelDB Authors and licensed under the BSD-3-Clause license.
  */
 
 package com.tchaicatkovsky.jleveldb.util;
 
-//LRU cache implementation
-//
-//Cache entries have an "in_cache" boolean indicating whether the cache has a
-//reference on the entry.  The only ways that this can become false without the
-//entry being passed to its "deleter" are via Erase(), via Insert() when
-//an element with a duplicate key is inserted, or on destruction of the cache.
-//
-//The cache keeps two linked lists of items in the cache.  All items in the
-//cache are in one list or the other, and never both.  Items still referenced
-//by clients but erased from the cache are in neither list.  The lists are:
-//- in-use:  contains the items currently referenced by clients, in no
-//particular order.  (This list is used for invariant checking.  If we
-//removed the check, elements that would otherwise be on this list could be
-//left as disconnected singleton lists.)
-//- LRU:  contains the items not currently referenced by clients, in LRU order
-//Elements are moved between these lists by the Ref() and Unref() methods,
-//when they detect an element in the cache acquiring or losing its only
-//external reference.
-
-//An entry is a variable length heap-allocated structure.  Entries
-//are kept in a circular doubly linked list ordered by access time.
+/**
+ * LRU cache implementation
+ * 
+ * Cache entries have an "in_cache" boolean indicating whether the cache has a 
+ * reference on the entry.  The only ways that this can become false without the 
+ * entry being passed to its "deleter" are via Erase(), via Insert() when 
+ * an element with a duplicate key is inserted, or on destruction of the cache.</br></br>
+ * 
+ * The cache keeps two linked lists of items in the cache.  All items in the 
+ * cache are in one list or the other, and never both.  Items still referenced 
+ * by clients but erased from the cache are in neither list.  The lists are:</br>
+ * - in-use:  contains the items currently referenced by clients, in no 
+ * particular order.  (This list is used for invariant checking.  If we 
+ * removed the check, elements that would otherwise be on this list could be 
+ * left as disconnected singleton lists.)</br>
+ * - LRU:  contains the items not currently referenced by clients, in LRU order 
+ * Elements are moved between these lists by the Ref() and Unref() methods, 
+ * when they detect an element in the cache acquiring or losing its only 
+ * external reference.</br></br>
+ * 
+ * An entry is a variable length heap-allocated structure.  Entries 
+ * are kept in a circular doubly linked list ordered by access time. 
+ */
 public class ShardedLRUCache extends Cache {
 	
 	static class LRUHandle extends Cache.Handle{

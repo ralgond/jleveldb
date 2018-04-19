@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017-2018, Teng Huang <ht201509 at 163 dot com>
+ * Copyright (c) 2017-2018 Teng Huang <ht201509 at 163 dot com>
  * All rights reserved.
  * 
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -23,9 +23,6 @@ package com.tchaicatkovsky.jleveldb.util;
 
 import java.io.File;
 
-/**
- * @author Teng Huang ht201509@163.com
- */
 public class FileUtils {
 	 public static void deletePath(String path) {
 		 deletePath(new File(path));

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017-2018, Teng Huang <ht201509 at 163 dot com>
+ * Copyright (c) 2017-2018 Teng Huang <ht201509 at 163 dot com>
  * All rights reserved.
  * 
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -21,8 +21,8 @@
 
 package com.tchaicatkovsky.jleveldb.util;
 
+@SuppressWarnings("serial")
 public class DecodeException extends CodingException {
-	private static final long serialVersionUID = -763618247875562001L;
 	
 	public DecodeException() {
 		super();

@@ -17,6 +17,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
+ * This file is translated from source code file Copyright (c) 2011 The 
+ * LevelDB Authors and licensed under the BSD-3-Clause license.
  */
 
 package com.tchaicatkovsky.jleveldb;
